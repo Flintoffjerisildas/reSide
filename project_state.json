@@ -1,0 +1,353 @@
+{
+  "schemaVersion": "1.0.0",
+  "projectStateVersion": 3,
+  "summary": "PropAssist (PropAssist AI) is a bilingual (English/Tamil) real-estate assistant built as a React SPA that integrates Internet Identity authentication and an Internet Computer (Motoko) backend canister. The app supports user registration (profile creation), an admin-driven approval workflow, property listing submission with image uploads and mandatory geo-located camera capture, public browsing of approved property listings, and a floating in-app assistant chat widget (with voice input/output) that can help customers search properties and help owners/brokers initiate adding a property. A SuperAdmin dashboard provides admin analytics and user approval controls, with a development-only dashboard bypass mode.",
+  "existing_features": [
+    {
+      "id": "IF-1",
+      "title": "Internet Identity authentication",
+      "synonyms": [
+        "II login",
+        "AuthClient integration",
+        "InternetIdentityProvider"
+      ],
+      "description": "Provides login/logout and identity rehydration using @dfinity/auth-client, exposing identity and detailed login status flags via a React context hook (useInternetIdentity).",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-2",
+      "title": "Identity-bound backend actor creation and query invalidation",
+      "synonyms": [
+        "useActor",
+        "ICP actor per identity",
+        "agent identity injection"
+      ],
+      "description": "Creates a canister actor configured with the current identity (or anonymous when logged out) and invalidates/refetches non-actor React Query caches when the actor changes.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-3",
+      "title": "Secret token extraction from URL hash with session persistence",
+      "synonyms": [
+        "caffeineAdminToken",
+        "getSecretParameter",
+        "hash secret clearing"
+      ],
+      "description": "Reads sensitive parameters from the URL hash fragment, persists them in sessionStorage, and clears them from the URL to reduce leakage (used for bootstrap/admin token flows).",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-4",
+      "title": "Motoko role-based access control with bootstrap initialization",
+      "synonyms": [
+        "AccessControl",
+        "MixinAuthorization",
+        "isCallerAdmin"
+      ],
+      "description": "Implements user roles (admin/user/guest) in Motoko, initializes a caller's role via a secret token comparison, and exposes admin checks and role operations through an authorization mixin.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-5",
+      "title": "Backend SuperAdmin override configuration",
+      "synonyms": [
+        "SUPERADMIN_PRINCIPAL allowlist",
+        "admin-or-superadmin checks"
+      ],
+      "description": "Backend includes a configured SuperAdmin principal and helper checks (isSuperAdmin / isCallerAdminOrSuperAdmin) used to authorize admin-gated operations and auto-approve SuperAdmin actions.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-6",
+      "title": "User profile APIs and storage",
+      "synonyms": [
+        "UserProfile",
+        "getCallerUserProfile",
+        "saveCallerUserProfile",
+        "getAllUsers"
+      ],
+      "description": "Stores user profiles keyed by principal and exposes APIs to fetch the caller profile, fetch an arbitrary profile with authorization constraints, update the caller profile, and list all users for admins.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-7",
+      "title": "User registration flow (frontend UI + backend call)",
+      "synonyms": [
+        "registerUser",
+        "ProfileSetupDialog",
+        "AuthDialog"
+      ],
+      "description": "Frontend provides registration dialogs to collect name/email/role and calls the backend registerUser mutation; successful registration triggers React Query cache invalidations and refetches.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-8",
+      "title": "User approval workflow (admin moderation)",
+      "synonyms": [
+        "isCallerApproved",
+        "listApprovals",
+        "setApproval",
+        "PendingApprovalScreen"
+      ],
+      "description": "Backend tracks per-principal approval state (pending/approved/rejected) with APIs to request approval and for admins to list and set approvals; frontend gates features on approval and renders a pending approval screen.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-9",
+      "title": "Property storage and public listings",
+      "synonyms": [
+        "getAllProperties",
+        "PropertyListings",
+        "approved-only listings"
+      ],
+      "description": "Backend stores properties (with status, owner, pricing, images, and geolocation metadata) and exposes a query to list approved properties; frontend renders a responsive landing page with a listings grid and loading/empty states.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-10",
+      "title": "Property submission with images and mandatory geo-located capture",
+      "synonyms": [
+        "PropertyForm",
+        "ImageUploadSection",
+        "GeoLocatedImageCapture"
+      ],
+      "description": "Modal form for adding a property via backend mutation, including up to 20 uploaded images (with validation and preview/progress) and a required front-view camera capture paired with GPS coordinates.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-11",
+      "title": "Reusable camera hook for photo capture",
+      "synonyms": [
+        "useCamera",
+        "getUserMedia wrapper"
+      ],
+      "description": "Encapsulates camera lifecycle (start/stop/switch/retry) and photo capture using a video+canvas pipeline with configurable resolution, format, and quality.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-12",
+      "title": "Protected property image retrieval APIs",
+      "synonyms": [
+        "getPropertyImages",
+        "getPropertyGeoLocatedImage"
+      ],
+      "description": "Backend conditionally allows property image access: approved properties are public; non-approved property images are accessible only to the owner or an admin/superadmin caller.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-13",
+      "title": "Floating AI assistant chat widget with gating",
+      "synonyms": [
+        "FloatingChat",
+        "chat launcher button",
+        "minimize/close"
+      ],
+      "description": "Floating chat UI that can open/minimize/close and gates access to the chat interface based on authentication, profile presence, and approval status.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-14",
+      "title": "Heuristic AI chat with property search and listing prompts",
+      "synonyms": [
+        "AIContext",
+        "criteria extraction",
+        "local chat state"
+      ],
+      "description": "Frontend-only assistant that keeps conversation state in memory, greets users based on role, extracts simple search criteria from messages, filters properties, and prompts owners/brokers to open the property form.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-15",
+      "title": "Voice input and voice output for chat",
+      "synonyms": [
+        "SpeechRecognition",
+        "webkitSpeechRecognition",
+        "SpeechSynthesis"
+      ],
+      "description": "Implements voice-to-text in the input area via Web Speech recognition (language-aware) and assistant text-to-speech responses via SpeechSynthesisUtterance.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-16",
+      "title": "SuperAdmin dashboard (analytics + approval tooling)",
+      "synonyms": [
+        "SuperAdminDashboard",
+        "admin moderation UI",
+        "Recharts charts"
+      ],
+      "description": "Admin dashboard with tabs (overview/users/properties), user/approval stats, charts (pie/bar), and actions to approve/reject users; includes non-blocking error alerts when admin data cannot be loaded.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-17",
+      "title": "Reliable admin gating based on backend isCallerAdmin with dev bypass",
+      "synonyms": [
+        "admin visibility source of truth",
+        "backend admin-role check",
+        "admin bypass mode"
+      ],
+      "description": "Frontend determines SuperAdmin dashboard visibility using the backend isCallerAdmin query as the primary source of truth, while supporting a sessionStorage-based development-only bypass mode.",
+      "reqIds": [
+        "REQ-3"
+      ],
+      "version": 1
+    },
+    {
+      "id": "IF-18",
+      "title": "Admin dashboard bypass state persisted in sessionStorage",
+      "synonyms": [
+        "useAdminDashboardBypass",
+        "dev admin mode"
+      ],
+      "description": "Provides a hook to activate/deactivate an 'admin mode' bypass flag persisted in sessionStorage and surfaced in the header and app routing decisions.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-19",
+      "title": "Admin login page UI placeholder",
+      "synonyms": [
+        "AdminLoginPage",
+        "username/password stub"
+      ],
+      "description": "Renders a bilingual admin login form with validation and password visibility toggle, but explicitly informs users that username/password authentication is not implemented yet.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-20",
+      "title": "Bilingual (English/Tamil) UI framework with persistence",
+      "synonyms": [
+        "LanguageContext",
+        "t(en, ta) helper",
+        "localStorage language preference"
+      ],
+      "description": "Provides a language context and translation helper used across the UI; language selection is persisted in localStorage.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-21",
+      "title": "Light/dark theme switching",
+      "synonyms": [
+        "ThemeProvider",
+        "next-themes"
+      ],
+      "description": "Supports system/light/dark themes using next-themes, with Tailwind configured against CSS variable tokens.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-22",
+      "title": "Property UI components (full + compact cards)",
+      "synonyms": [
+        "PropertyCard",
+        "INR price formatting",
+        "rent/purchase badges"
+      ],
+      "description": "Reusable responsive property card UI showing icon-by-type, location, formatted INR price (including Lakh/Crore abbreviations), and transaction-type badges; supports compact mode for chat results.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-23",
+      "title": "Blob storage maintenance endpoints (ICP tooling)",
+      "synonyms": [
+        "MixinStorage",
+        "dead blob pruning",
+        "cashier refill"
+      ],
+      "description": "Backend exposes blob-storage helper endpoints for gateway principal refresh, dead-blob enumeration and pruning (authorized principals), and cycle top-up to a cashier canister (cashier-only).",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-24",
+      "title": "Resilient admin status query with caching and non-blocking errors",
+      "synonyms": [
+        "useIsCallerAdmin",
+        "staleTime caching",
+        "safe fallback false"
+      ],
+      "description": "Frontend admin check uses React Query with a 30s cache and returns false on errors (rather than blocking the UI) to avoid excessive checks and improve resilience.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "feature-add-a-local-development-guide-in-english-that-explains-exactly-how-to-run-the-app-locally-and-how-to-keep-all-dependency-artifacts-stored-within-the-project-folder-frontend-dependencies-and-local-replica-canister-artifacts-including-copy-paste-commands",
+      "title": "Add a local development guide (in English) that explains exactly how to run the app locally and how to keep all dependency artifacts stored within the project folder (frontend dependencies and local replica/canister artifacts), including copy-paste commands.",
+      "reqIds": [
+        "REQ-4"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-ensure-frontend-package-management-can-be-configured-to-store-its-package-cache-store-within-the-project-directory-not-in-a-global-user-level-location-and-provide-repo-checked-in-configuration-to-enable-it",
+      "title": "Ensure frontend package management can be configured to store its package cache/store within the project directory (not in a global user-level location) and provide repo-checked-in configuration to enable it.",
+      "reqIds": [
+        "REQ-5"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-a-single-command-script-in-the-repository-that-verifies-a-machine-has-all-required-local-dependencies-and-that-project-local-dependency-directories-are-present-or-prints-clear-instructions-to-generate-them",
+      "title": "Add a single command/script in the repository that verifies a machine has all required local dependencies and that project-local dependency directories are present (or prints clear instructions to generate them).",
+      "reqIds": [
+        "REQ-6"
+      ],
+      "version": 1
+    }
+  ],
+  "new_feature_requests": [
+    {
+      "id": "AR-1",
+      "summary": "Provide guidance/configuration to ensure all required dependency files are present in the project folder for local running (dfx/IC + frontend deps, lockfiles, and any required config/env templates).",
+      "reqIds": [],
+      "status": "pending"
+    }
+  ],
+  "architectural_notes": [
+    "Frontend is a React SPA using Tailwind CSS and shadcn/ui components, with next-themes for light/dark theming and lucide-react icons.",
+    "Backend is a Motoko canister using mixin composition (authorization mixin + blob-storage mixin) and in-canister maps for properties, profiles, and approval state.",
+    "Authentication uses DFINITY Internet Identity via AuthClient; identity is stored/rehydrated on page load through a React context provider.",
+    "ICP canister calls are encapsulated as @tanstack/react-query hooks (queries/mutations) with cache invalidation on mutation success.",
+    "An identity-bound backend actor is created via a React Query hook; dependent queries are invalidated/refetched when the actor changes.",
+    "Authorization is role-based (AccessControl: admin/user/guest) with an initialization step tied to a bootstrap token (CAFFEINE_ADMIN_TOKEN) and optional secret passed from the frontend.",
+    "SuperAdmin UX is driven by a backend admin check (isCallerAdmin) plus a dev-only frontend bypass flag stored in sessionStorage.",
+    "UI access gating is layered: authenticated identity → user profile existence → approval status, with SuperAdmin/bypass skipping gates.",
+    "The AI assistant is heuristic and frontend-local (no LLM): it parses user messages for simple criteria and filters properties; it uses Web Speech APIs for voice input/output."
+  ],
+  "known_issues": [
+    "Backend registration likely traps: registerUser() calls AccessControl.assignRole(...), but assignRole is admin-only; non-admin callers cannot self-assign #user under the current AccessControl implementation.",
+    "Backend profile reads for new users can trap: AccessControl.getUserRole() traps when a principal has no role entry; getCallerUserProfile() checks permissions via hasPermission(), which calls getUserRole(). (Frontend catches and returns null.)",
+    "Actor initialization can trap if the CAFFEINE_ADMIN_TOKEN environment variable is not set (MixinAuthorization._initializeAccessControlWithSecret traps when env var missing).",
+    "SuperAdmin principal is hard-coded in backend/main.mo (SUPERADMIN_PRINCIPAL) and currently set to the anonymous principal (\"2vxsx-fae\"), which likely makes the SuperAdmin override ineffective.",
+    "Property moderation is incomplete: backend getAllProperties() returns only approved properties, so the dashboard's 'pending property approvals' view cannot be accurate/functional.",
+    "Blob-storage gateway principal refresh has no caller authorization (_caffeineStorageUpdateGatewayPrincipals), allowing any caller to refresh the allowlist state.",
+    "Storage.refillCashier computes Nat.sub(currentBalance, reservedCycles) which can underflow/trap when balance < reservedCycles.",
+    "Frontend ImageUploadSection ties previews/progress to Object.keys(previewUrls)[index]; removing/reordering images can desynchronize previews/progress from the images array.",
+    "GeoLocatedImageCapture.handleRetake() calls onCapture(null as any, null as any), violating the non-null callback contract and risking runtime issues downstream.",
+    "Bigint/int monetary values are frequently coerced to Number(...) for display/filtering (PropertyCard, AI search, dashboard), risking precision loss for large values."
+  ],
+  "isFixRequest": false,
+  "gameProjectType": "none",
+  "projectName": "PropAssist",
+  "clarification_mode": "instant",
+  "clarification_rounds": 0
+}

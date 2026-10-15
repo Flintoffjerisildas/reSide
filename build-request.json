@@ -1,0 +1,76 @@
+{
+  "kind": "build_request",
+  "title": "Make local-run dependencies self-contained inside the project folder",
+  "priority": "normal",
+  "requirements": [
+    {
+      "id": "REQ-4",
+      "text": "Add a local development guide (in English) that explains exactly how to run the app locally and how to keep all dependency artifacts stored within the project folder (frontend dependencies and local replica/canister artifacts), including copy-paste commands.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-1"
+        ],
+        "quotes": [
+          "makesure i get all dependency files inside my project folder"
+        ]
+      },
+      "acceptanceCriteria": [
+        "A new documentation file exists in the repo (e.g., LOCAL_DEV.md or README-local.md) written in English.",
+        "The guide includes steps to: install DFX, start the local replica, deploy canisters, install frontend deps, and run the frontend dev server.",
+        "The guide explicitly explains where dependency/artifact files will be created on disk (e.g., node_modules, pnpm store, .dfx) and how to configure them so they live under the project directory.",
+        "The guide includes a troubleshooting section for common local issues (missing DFX, missing Node/pnpm, canister deploy failures)."
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "text": "Ensure frontend package management can be configured to store its package cache/store within the project directory (not in a global user-level location) and provide repo-checked-in configuration to enable it.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-1"
+        ],
+        "quotes": [
+          "makesure i get all dependency files inside my project folder"
+        ]
+      },
+      "acceptanceCriteria": [
+        "A repo-checked-in configuration file is added/updated to force the package manager store to be located in a project-local directory (e.g., a .pnpm-store folder under the repo).",
+        "The local dev guide documents the exact commands to install using that project-local store.",
+        "After running the documented install steps, the dependency store/cache directory is created inside the project folder (not only in a global home directory)."
+      ]
+    },
+    {
+      "id": "REQ-6",
+      "text": "Add a single command/script in the repository that verifies a machine has all required local dependencies and that project-local dependency directories are present (or prints clear instructions to generate them).",
+      "target": "both",
+      "source": {
+        "messageIds": [
+          "msg-1"
+        ],
+        "quotes": [
+          "makesure i get all dependency files inside my project folder"
+        ]
+      },
+      "acceptanceCriteria": [
+        "A new script is added under a scripts/ (or equivalent) directory that can be run from the repo root.",
+        "The script checks for: dfx availability, Node availability, package manager availability, and existence of required project-local directories once initialized (e.g., .dfx and the frontend dependency directories).",
+        "If something is missing, the script exits non-zero and prints actionable English instructions to fix it.",
+        "If everything is present, the script exits zero and prints a short success summary."
+      ]
+    }
+  ],
+  "constraints": [
+    "Do not modify files under frontend/src/components/ui or other frontend immutable paths listed in SYSTEM_CONTEXT.",
+    "Keep the backend as a single Motoko actor in backend/main.mo; do not introduce additional backend services."
+  ],
+  "nonGoals": [
+    "Committing node_modules or the package manager store to version control.",
+    "Adding Docker-based workflows or cloud-based dev environments.",
+    "Changing application features unrelated to local setup/dependency handling."
+  ],
+  "imageRequirements": {
+    "required": [],
+    "edits": []
+  }
+}
