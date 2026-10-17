@@ -1,0 +1,129 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        --radius: 0.75rem;
+        
+        /* Real estate themed colors - Light mode */
+        --background: 0.98 0 0;
+        --foreground: 0.15 0 0;
+        
+        --card: 1 0 0;
+        --card-foreground: 0.15 0 0;
+        
+        --popover: 1 0 0;
+        --popover-foreground: 0.15 0 0;
+        
+        /* Primary: Deep blue for trust and professionalism */
+        --primary: 0.45 0.15 250;
+        --primary-foreground: 0.98 0 0;
+        
+        /* Secondary: Warm gray */
+        --secondary: 0.92 0.01 260;
+        --secondary-foreground: 0.15 0 0;
+        
+        /* Muted: Light gray */
+        --muted: 0.95 0.005 260;
+        --muted-foreground: 0.50 0.01 260;
+        
+        /* Accent: Teal for highlights */
+        --accent: 0.65 0.12 200;
+        --accent-foreground: 0.98 0 0;
+        
+        --destructive: 0.55 0.22 25;
+        --destructive-foreground: 0.98 0 0;
+        
+        --border: 0.88 0.01 260;
+        --input: 0.88 0.01 260;
+        --ring: 0.45 0.15 250;
+        
+        --chart-1: 0.60 0.18 250;
+        --chart-2: 0.65 0.15 200;
+        --chart-3: 0.55 0.20 180;
+        --chart-4: 0.70 0.12 160;
+        --chart-5: 0.50 0.18 280;
+    }
+
+    .dark {
+        --background: 0.12 0.01 260;
+        --foreground: 0.95 0.005 260;
+        
+        --card: 0.16 0.01 260;
+        --card-foreground: 0.95 0.005 260;
+        
+        --popover: 0.14 0.01 260;
+        --popover-foreground: 0.95 0.005 260;
+        
+        /* Primary: Bright blue for dark mode */
+        --primary: 0.70 0.18 250;
+        --primary-foreground: 0.12 0.01 260;
+        
+        --secondary: 0.22 0.02 260;
+        --secondary-foreground: 0.95 0.005 260;
+        
+        --muted: 0.20 0.02 260;
+        --muted-foreground: 0.65 0.01 260;
+        
+        /* Accent: Bright teal */
+        --accent: 0.75 0.15 200;
+        --accent-foreground: 0.12 0.01 260;
+        
+        --destructive: 0.60 0.24 25;
+        --destructive-foreground: 0.12 0.01 260;
+        
+        --border: 0.25 0.02 260;
+        --input: 0.25 0.02 260;
+        --ring: 0.70 0.18 250;
+        
+        --chart-1: 0.65 0.20 250;
+        --chart-2: 0.70 0.18 200;
+        --chart-3: 0.60 0.22 180;
+        --chart-4: 0.75 0.15 160;
+        --chart-5: 0.55 0.20 280;
+    }
+
+    * {
+        @apply border-border;
+    }
+    
+    body {
+        @apply bg-background text-foreground;
+        font-feature-settings: "rlig" 1, "calt" 1;
+    }
+    
+    /* Smooth scrolling */
+    html {
+        scroll-behavior: smooth;
+    }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        @apply bg-muted;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        @apply bg-muted-foreground/30 rounded-lg;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        @apply bg-muted-foreground/50;
+    }
+    
+    /* Mobile touch improvements */
+    @media (max-width: 768px) {
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        button, a, [role="button"] {
+            touch-action: manipulation;
+        }
+    }
+}

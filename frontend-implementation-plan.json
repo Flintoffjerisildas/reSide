@@ -1,0 +1,72 @@
+{
+  "kind": "implementation_plan",
+  "version": "1.0",
+  "title": "Project-local dependency artifacts for local development (frontend-only)",
+  "requirements": [
+    {
+      "id": "REQ-4",
+      "summary": "Add an English local development guide covering local run steps and how to keep dependency/artifact files inside the project folder",
+      "acceptanceCriteria": [
+        "A new documentation file exists in the repo (e.g., LOCAL_DEV.md or README-local.md) written in English.",
+        "The guide includes steps to: install DFX, start the local replica, deploy canisters, install frontend deps, and run the frontend dev server.",
+        "The guide explicitly explains where dependency/artifact files will be created on disk (e.g., node_modules, pnpm store, .dfx) and how to configure them so they live under the project directory.",
+        "The guide includes a troubleshooting section for common local issues (missing DFX, missing Node/pnpm, canister deploy failures)."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/LOCAL_DEV.md",
+          "operation": "create",
+          "description": "Create an English local development guide with copy-paste commands for installing DFX, starting the local replica, deploying canisters, installing frontend dependencies using a project-local package store, and running the frontend dev server. Explicitly document on-disk locations for project-local artifacts (e.g., frontend/node_modules, frontend/.pnpm-store, and ../.dfx) and include a troubleshooting section for common issues."
+        }
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "summary": "Add repo-checked-in configuration to force the frontend package manager store/cache to be project-local",
+      "acceptanceCriteria": [
+        "A repo-checked-in configuration file is added/updated to force the package manager store to be located in a project-local directory (e.g., a .pnpm-store folder under the repo).",
+        "The local dev guide documents the exact commands to install using that project-local store.",
+        "After running the documented install steps, the dependency store/cache directory is created inside the project folder (not only in a global home directory)."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/.npmrc",
+          "operation": "create",
+          "description": "Add a repo-checked-in package-manager configuration that forces a project-local package store/cache directory under the frontend folder (e.g., configure pnpm store-dir to ./ .pnpm-store so installs do not rely on a user-level global store)."
+        },
+        {
+          "path": "frontend/.gitignore",
+          "operation": "create",
+          "description": "Add/ensure ignore rules for project-local dependency artifacts such as frontend/node_modules and frontend/.pnpm-store so they are not committed, while still allowing the configuration files to be checked in."
+        },
+        {
+          "path": "frontend/LOCAL_DEV.md",
+          "operation": "modify",
+          "description": "Document the exact install commands that use the checked-in project-local store/cache configuration (including how to verify the store directory was created under the project folder)."
+        }
+      ]
+    },
+    {
+      "id": "REQ-6",
+      "summary": "Add a single repo script to verify local prerequisites and the presence of project-local dependency directories, with actionable remediation output",
+      "acceptanceCriteria": [
+        "A new script is added under a scripts/ (or equivalent) directory that can be run from the repo root.",
+        "The script checks for: dfx availability, Node availability, package manager availability, and existence of required project-local directories once initialized (e.g., .dfx and the frontend dependency directories).",
+        "If something is missing, the script exits non-zero and prints actionable English instructions to fix it.",
+        "If everything is present, the script exits zero and prints a short success summary."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/scripts/check-local-dev.mjs",
+          "operation": "create",
+          "description": "Create a runnable verification script that can be executed from the repo root (e.g., via `node frontend/scripts/check-local-dev.mjs`). The script should check for availability of dfx, Node, and a package manager (prefer pnpm, allow npm fallback), and verify presence of project-local directories after initialization (e.g., ../.dfx, frontend/node_modules, frontend/.pnpm-store). On missing items, exit non-zero and print clear English commands/instructions; on success, exit zero with a brief summary."
+        },
+        {
+          "path": "frontend/LOCAL_DEV.md",
+          "operation": "modify",
+          "description": "Add documentation for the single verification command/script (how to run it from the repo root, what it checks, and what to do when it reports missing prerequisites or directories)."
+        }
+      ]
+    }
+  ]
+}
