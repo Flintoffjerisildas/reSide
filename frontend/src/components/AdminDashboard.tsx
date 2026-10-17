@@ -695,10 +695,11 @@ function AdminDashboardModern() {
               <CardTitle className="text-base text-slate-900">{t('Quick Actions', 'விரைவு செயல்கள்')}</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2">
-              <Button className="h-10 justify-start rounded-2xl bg-blue-600 px-4 hover:bg-blue-700" onClick={() => setCreatePropertyOpen(true)}>
+              {/* Removed Add Property button because of failed logical implementation */}
+              {/* <Button className="h-10 justify-start rounded-2xl bg-blue-600 px-4 hover:bg-blue-700" onClick={() => setCreatePropertyOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 {t('Add Property', 'சொத்து சேர்க்க')}
-              </Button>
+              </Button> */}
               <Button
                 variant="outline"
                 className="h-10 justify-start rounded-2xl border-slate-200 bg-white px-4"
