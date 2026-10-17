@@ -15,6 +15,9 @@ export default {
             }
         },
         extend: {
+            fontFamily: {
+                serif: ['"Playfair Display"', 'Georgia', 'serif'],
+            },
             colors: {
                 border: 'oklch(var(--border))',
                 input: 'oklch(var(--input))',

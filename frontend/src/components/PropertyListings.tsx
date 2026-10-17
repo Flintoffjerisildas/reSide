@@ -4,8 +4,14 @@ import PropertyCard from './PropertyCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { X, ChevronLeft, ChevronRight, Send } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Send, Search, PlayCircle, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import type { Property } from '../types';
 import AuthDialog from './AuthDialog';
 import RequestPropertyDialog from './RequestPropertyDialog';
@@ -28,6 +34,7 @@ export default function PropertyListings() {
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showVideoModal, setShowVideoModal] = useState(false);
 
   // Filter logic
   const filteredProperties = useMemo(() => {
@@ -166,23 +173,131 @@ export default function PropertyListings() {
   };
 
   return (
-    <div className="container py-4 sm:py-6 lg:py-8 px-4 sm:px-6">
-      <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
+    <div className="container py-4 sm:py-6 lg:py-0 px-4 sm:px-6">
+      <div className="mx-auto max-w-8xl space-y-6 sm:space-y-8">
         {/* Hero Section */}
-        <div className="relative overflow-hidden rounded-xl sm:rounded-2xl">
+        <div className="relative overflow-hidden  border border-white/10 shadow-2xl bg-zinc-950 min-h-[520px] sm:min-h-[580px] lg:min-h-[620px] xl:min-h-[660px] flex flex-col justify-between">
+          {/* Background Villa Image */}
           <img
-            src="https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80"
-            alt="Real Estate"
-            className="h-[200px] sm:h-[300px] lg:h-[400px] w-full object-cover"
+            src="https://truevae.com/wp-content/uploads/2026/10/Twilight-Villa-Overlooking-the-City-skyline.jpg"
+            alt="Discover Luxury Homes"
+            className="absolute inset-0 h-full w-full object-cover object-[75%_center] lg:object-center pointer-events-none select-none transition-transform duration-1000 scale-100 hover:scale-105"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-blue-900/80 via-blue-900/40 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 lg:p-8 text-center text-white">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold tracking-tight">
-              {t('Welcome to Reside', 'Reside க்கு வரவேற்கிறோம்')}
-            </h2>
-            <p className="mt-1 sm:mt-2 text-sm sm:text-base lg:text-lg xl:text-xl text-gray-200">
-              {t('Your Bilingual Real Estate Assistant', 'உங்கள் இருமொழி ரியல் எஸ்டேட் உதவியாளர்')}
-            </p>
+
+          {/* Gradients tailored to image lighting and text contrast */}
+          {/* 1. Left-to-right dusk gradient */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/75 to-black/30 md:from-black/90 md:via-black/60 md:to-transparent lg:from-black/85 lg:via-black/45 lg:to-transparent pointer-events-none" />
+          
+          {/* 2. Bottom subtle gradient */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent pointer-events-none" />
+
+          {/* 3. Top subtle vignette */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent pointer-events-none" />
+
+          {/* Hero Content */}
+          <div className="relative z-10 flex flex-col justify-between flex-1 p-6 sm:p-10 md:p-12 lg:p-14 xl:p-16">
+            {/* Top / Main Hero Content */}
+            <div className="max-w-2xl">
+              {/* Category / Pre-heading */}
+              <p className="text-xs sm:text-sm font-semibold tracking-[0.25em] text-[#e8c98d] uppercase mb-3 sm:mb-4 drop-shadow-sm">
+                {t('FIND YOUR PERFECT PLACE', 'உங்கள் சரியான இடத்தை கண்டறியுங்கள்')}
+              </p>
+
+              {/* Headline */}
+              <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.12] mb-3 sm:mb-5 drop-shadow-md">
+                {t('Discover Homes', 'உங்கள் விருப்பத்திற்கேற்ற இல்லங்கள்')} <br />
+                <span className="bg-gradient-to-r from-[#FFF5E1] via-[#E8C98D] to-[#D4AA63] bg-clip-text text-transparent">
+                  {t('That Feel Like You', 'உங்களை போன்ற உணர்வு')}
+                </span>
+              </h1>
+
+              {/* Subheading / Description */}
+              <p className="text-sm sm:text-base lg:text-lg text-gray-200/90 max-w-xl font-normal leading-relaxed mb-6 sm:mb-8 drop-shadow-sm">
+                {t(
+                  'Buy, Rent, or Explore Premium Properties with Reside – Your Smart, Bilingual Real Estate Companion.',
+                  'Reside உடன் பிரீமியம் சொத்துகளை வாங்குங்கள், வாடகைக்கு எடுங்கள் அல்லது ஆராயுங்கள் – உங்கள் இருமொழி ரியல் எஸ்டேட் துணை.'
+                )}
+              </p>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                {/* Explore Properties Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById('explore-properties');
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                  className="group inline-flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3 sm:py-3.5 rounded-full font-semibold text-sm sm:text-base text-zinc-950 bg-gradient-to-r from-[#F5D289] via-[#E8B862] to-[#DC9F42] shadow-[0_4px_22px_rgba(232,184,98,0.4)] hover:shadow-[0_6px_28px_rgba(232,184,98,0.6)] hover:brightness-105 active:scale-95 transition-all duration-300 cursor-pointer"
+                >
+                  <Search className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-950 stroke-[2.5]" />
+                  <span>{t('Explore Properties', 'சொத்துகளை ஆராயுங்கள்')}</span>
+                </button>
+
+                {/* Watch Video Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowVideoModal(true)}
+                  className="group inline-flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3 sm:py-3.5 rounded-full font-medium text-sm sm:text-base text-white bg-black/40 hover:bg-white/10 backdrop-blur-md border border-white/30 hover:border-white/60 active:scale-95 transition-all duration-300 shadow-lg cursor-pointer"
+                >
+                  <PlayCircle className="w-5 h-5 text-white/90 group-hover:text-white transition-colors" />
+                  <span>{t('Watch Video', 'வீடியோ பாருங்கள்')}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Bottom Row: Stats & Luxury Living Badge */}
+            <div className="mt-8 sm:mt-12 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+              {/* Stats Counters */}
+              <div className="flex items-center gap-4 sm:gap-6 lg:gap-8 flex-wrap sm:flex-nowrap">
+                {/* Stat 1 */}
+                <div>
+                  <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight">5K+</div>
+                  <div className="text-xs sm:text-sm text-gray-300 font-medium">
+                    {t('Verified Listings', 'சரிபார்க்கப்பட்டவை')}
+                  </div>
+                </div>
+
+                <div className="h-8 sm:h-10 w-px bg-white/20" />
+
+                {/* Stat 2 */}
+                <div>
+                  <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight">2K+</div>
+                  <div className="text-xs sm:text-sm text-gray-300 font-medium">
+                    {t('Happy Customers', 'வாடிக்கையாளர்கள்')}
+                  </div>
+                </div>
+
+                <div className="h-8 sm:h-10 w-px bg-white/20" />
+
+                {/* Stat 3 */}
+                <div>
+                  <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight">50+</div>
+                  <div className="text-xs sm:text-sm text-gray-300 font-medium">
+                    {t('Cities Covered', 'நகரங்கள்')}
+                  </div>
+                </div>
+              </div>
+
+              {/* Luxury Living Floating Card */}
+              <div className="self-start lg:self-end">
+                <div className="inline-flex items-center gap-3.5 px-4 sm:px-5 py-3 rounded-2xl bg-black/60 backdrop-blur-md border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.5)] hover:border-amber-400/40 hover:bg-black/70 transition-all duration-300">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 shrink-0">
+                    <MapPin className="w-5 h-5 fill-amber-400/30 text-amber-400" />
+                  </div>
+                  <div>
+                    <div className="text-sm sm:text-base font-semibold text-white tracking-wide">
+                      {t('Luxury Living', 'ஆடம்பர வாழ்க்கை')}
+                    </div>
+                    <div className="text-xs text-white/70 font-medium tracking-wide">
+                      {t('Modern • Spacious • Elegant', 'நவீன • விசாலமான • நேர்த்தியான')}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -238,7 +353,7 @@ export default function PropertyListings() {
         </div>
 
         {/* Property Listings */}
-        <div className="space-y-4 sm:space-y-6">
+        <div id="explore-properties" className="space-y-4 sm:space-y-6 scroll-mt-8">
           {/* Filters Section */}
           <div className="rounded-lg sm:rounded-xl border border-border bg-gradient-to-br from-card to-muted/20 p-4 sm:p-6 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
@@ -570,6 +685,43 @@ export default function PropertyListings() {
             handleCloseDetail();
           }}
         />
+
+        {/* Video Tour Modal */}
+        <Dialog open={showVideoModal} onOpenChange={setShowVideoModal}>
+          <DialogContent className="sm:max-w-4xl p-0 overflow-hidden bg-zinc-950 border-white/20 text-white shadow-2xl">
+            <DialogHeader className="p-4 sm:p-5 pb-3 border-b border-white/10 flex flex-row items-center justify-between">
+              <DialogTitle className="text-lg sm:text-xl font-serif font-bold text-white flex items-center gap-2.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+                {t('Discover Luxury Living – Video Tour', 'ஆடம்பர வாழ்க்கை – வீடியோ உலா')}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="relative aspect-video w-full bg-black">
+              <iframe
+                src="https://www.youtube-nocookie.com/embed/LXb3EKWsInQ?autoplay=1"
+                title="Luxury Villa Tour"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="w-full h-full border-0"
+              />
+            </div>
+            <div className="p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-3 bg-zinc-900/90 text-xs sm:text-sm text-gray-300">
+              <p>
+                {t('Experience architectural excellence and bespoke luxury homes with Reside.', 'Reside உடன் கட்டடக் கலை மேன்மை மற்றும் பிரத்யேக இல்லங்களை அனுபவியுங்கள்.')}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowVideoModal(false);
+                  const el = document.getElementById('explore-properties');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="px-4 py-2 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-zinc-950 font-semibold hover:brightness-110 transition-all cursor-pointer whitespace-nowrap"
+              >
+                {t('View Available Homes', 'கிடைக்கும் இல்லங்களைக் காண்க')}
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
