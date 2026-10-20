@@ -1,0 +1,74 @@
+{
+  "kind": "feature_evidence_report",
+  "features": [
+    {
+      "featureId": "feature-add-a-local-development-guide-in-english-that-explains-exactly-how-to-run-the-app-locally-and-how-to-keep-all-dependency-artifacts-stored-within-the-project-folder-frontend-dependencies-and-local-replica-canister-artifacts-including-copy-paste-commands",
+      "featureTitle": "Add a local development guide (in English) that explains exactly how to run the app locally and how to keep all dependency artifacts stored within the project folder (frontend dependencies and local replica/canister artifacts), including copy-paste commands.",
+      "files": [
+        "frontend/LOCAL_DEV.md"
+      ],
+      "components": [
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "authorization@4.0.0",
+        "user-approval@3.0.0",
+        "blob-storage@4.0.0",
+        "camera@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-4"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-ensure-frontend-package-management-can-be-configured-to-store-its-package-cache-store-within-the-project-directory-not-in-a-global-user-level-location-and-provide-repo-checked-in-configuration-to-enable-it",
+      "featureTitle": "Ensure frontend package management can be configured to store its package cache/store within the project directory (not in a global user-level location) and provide repo-checked-in configuration to enable it.",
+      "files": [
+        "frontend/.gitignore",
+        "frontend/.npmrc",
+        "frontend/LOCAL_DEV.md"
+      ],
+      "components": [
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "authorization@4.0.0",
+        "user-approval@3.0.0",
+        "blob-storage@4.0.0",
+        "camera@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-5"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-add-a-single-command-script-in-the-repository-that-verifies-a-machine-has-all-required-local-dependencies-and-that-project-local-dependency-directories-are-present-or-prints-clear-instructions-to-generate-them",
+      "featureTitle": "Add a single command/script in the repository that verifies a machine has all required local dependencies and that project-local dependency directories are present (or prints clear instructions to generate them).",
+      "files": [
+        "frontend/LOCAL_DEV.md",
+        "frontend/scripts/check-local-dev.mjs"
+      ],
+      "components": [
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "authorization@4.0.0",
+        "user-approval@3.0.0",
+        "blob-storage@4.0.0",
+        "camera@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-6"
+      ],
+      "confidence": "high"
+    }
+  ]
+}

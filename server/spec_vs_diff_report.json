@@ -1,0 +1,51 @@
+{
+  "kind": "spec_vs_diff_report",
+  "version": "1.0",
+  "generatedAt": "2026-02-05T13:27:36.744Z",
+  "summary": "The diff adds project-local pnpm store configuration and a local-dev check script, plus a new LOCAL_DEV.md. However, the local-dev guide content is truncated (so several REQ-4 acceptance criteria cannot be verified from the provided diff), the verification script is placed under frontend/scripts (not a repo-root scripts/ equivalent) and appears not runnable from repo root as-is, and unrelated backend authorization changes were introduced.",
+  "missing_requirements": [
+    {
+      "id": "REQ-4",
+      "requirement": "Local development guide includes exact steps (install DFX, start local replica, deploy canisters, install frontend deps, run frontend dev server), explains where artifacts are created and how to keep them project-local, and includes troubleshooting.",
+      "reason": "A new guide file exists, but its content is truncated in the diff summary right after the DFX install section, so the required sections/commands and troubleshooting cannot be confirmed from the provided evidence.",
+      "evidence": [
+        "frontend/LOCAL_DEV.md (truncated)"
+      ]
+    },
+    {
+      "id": "REQ-6",
+      "requirement": "Add a single command/script runnable from the repo root (under scripts/ or equivalent) that checks dfx/node/package manager and presence of project-local directories, exiting non-zero with actionable instructions when missing and zero with a success summary when OK.",
+      "reason": "The script is added under frontend/scripts rather than a repo-root scripts/ (or clearly documented equivalent), and it resolves directories relative to its own location (e.g., '../../.dfx', '../node_modules'), which suggests it is intended to be run from within frontend/scripts, not from the repo root as required by the AC.",
+      "evidence": [
+        "frontend/scripts/check-local-dev.mjs"
+      ]
+    }
+  ],
+  "hallucinated_features": [
+    {
+      "description": "Backend SuperAdmin principal configuration and expanded admin/superadmin authorization logic.",
+      "reason": "The BuildRequest is solely about local-run dependency/artifact self-containment and local dev tooling/docs; it explicitly lists non-goals of changing unrelated application features. The backend authorization changes are unrelated to dependency handling.",
+      "evidence": [
+        "backend/main.mo (truncated)"
+      ]
+    },
+    {
+      "description": "Added/updated repository metadata/summary files not requested for local dependency handling (frontend-file-summaries.txt, project_state.json).",
+      "reason": "These files do not correspond to REQ-4/REQ-5/REQ-6 and appear unrelated to local dependency/artifact self-containment.",
+      "evidence": [
+        "frontend-file-summaries.txt",
+        "project_state.json"
+      ]
+    }
+  ],
+  "confidence": 0.66,
+  "changed_files": [
+    "backend/main.mo",
+    "frontend-file-summaries.txt",
+    "frontend/.gitignore",
+    "frontend/.npmrc",
+    "frontend/LOCAL_DEV.md",
+    "frontend/scripts/check-local-dev.mjs",
+    "project_state.json"
+  ]
+}
