@@ -4,7 +4,7 @@ import PropertyCard from './PropertyCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { X, ChevronLeft, ChevronRight, Send, Search, PlayCircle, MapPin } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Send, Search, PlayCircle, MapPin, Home, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -18,7 +18,13 @@ import RequestPropertyDialog from './RequestPropertyDialog';
 import { useCreateRequest } from '../hooks/useQueries';
 import { toast } from 'sonner';
 import { translateText } from '../lib/api';
-
+import{
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 export default function PropertyListings() {
   const { data: properties = [], isLoading } = useGetAllProperties();
   const { t, language } = useLanguage();
@@ -27,8 +33,8 @@ export default function PropertyListings() {
 
   // Filter states
   const [location, setLocation] = useState('');
-  const [propertyType, setPropertyType] = useState('');
-  const [transactionType, setTransactionType] = useState('');
+  const [propertyType, setPropertyType] = useState('all');
+  const [transactionType, setTransactionType] = useState('all');
   const [priceRange, setPriceRange] = useState([0, 0]);
   const [selectedPropertyIndex, setSelectedPropertyIndex] = useState<number | null>(null);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
@@ -44,15 +50,15 @@ export default function PropertyListings() {
       const locationMatch = propertyLocation.includes(filterLocation);
 
       const propertyPropertyType = String((property as any)?.propertyType ?? '');
-      const typeMatch = propertyType ? propertyPropertyType === propertyType : true;
+      const typeMatch = (!propertyType || propertyType === 'all') ? true : propertyPropertyType === propertyType ;
 
       const propertyTransactionType = String((property as any)?.transactionType ?? '');
-      const transactionMatch = transactionType ? propertyTransactionType === transactionType : true;
+      const transactionMatch = (transactionType && transactionType !== 'all') ? propertyTransactionType === transactionType : true;
 
       const propertyPrice = Number((property as any)?.price ?? 0);
       const priceMatch = priceRange[1] === 0 || (propertyPrice >= priceRange[0] && propertyPrice <= priceRange[1]);
       const availabilityMatch = !property.tenant; // Only show properties without a tenant (available)
-      
+
       return locationMatch && typeMatch && transactionMatch && priceMatch && availabilityMatch;
     });
   }, [properties, location, propertyType, transactionType, priceRange]);
@@ -116,7 +122,7 @@ export default function PropertyListings() {
       }
     })();
   }, [language, selectedProperty?.title, selectedProperty?.location]);
-  
+
   const handlePreviousProperty = () => {
     if (selectedPropertyIndex !== null && selectedPropertyIndex > 0) {
       setSelectedPropertyIndex(selectedPropertyIndex - 1);
@@ -156,7 +162,7 @@ export default function PropertyListings() {
       toast.error(t('Unable to send request', 'கோரிக்கையை அனுப்ப முடியவில்லை'));
       return;
     }
-    
+
     createRequest.mutate(
       { propertyId, type: requestType },
       {
@@ -187,7 +193,7 @@ export default function PropertyListings() {
           {/* Gradients tailored to image lighting and text contrast */}
           {/* 1. Left-to-right dusk gradient */}
           <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/75 to-black/30 md:from-black/90 md:via-black/60 md:to-transparent lg:from-black/85 lg:via-black/45 lg:to-transparent pointer-events-none" />
-          
+
           {/* 2. Bottom subtle gradient */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent pointer-events-none" />
 
@@ -305,8 +311,8 @@ export default function PropertyListings() {
         <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           <div className="rounded-lg sm:rounded-xl border border-border bg-card p-4 sm:p-6 shadow-sm transition-shadow hover:shadow-md">
             <div className="flex gap-3 items-start">
-              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
-                <span className="text-xl sm:text-2xl">🏠</span>
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-lg bg-accent/10 flex-shrink-0">
+                <span className="text-xl sm:text-2xl"><Home className='text-primary' /></span>
               </div>
               <div>
                 <h3 className="mb-1 sm:mb-2 text-base sm:text-lg font-semibold">
@@ -322,7 +328,7 @@ export default function PropertyListings() {
           <div className="rounded-lg sm:rounded-xl border border-border bg-card p-4 sm:p-6 shadow-sm transition-shadow hover:shadow-md">
             <div className="flex gap-3 items-start">
               <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-lg bg-accent/10 flex-shrink-0">
-                <span className="text-xl sm:text-2xl">🔍</span>
+                <span className="text-xl sm:text-2xl"><Search className='text-primary' /></span>
               </div>
               <div>
                 <h3 className="mb-1 sm:mb-2 text-base sm:text-lg font-semibold">
@@ -337,8 +343,8 @@ export default function PropertyListings() {
 
           <div className="rounded-lg sm:rounded-xl border border-border bg-card p-4 sm:p-6 shadow-sm transition-shadow hover:shadow-md sm:col-span-2 lg:col-span-1">
             <div className="flex gap-3 items-start">
-              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-lg bg-secondary/10 flex-shrink-0">
-                <span className="text-xl sm:text-2xl">🎤</span>
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-lg bg-accent/10 flex-shrink-0">
+                <span className="text-xl sm:text-2xl"><Mic className='text-primary' /></span>
               </div>
               <div>
                 <h3 className="mb-1 sm:mb-2 text-base sm:text-lg font-semibold">
@@ -385,21 +391,22 @@ export default function PropertyListings() {
               </div>
 
               {/* Property Type */}
-              <div className="space-y-2">
+              <div className="space-y-2 ">
                 <label className="text-sm font-medium text-foreground">
                   {t('Property Type', 'சொத்து வகை')}
                 </label>
-                <select
-                  value={propertyType}
-                  onChange={(e) => setPropertyType(e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                >
-                  <option value="">{t('All Types', 'அனைத்து வகைகளும்')}</option>
-                  <option value="flat">Flat / Apartment</option>
-                  <option value="house">House</option>
-                  <option value="pg">PG / Hostel</option>
-                  <option value="land">Land</option>
-                </select>
+                <Select value={propertyType} onValueChange={(value) => setPropertyType(value)}>
+                  <SelectTrigger className="w-full px-3 py-2 border border-input rounded-lg bg-background text-sm outline-none focus:outline-none focus-visible:outline-none data-[focus]:ring-2 data-[focus]:ring-primary/50 data-[state=open]:ring-2 data-[state=open]:ring-primary/50">
+                    <SelectValue placeholder={t('All Types', 'அனைத்து வகைகளும்')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t('All Types', 'அனைத்து வகைகளும்')}</SelectItem>
+                    <SelectItem value="flat">{t('Flat / Apartment', 'அடுக்குமாடி குடியிருப்பு')}</SelectItem>
+                    <SelectItem value="house">{t('House', 'வீடு')}</SelectItem>
+                    <SelectItem value="pg">{t('PG / Hostel', 'விடுதி / பி.ஜி')}</SelectItem>
+                    <SelectItem value="land">{t('Land', 'நிலம்')}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Looking For */}
@@ -407,16 +414,17 @@ export default function PropertyListings() {
                 <label className="text-sm font-medium text-foreground">
                   {t('Looking For', 'தேடுகிறேன்')}
                 </label>
-                <select
-                  value={transactionType}
-                  onChange={(e) => setTransactionType(e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                >
-                  <option value="">{t('All', 'அனைத்தும்')}</option>
-                  <option value="rent">{t('Rent', 'வாடகை')}</option>
-                  <option value="lease">{t('Lease', 'குத்தகை')}</option>
-                  <option value="purchase">{t('Purchase', 'கொள்ளிப் பெறுதல்')}</option>
-                </select>
+                <Select value={transactionType} onValueChange={(value) => setTransactionType(value)}>
+                  <SelectTrigger className="w-full px-3 py-2 border border-input rounded-lg bg-background text-sm outline-none focus:outline-none focus-visible:outline-none data-[focus]:ring-2 data-[focus]:ring-primary/50 data-[state=open]:ring-2 data-[state=open]:ring-primary/50">
+                    <SelectValue placeholder={t('All', 'அனைத்தும்')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t('All', 'அனைத்தும்')}</SelectItem>
+                    <SelectItem value="rent">{t('Rent', 'வாடகை')}</SelectItem>
+                    <SelectItem value="lease">{t('Lease', 'குத்தகை')}</SelectItem>
+                    <SelectItem value="purchase">{t('Purchase', 'கொள்ளிப் பெறுதல்')}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Price Range */}
@@ -525,7 +533,7 @@ export default function PropertyListings() {
                   </h2>
                   <div className="flex items-center gap-2 text-muted-foreground mt-1">
                     <span>
-                      📍 {language === 'ta' ? (selectedLocationTa || selectedProperty.location) : selectedProperty.location}
+                      <MapPin className="w-5 h-5 inline" />{language === 'ta' ? (selectedLocationTa || selectedProperty.location) : selectedProperty.location}
                     </span>
                   </div>
                 </div>
@@ -575,7 +583,7 @@ export default function PropertyListings() {
                   </div>
                 ) : (
                   <div className="relative rounded-lg overflow-hidden bg-muted aspect-video flex items-center justify-center">
-                    <span className="text-4xl">🏠</span>
+                    <span className="text-4xl text-muted-foreground"><Home /></span>
                   </div>
                 )}
 
@@ -642,7 +650,7 @@ export default function PropertyListings() {
                   <ChevronLeft className="h-4 w-4" />
                   {t('Previous', 'முந்தைய')}
                 </Button>
-                
+
                 <Button
                   onClick={handleRequestProperty}
                   disabled={createRequest.isPending}
@@ -656,7 +664,7 @@ export default function PropertyListings() {
                 <div className="text-sm text-muted-foreground text-center hidden sm:block">
                   {selectedPropertyIndex! + 1} / {filteredProperties.length}
                 </div>
-                
+
                 <Button
                   onClick={handleNextProperty}
                   disabled={selectedPropertyIndex === filteredProperties.length - 1}
@@ -676,9 +684,9 @@ export default function PropertyListings() {
         <AuthDialog open={showAuthDialog} onOpenChange={setShowAuthDialog} />
 
         {/* Request Property Dialog */}
-        <RequestPropertyDialog 
-          property={selectedProperty} 
-          open={showRequestDialog} 
+        <RequestPropertyDialog
+          property={selectedProperty}
+          open={showRequestDialog}
           onOpenChange={setShowRequestDialog}
           onSuccess={() => {
             setShowRequestDialog(false);

@@ -266,8 +266,8 @@ function LoginPage() {
             : t('Enter the OTP and your new password', 'OTP மற்றும் உங்கள் புதிய கடவுச்சொல்லை உள்ளிடவும்');
 
   return (
-    <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center bg-gradient-to-b from-sky-100 to-white px-4 py-8">
-      <div className="absolute inset-x-0 bottom-0 h-1/2 rounded-t-[3rem] bg-white" />
+    <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-8">
+      <div className="absolute inset-x-0 bottom-0 h-1/2 rounded-t-[3rem] bg-secondary" />
       <div className="relative w-full max-w-md rounded-2xl border border-sky-100 bg-card shadow-2xl">
         <div className="flex flex-col items-center px-8 pt-10">
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
@@ -315,7 +315,7 @@ function LoginPage() {
                 </button>
               </div>
 
-              <Button type="submit" className="mt-2 w-full rounded-full bg-sky-600 hover:bg-sky-700" disabled={loading}>
+              <Button type="submit" className="mt-2 w-full rounded-full" disabled={loading}>
                 {loading ? t('Processing...', 'செயலாக்குகிறது...') : t('Login', 'உள்நுழைய')}
               </Button>
 
