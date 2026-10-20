@@ -53,7 +53,7 @@ export default function Header({
   const { user, logout, isInitializing } = useAuth();
   const { data: userProfile } = useGetCallerUserProfile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeNav, setActiveNav] = useState<'home' | 'about' | 'rent' | 'buy' | 'list'>('home');
+  const [activeNav, setActiveNav] = useState<'home' | 'about' | 'rent' | 'buy' | 'contact'>('home');
   const { language, setLanguage, t } = useLanguage();
 
   const isAuthenticated = !!user;
@@ -133,8 +133,8 @@ export default function Header({
             <button type="button" onClick={handleBuyNavigation} className={navClass('buy')}>
               {t('Buy', 'வாங்க')}
             </button>
-            <button type="button" onClick={() => setActiveNav('list')} className={navClass('list')}>
-              {t('List Property', 'சொத்தை பட்டியலிடுங்கள்')}
+            <button type="button" onClick={() => setActiveNav('contact')} className={navClass('contact')}>
+                {t('Contact', 'தொடர்பு')}
             </button>
           </nav>
           <div className="flex shrink-0 items-center gap-2">

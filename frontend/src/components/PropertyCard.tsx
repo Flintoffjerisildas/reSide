@@ -95,6 +95,8 @@ export default function PropertyCard({ property, compact = false, showRequestBut
         return '🏢';
       case 'house':
         return '🏠';
+      case 'villa':
+        return '🏡';
       case 'pg':
         return '🏘️';
       case 'land':
@@ -110,6 +112,8 @@ export default function PropertyCard({ property, compact = false, showRequestBut
         return t('Flat', 'பிளாட்');
       case 'house':
         return t('House', 'வீடு');
+      case 'villa':
+        return t('Villa', 'வில்லா');
       case 'pg':
         return 'PG';
       case 'land':

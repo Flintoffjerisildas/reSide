@@ -68,13 +68,21 @@ export default function PropertyListings({ showAbout = false, initialTransaction
     ) {
       return 'flat';
     }
-    if (normalized === 'house' || normalized === 'houses' || normalized === 'villa' || normalized === 'villas') {
+    if (normalized === 'house' || normalized === 'houses') {
       return 'house';
     }
     if (normalized === 'pg' || normalized === 'pgs' || normalized === 'hostel' || normalized === 'pghostel') {
       return 'pg';
     }
-    if (normalized === 'land' || normalized === 'plot' || normalized === 'plots') return 'land';
+    if (
+      normalized === 'land' ||
+      normalized === 'lands' ||
+      normalized === 'plot' ||
+      normalized === 'plots' ||
+      normalized === 'plotland'
+    ) {
+      return 'land';
+    }
     return normalized;
   };
 
@@ -103,7 +111,9 @@ export default function PropertyListings({ showAbout = false, initialTransaction
       const filterLocation = String(location ?? '').toLowerCase();
       const locationMatch = propertyLocation.includes(filterLocation);
 
-      const propertyPropertyType = normalizePropertyType((property as any)?.propertyType);
+      const propertyPropertyType = normalizePropertyType(
+        (property as any)?.propertyType ?? (property as any)?.propertyCategory ?? (property as any)?.type
+      );
       const typeMatch = propertyType ? propertyPropertyType === normalizePropertyType(propertyType) : true;
 
       const propertyTransactionType = normalizeTransactionType((property as any)?.transactionType);
@@ -131,13 +141,16 @@ export default function PropertyListings({ showAbout = false, initialTransaction
 
   const handlePropertyTypeChange = (value: string) => {
     setPropertyType(value);
-    if (!value) return;
-
-    setTransactionType('rent');
-    requestAnimationFrame(() => {
-      document.getElementById('property-listings')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
   };
+
+  const handleTransactionTypeChange = (value: string) => {
+    setTransactionType(value);
+  };
+
+  useEffect(() => {
+    setSelectedPropertyIndex(null);
+    setCurrentImageIndex(0);
+  }, [location, propertyType, transactionType, priceRange]);
 
   // Navigation for property details view
   const selectedProperty = selectedPropertyIndex !== null ? filteredProperties[selectedPropertyIndex] : null;
@@ -253,7 +266,7 @@ export default function PropertyListings({ showAbout = false, initialTransaction
           propertyType={propertyType}
           onPropertyTypeChange={handlePropertyTypeChange}
           transactionType={transactionType}
-          onTransactionTypeChange={setTransactionType}
+          onTransactionTypeChange={handleTransactionTypeChange}
           maxPrice={priceRange[1]}
           onMaxPriceChange={(value) => setPriceRange([0, value])}
           onSearch={() => document.getElementById('property-listings')?.scrollIntoView({ behavior: 'smooth' })}
@@ -381,14 +394,14 @@ export default function PropertyListings({ showAbout = false, initialTransaction
                 </label>
                 <select
                   value={propertyType}
-                  onChange={(e) => setPropertyType(e.target.value)}
+                  onChange={(e) => handlePropertyTypeChange(e.target.value)}
                   className="w-full px-3 py-2 border border-input rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                 >
                   <option value="">{t('All Types', 'அனைத்து வகைகளும்')}</option>
-                  <option value="flat">Flat / Apartment</option>
-                  <option value="house">House</option>
-                  <option value="pg">PG / Hostel</option>
-                  <option value="land">Land</option>
+                  <option value="flat">{t('Flat', 'பிளாட்')}</option>
+                  <option value="house">{t('House', 'வீடு')}</option>
+                  <option value="pg">{t('PG', 'PG')}</option>
+                  <option value="land">{t('Land', 'நிலம்')}</option>
                 </select>
               </div>
 
@@ -399,13 +412,12 @@ export default function PropertyListings({ showAbout = false, initialTransaction
                 </label>
                 <select
                   value={transactionType}
-                  onChange={(e) => setTransactionType(e.target.value)}
+                  onChange={(e) => handleTransactionTypeChange(e.target.value)}
                   className="w-full px-3 py-2 border border-input rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                 >
                   <option value="">{t('All', 'அனைத்தும்')}</option>
                   <option value="rent">{t('Rent', 'வாடகை')}</option>
-                  <option value="lease">{t('Lease', 'குத்தகை')}</option>
-                  <option value="purchase">{t('Purchase', 'கொள்ளிப் பெறுதல்')}</option>
+                  <option value="purchase">{t('Buy', 'வாங்க')}</option>
                 </select>
               </div>
 
@@ -448,14 +460,20 @@ export default function PropertyListings({ showAbout = false, initialTransaction
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {['All', 'Apartments', 'Villas'].map((category) => (
+                {[
+                  { value: '', label: 'All Types', tamilLabel: 'அனைத்து வகைகள்' },
+                  { value: 'flat', label: 'Flat', tamilLabel: 'பிளாட்' },
+                  { value: 'house', label: 'House', tamilLabel: 'வீடு' },
+                  { value: 'pg', label: 'PG', tamilLabel: 'PG' },
+                  { value: 'land', label: 'Land', tamilLabel: 'நிலம்' },
+                ].map((category) => (
                   <button
-                    key={category}
+                    key={category.value || 'all'}
                     type="button"
-                    onClick={() => handlePropertyTypeChange(category === 'All' ? '' : category === 'Apartments' ? 'flat' : 'house')}
-                    className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${propertyType === (category === 'All' ? '' : category === 'Apartments' ? 'flat' : 'house') ? 'border-blue-600 bg-blue-600 text-white' : 'border-border bg-card text-muted-foreground hover:border-blue-300 hover:text-blue-600'}`}
+                    onClick={() => handlePropertyTypeChange(category.value)}
+                    className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${propertyType === category.value ? 'border-blue-600 bg-blue-600 text-white' : 'border-border bg-card text-muted-foreground hover:border-blue-300 hover:text-blue-600'}`}
                   >
-                    {t(category, category === 'All' ? 'அனைத்தும்' : category === 'Apartments' ? 'அபார்ட்மென்ட்கள்' : 'வில்லாக்கள்')}
+                    {t(category.label, category.tamilLabel)}
                   </button>
                 ))}
                 {!isLoading && <span className="hidden text-xs text-muted-foreground xl:inline">{filteredProperties.length} {t('available', 'கிடைக்கும்')}</span>}

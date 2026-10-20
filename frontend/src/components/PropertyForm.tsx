@@ -348,7 +348,7 @@ export default function PropertyForm({ open, onOpenChange, initialData }: Proper
                 <SelectContent>
                   <SelectItem value="flat">{t('Flat', 'பிளாட்')}</SelectItem>
                   <SelectItem value="house">{t('House', 'வீடு')}</SelectItem>
-                  <SelectItem value="pg">PG</SelectItem>
+                  <SelectItem value="pg">{t('PG', 'PG')}</SelectItem>
                   <SelectItem value="land">{t('Land', 'நிலம்')}</SelectItem>
                 </SelectContent>
               </Select>

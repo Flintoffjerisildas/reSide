@@ -199,6 +199,7 @@ export function useGetAllProperties() {
       return res.data.map((p: any) => ({
         ...p,
         id: p._id || p.id,
+        propertyType: p.propertyType ?? p.propertyCategory ?? p.type,
         facing: p.facing ?? p.propertyFacing
       }));
     },
@@ -219,6 +220,7 @@ export function useGetMyProperties() {
       return res.data.map((p: any) => ({
         ...p,
         id: p._id || p.id,
+        propertyType: p.propertyType ?? p.propertyCategory ?? p.type,
         facing: p.facing ?? p.propertyFacing
       }));
     }
