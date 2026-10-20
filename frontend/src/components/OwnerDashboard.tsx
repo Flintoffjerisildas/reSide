@@ -67,7 +67,11 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
-export default function OwnerDashboard() {
+interface OwnerDashboardProps {
+  onBrowseProperties?: (transactionType: 'rent' | 'buy') => void;
+}
+
+export default function OwnerDashboard({ onBrowseProperties }: OwnerDashboardProps) {
   const { t, language } = useLanguage();
   const { data: userProfile, refetch: refetchUserProfile } = useGetCallerUserProfile();
 
@@ -1209,6 +1213,21 @@ export default function OwnerDashboard() {
           <Button onClick={() => setIsPropertyFormOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" />
             {t('Add Property', 'சொத்தைச் சேர்க்கவும்')}
+          </Button>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Button variant="outline" className="h-11 justify-start rounded-xl" onClick={() => onBrowseProperties?.('rent')}>
+            <Home className="mr-2 h-4 w-4" />
+            {t('Rent', 'வாடகை')}
+          </Button>
+          <Button variant="outline" className="h-11 justify-start rounded-xl" onClick={() => onBrowseProperties?.('buy')}>
+            <Building className="mr-2 h-4 w-4" />
+            {t('Buy', 'வாங்க')}
+          </Button>
+          <Button className="h-11 justify-start rounded-xl" onClick={() => setIsPropertyFormOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t('List Property', 'சொத்தை பட்டியலிடுங்கள்')}
           </Button>
         </div>
 

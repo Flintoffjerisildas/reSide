@@ -660,6 +660,8 @@ function AppContent() {
   const queryClient = useQueryClient();
   const [showDashboard, setShowDashboard] = useState(() => !!localStorage.getItem('token'));
   const [showLoginPage, setShowLoginPage] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
+  const [browseTransactionType, setBrowseTransactionType] = useState<'rent' | 'buy' | ''>('');
 
   const isAuthenticated = !!user;
   
@@ -702,6 +704,25 @@ function AppContent() {
   const handleHomeClick = () => {
     setShowDashboard(false);
     setShowLoginPage(false);
+    setShowAbout(false);
+    setBrowseTransactionType('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleBrowseProperties = (transactionType: 'rent' | 'buy') => {
+    setShowDashboard(false);
+    setShowLoginPage(false);
+    setShowAbout(false);
+    setBrowseTransactionType(transactionType);
+    requestAnimationFrame(() => {
+      document.getElementById('property-listings')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  const handleAboutClick = () => {
+    setShowDashboard(false);
+    setShowLoginPage(false);
+    setShowAbout(true);
   };
 
   useEffect(() => {
@@ -722,6 +743,9 @@ function AppContent() {
         onLogout={handleLogout}
         onDashboardClick={handleDashboardClick}
         onHomeClick={handleHomeClick}
+        onAboutClick={handleAboutClick}
+        onRentClick={() => handleBrowseProperties('rent')}
+        onBuyClick={() => handleBrowseProperties('buy')}
         onLoginClick={handleLoginClick}
         isDashboardActive={showDashboard}
       />
@@ -732,9 +756,9 @@ function AppContent() {
           isAdmin ? (
             <AdminDashboard />
           ) : isOwner ? (
-            <OwnerDashboard />
+            <OwnerDashboard onBrowseProperties={handleBrowseProperties} />
           ) : isBroker ? (
-            <BrokerDashboard />
+            <BrokerDashboard onBrowseProperties={handleBrowseProperties} />
           ) : isCustomer ? (
             <CustomerDashboard />
           ) : (
@@ -748,7 +772,7 @@ function AppContent() {
         ) : showLoginPage && !isAuthenticated ? (
           <LoginPage />
         ) : (
-          <PropertyListings />
+          <PropertyListings showAbout={showAbout} initialTransactionType={browseTransactionType} />
         )}
         <FloatingChat />
       </main>

@@ -109,7 +109,6 @@ function AdminDashboardModern() {
   const { data: maintenance = [] } = useAdminMaintenance();
   const { data: payments = [] } = useAdminPayments();
 
-  const createProperty = useAdminCreateProperty();
   const createUser = useAdminCreateUser();
   const sendAnnouncement = useAdminSendAnnouncement();
   const updateMaintenance = useAdminUpdateMaintenance();
@@ -119,7 +118,6 @@ function AdminDashboardModern() {
   const [selectedProperty, setSelectedProperty] = useState<any | null>(null);
   const [selectedTenantRow, setSelectedTenantRow] = useState<any | null>(null);
   const [selectedMaintenanceRow, setSelectedMaintenanceRow] = useState<any | null>(null);
-  const [createPropertyOpen, setCreatePropertyOpen] = useState(false);
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState<null | { email: string; password: string; name: string; tamilRole: string }>(null);
   const [userDraft, setUserDraft] = useState({ name: '', email: '', phone: '', tamilRole: 'customers' });
@@ -127,13 +125,6 @@ function AdminDashboardModern() {
   const [announcementDraft, setAnnouncementDraft] = useState({ title: '', message: '' });
   const [manualActivities, setManualActivities] = useState<Array<{ id: string; title: string; subtitle: string; icon: any; ts: number }>>([]);
   const [maintenanceStatusDraft, setMaintenanceStatusDraft] = useState('pending');
-  const [propertyDraft, setPropertyDraft] = useState({
-    ownerId: '',
-    title: '',
-    propertyType: 'Apartment',
-    location: '',
-    price: ''
-  });
 
   const scrollTo = useCallback((id: string) => {
     const el = document.getElementById(id);
@@ -145,13 +136,6 @@ function AdminDashboardModern() {
     const s = String(selectedMaintenanceRow?.status || 'pending');
     setMaintenanceStatusDraft(s);
   }, [selectedMaintenanceRow]);
-
-  const owners = useMemo(() => {
-    const list = Array.isArray(users) ? users : [];
-    return list
-      .filter((u: any) => String(u?.tamilRole || u?.role || '').toLowerCase().includes('owner'))
-      .sort((a: any, b: any) => String(a?.name || '').localeCompare(String(b?.name || '')));
-  }, [users]);
 
   const totals = useMemo(() => {
     const isTenant = (u: any) => {
@@ -414,34 +398,6 @@ function AdminDashboardModern() {
     }
   };
 
-  const onCreateProperty = async () => {
-    const ownerId = propertyDraft.ownerId.trim();
-    const title = propertyDraft.title.trim();
-    const location = propertyDraft.location.trim();
-    const price = Number(propertyDraft.price);
-    if (!ownerId || !title || !location || !Number.isFinite(price) || price <= 0) {
-      toast.error(t('Please fill in all required fields', 'அனைத்து கட்டாய புலங்களையும் நிரப்பவும்'));
-      return;
-    }
-    try {
-      await createProperty.mutateAsync({
-        ownerId,
-        title,
-        propertyType: propertyDraft.propertyType,
-        location,
-        price,
-        transactionType: 'Rent',
-        status: 'approved',
-        occupancyStatus: 'vacant'
-      });
-      setCreatePropertyOpen(false);
-      setPropertyDraft({ ownerId: '', title: '', propertyType: 'Apartment', location: '', price: '' });
-      toast.success(t('Property created', 'சொத்து உருவாக்கப்பட்டது'));
-    } catch (e: any) {
-      toast.error(e?.response?.data?.msg || e?.message || t('Failed to create property', 'சொத்தை உருவாக்க முடியவில்லை'));
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto grid w-full max-w-[1600px] grid-cols-1 items-start gap-5 px-4 py-4 xl:grid-cols-[minmax(0,1fr)_380px] sm:px-6">
@@ -452,18 +408,18 @@ function AdminDashboardModern() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t('Search properties, tenants, requests...', 'சொத்துகள், வாடகையாளர்கள், கோரிக்கைகள்...')}
-              className="h-10 rounded-2xl border-slate-200 bg-white pl-10 shadow-sm"
+              className="h-10 rounded-2xl border-slate-200 bg-white pl-10 shadow-sm dark:border-blue-900/70 dark:bg-slate-950/70"
             />
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card
-              className="cursor-pointer rounded-3xl border-slate-200 bg-white shadow-sm transition hover:shadow-md"
+              className="cursor-pointer rounded-3xl border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-blue-900/70 dark:bg-slate-950/70"
               onClick={() => setSummaryModal('properties')}
             >
               <CardContent className="flex items-center justify-between p-5">
                 <div>
-                  <div className="text-sm text-slate-500">{t('Total Properties', 'மொத்த சொத்துகள்')}</div>
-                  <div className="mt-1 text-2xl font-semibold text-slate-900">{Number(totals.totalProperties).toLocaleString()}</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-300">{t('Total Properties', 'மொத்த சொத்துகள்')}</div>
+                  <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">{Number(totals.totalProperties).toLocaleString()}</div>
                 </div>
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
                   <Building className="h-5 w-5" />
@@ -471,13 +427,13 @@ function AdminDashboardModern() {
               </CardContent>
             </Card>
             <Card
-              className="cursor-pointer rounded-3xl border-slate-200 bg-white shadow-sm transition hover:shadow-md"
+              className="cursor-pointer rounded-3xl border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-blue-900/70 dark:bg-slate-950/70"
               onClick={() => setSummaryModal('tenants')}
             >
               <CardContent className="flex items-center justify-between p-5">
                 <div>
-                  <div className="text-sm text-slate-500">{t('Total Tenants', 'மொத்த வாடகையாளர்கள்')}</div>
-                  <div className="mt-1 text-2xl font-semibold text-slate-900">{Number(totals.totalTenants).toLocaleString()}</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-300">{t('Total Tenants', 'மொத்த வாடகையாளர்கள்')}</div>
+                  <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">{Number(totals.totalTenants).toLocaleString()}</div>
                 </div>
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
                   <Users className="h-5 w-5" />
@@ -485,13 +441,13 @@ function AdminDashboardModern() {
               </CardContent>
             </Card>
             <Card
-              className="cursor-pointer rounded-3xl border-slate-200 bg-white shadow-sm transition hover:shadow-md"
+              className="cursor-pointer rounded-3xl border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-blue-900/70 dark:bg-slate-950/70"
               onClick={() => setSummaryModal('revenue')}
             >
               <CardContent className="flex items-center justify-between p-5">
                 <div>
-                  <div className="text-sm text-slate-500">{t('Monthly Rent Collection', 'மாதாந்திர வாடகை வசூல்')}</div>
-                  <div className="mt-1 text-2xl font-semibold text-slate-900">₹{Number(totals.monthlyRevenue).toLocaleString()}</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-300">{t('Monthly Rent Collection', 'மாதாந்திர வாடகை வசூல்')}</div>
+                  <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">₹{Number(totals.monthlyRevenue).toLocaleString()}</div>
                 </div>
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
                   <CreditCard className="h-5 w-5" />
@@ -499,13 +455,13 @@ function AdminDashboardModern() {
               </CardContent>
             </Card>
             <Card
-              className="cursor-pointer rounded-3xl border-slate-200 bg-white shadow-sm transition hover:shadow-md"
+              className="cursor-pointer rounded-3xl border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-blue-900/70 dark:bg-slate-950/70"
               onClick={() => setSummaryModal('maintenance')}
             >
               <CardContent className="flex items-center justify-between p-5">
                 <div>
-                  <div className="text-sm text-slate-500">{t('Open Maintenance Requests', 'திறந்த பராமரிப்பு கோரிக்கைகள்')}</div>
-                  <div className="mt-1 text-2xl font-semibold text-slate-900">{Number(totals.openMaintenance).toLocaleString()}</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-300">{t('Open Maintenance Requests', 'திறந்த பராமரிப்பு கோரிக்கைகள்')}</div>
+                  <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">{Number(totals.openMaintenance).toLocaleString()}</div>
                 </div>
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
                   <Wrench className="h-5 w-5" />
@@ -515,16 +471,16 @@ function AdminDashboardModern() {
           </div>
 
           <div id="admin-charts-section" className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Card className="rounded-3xl border-slate-200 bg-white shadow-sm">
+            <Card className="rounded-3xl border-slate-200 bg-white shadow-sm dark:border-blue-900/70 dark:bg-slate-950/70">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base text-slate-900">{t('Rent Collection Trend', 'வாடகை வசூல் போக்கு')}</CardTitle>
+                <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Rent Collection Trend', 'வாடகை வசூல் போக்கு')}</CardTitle>
               </CardHeader>
               <CardContent className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={revenueByMonth}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.18} />
-                    <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 12 }} />
-                    <YAxis tick={{ fill: '#64748b', fontSize: 12 }} />
+                    <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                    <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} />
                     <Tooltip formatter={(value: number) => [`₹${Number(value || 0).toLocaleString()}`, t('Revenue', 'வருமானம்')]} />
                     <Line type="monotone" dataKey="revenue" stroke="#2563eb" strokeWidth={3} dot={false} />
                   </LineChart>
@@ -532,9 +488,9 @@ function AdminDashboardModern() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-3xl border-slate-200 bg-white shadow-sm">
+            <Card className="rounded-3xl border-slate-200 bg-white shadow-sm dark:border-blue-900/70 dark:bg-slate-950/70">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base text-slate-900">{t('Property Occupancy Rate', 'சொத்து குடியேற்ற விகிதம்')}</CardTitle>
+                <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Property Occupancy Rate', 'சொத்து குடியேற்ற விகிதம்')}</CardTitle>
               </CardHeader>
               <CardContent className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -551,9 +507,9 @@ function AdminDashboardModern() {
             </Card>
           </div>
 
-          <Card id="admin-properties-section" className="rounded-3xl border-slate-200 bg-white shadow-sm">
+          <Card id="admin-properties-section" className="rounded-3xl border-slate-200 bg-white shadow-sm dark:border-blue-900/70 dark:bg-slate-950/70">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base text-slate-900">{t('Property Management', 'சொத்து நிர்வாகம்')}</CardTitle>
+              <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Property Management', 'சொத்து நிர்வாகம்')}</CardTitle>
             </CardHeader>
             <CardContent className="overflow-auto">
               <Table>
@@ -571,7 +527,7 @@ function AdminDashboardModern() {
                 <TableBody>
                   {filteredProps.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-sm text-slate-500">
+                      <TableCell colSpan={7} className="text-sm text-slate-500 dark:text-slate-300">
                         {t('No properties found', 'சொத்துகள் இல்லை')}
                       </TableCell>
                     </TableRow>
@@ -583,7 +539,7 @@ function AdminDashboardModern() {
                       const vacant = Math.max(0, units - occupied);
                       const active = String(p?.status || '').toLowerCase() === 'approved';
                       return (
-                        <TableRow key={String(p?._id || p?.id)} className="hover:bg-slate-50">
+                        <TableRow key={String(p?._id || p?.id)} className="hover:bg-slate-50 dark:hover:bg-slate-800/60">
                           <TableCell className="font-medium">{String(p?.title || '-')}</TableCell>
                           <TableCell>{String(p?.owner?.name || '-')}</TableCell>
                           <TableCell>{units}</TableCell>
@@ -591,7 +547,7 @@ function AdminDashboardModern() {
                           <TableCell>{vacant}</TableCell>
                           <TableCell>{statusBadge(active)}</TableCell>
                           <TableCell className="text-right">
-                            <Button variant="outline" className="h-9 rounded-2xl border-slate-200 bg-white px-3" onClick={() => setSelectedProperty(p)}>
+                            <Button variant="outline" className="h-9 rounded-2xl border-slate-200 bg-white px-3 dark:border-blue-800 dark:bg-slate-900/80 dark:hover:bg-slate-800" onClick={() => setSelectedProperty(p)}>
                               {t('View', 'பார்')}
                             </Button>
                           </TableCell>
@@ -604,9 +560,9 @@ function AdminDashboardModern() {
             </CardContent>
           </Card>
 
-          <Card id="admin-tenants-section" className="rounded-3xl border-slate-200 bg-white shadow-sm">
+          <Card id="admin-tenants-section" className="rounded-3xl border-slate-200 bg-white shadow-sm dark:border-blue-900/70 dark:bg-slate-950/70">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base text-slate-900">{t('Recent Tenants', 'சமீபத்திய வாடகையாளர்கள்')}</CardTitle>
+              <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Recent Tenants', 'சமீபத்திய வாடகையாளர்கள்')}</CardTitle>
             </CardHeader>
             <CardContent className="overflow-auto">
               <Table>
@@ -622,7 +578,7 @@ function AdminDashboardModern() {
                 <TableBody>
                   {recentTenants.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-sm text-slate-500">
+                      <TableCell colSpan={5} className="text-sm text-slate-500 dark:text-slate-300">
                         {t('No tenant activity found', 'வாடகையாளர் செயல்பாடு இல்லை')}
                       </TableCell>
                     </TableRow>
@@ -630,7 +586,7 @@ function AdminDashboardModern() {
                     recentTenants.map((r) => (
                       <TableRow
                         key={r.id}
-                        className="cursor-pointer hover:bg-slate-50"
+                        className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60"
                         onClick={() => setSelectedTenantRow(r)}
                       >
                         <TableCell className="font-medium">{r.tenantName}</TableCell>
@@ -646,9 +602,9 @@ function AdminDashboardModern() {
             </CardContent>
           </Card>
 
-          <Card id="admin-maintenance-section" className="rounded-3xl border-slate-200 bg-white shadow-sm">
+          <Card id="admin-maintenance-section" className="rounded-3xl border-slate-200 bg-white shadow-sm dark:border-blue-900/70 dark:bg-slate-950/70">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base text-slate-900">{t('Maintenance Overview', 'பராமரிப்பு மேலோட்டம்')}</CardTitle>
+              <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Maintenance Overview', 'பராமரிப்பு மேலோட்டம்')}</CardTitle>
             </CardHeader>
             <CardContent className="overflow-auto">
               <Table>
@@ -664,7 +620,7 @@ function AdminDashboardModern() {
                 <TableBody>
                   {filteredMaintenance.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-sm text-slate-500">
+                      <TableCell colSpan={5} className="text-sm text-slate-500 dark:text-slate-300">
                         {t('No maintenance requests', 'பராமரிப்பு கோரிக்கைகள் இல்லை')}
                       </TableCell>
                     </TableRow>
@@ -672,7 +628,7 @@ function AdminDashboardModern() {
                     filteredMaintenance.slice(0, 10).map((m: any) => (
                       <TableRow
                         key={String(m?._id || m?.id)}
-                        className="cursor-pointer hover:bg-slate-50"
+                        className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60"
                         onClick={() => setSelectedMaintenanceRow(m)}
                       >
                         <TableCell className="font-medium">{String(m?.issue || '-')}</TableCell>
@@ -690,18 +646,14 @@ function AdminDashboardModern() {
         </main>
 
         <aside className="h-fit space-y-5 xl:sticky xl:top-4">
-          <Card className="rounded-3xl border-slate-200 bg-white shadow-sm">
+          <Card className="rounded-3xl border-slate-200 bg-white shadow-sm dark:border-blue-900/70 dark:bg-slate-950/70">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base text-slate-900">{t('Quick Actions', 'விரைவு செயல்கள்')}</CardTitle>
+              <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Quick Actions', 'விரைவு செயல்கள்')}</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2">
-              <Button className="h-10 justify-start rounded-2xl bg-blue-600 px-4 hover:bg-blue-700" onClick={() => setCreatePropertyOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                {t('Add Property', 'சொத்து சேர்க்க')}
-              </Button>
               <Button
                 variant="outline"
-                className="h-10 justify-start rounded-2xl border-slate-200 bg-white px-4"
+                className="h-10 justify-start rounded-2xl border-slate-200 bg-white px-4 dark:border-blue-800 dark:bg-slate-900/80 dark:hover:bg-slate-800"
                 onClick={() => {
                   setUserDraft({ name: '', email: '', phone: '', tamilRole: 'customers' });
                   setCreateUserOpen(true);
@@ -712,7 +664,7 @@ function AdminDashboardModern() {
               </Button>
               <Button
                 variant="outline"
-                className="h-10 justify-start rounded-2xl border-slate-200 bg-white px-4"
+                className="h-10 justify-start rounded-2xl border-slate-200 bg-white px-4 dark:border-blue-800 dark:bg-slate-900/80 dark:hover:bg-slate-800"
                 onClick={() => {
                   setUserDraft({ name: '', email: '', phone: '', tamilRole: 'owners' });
                   setCreateUserOpen(true);
@@ -723,7 +675,7 @@ function AdminDashboardModern() {
               </Button>
               <Button
                 variant="outline"
-                className="h-10 justify-start rounded-2xl border-slate-200 bg-white px-4"
+                className="h-10 justify-start rounded-2xl border-slate-200 bg-white px-4 dark:border-blue-800 dark:bg-slate-900/80 dark:hover:bg-slate-800"
                 onClick={() => setAnnouncementOpen(true)}
               >
                 <Bell className="mr-2 h-4 w-4" />
@@ -731,7 +683,7 @@ function AdminDashboardModern() {
               </Button>
               <Button
                 variant="outline"
-                className="h-10 justify-start rounded-2xl border-slate-200 bg-white px-4"
+                className="h-10 justify-start rounded-2xl border-slate-200 bg-white px-4 dark:border-blue-800 dark:bg-slate-900/80 dark:hover:bg-slate-800"
                 onClick={() => {
                   downloadCsv(
                     'properties-report.csv',
@@ -753,27 +705,27 @@ function AdminDashboardModern() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-3xl border-slate-200 bg-white shadow-sm">
+          <Card className="rounded-3xl border-slate-200 bg-white shadow-sm dark:border-blue-900/70 dark:bg-slate-950/70">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base text-slate-900">{t('Recent Activity', 'சமீப செயல்பாடு')}</CardTitle>
+              <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Recent Activity', 'சமீப செயல்பாடு')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {recentActivity.length === 0 ? (
-                <div className="text-sm text-slate-500">{t('No recent activity', 'சமீப செயல்பாடு இல்லை')}</div>
+                <div className="text-sm text-slate-500 dark:text-slate-300">{t('No recent activity', 'சமீப செயல்பாடு இல்லை')}</div>
               ) : (
                 recentActivity.map((a) => {
                   const Icon = a.icon;
                   return (
                     <div
                       key={a.id}
-                      className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-3 py-2 shadow-sm transition hover:border-slate-200"
+                      className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-3 py-2 shadow-sm transition hover:border-slate-200 dark:border-blue-900/60 dark:bg-slate-900/80 dark:hover:border-blue-700"
                     >
                       <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
                         <Icon className="h-4 w-4" />
                       </div>
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-medium text-slate-900">{a.title}</div>
-                        <div className="truncate text-xs text-slate-500">{a.subtitle}</div>
+                        <div className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{a.title}</div>
+                        <div className="truncate text-xs text-slate-500 dark:text-slate-300">{a.subtitle}</div>
                       </div>
                     </div>
                   );
@@ -1242,81 +1194,6 @@ function AdminDashboardModern() {
               }}
             >
               {t('Save', 'சேமி')}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={createPropertyOpen} onOpenChange={setCreatePropertyOpen}>
-        <DialogContent className="rounded-3xl">
-          <DialogHeader>
-            <DialogTitle>{t('Add Property', 'சொத்து சேர்க்க')}</DialogTitle>
-            <DialogDescription>{t('Create a new property with minimal details.', 'குறைந்த விவரங்களுடன் புதிய சொத்தை உருவாக்கவும்.')}</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3">
-            <div className="grid gap-2">
-              <Label>{t('Owner', 'உரிமையாளர்')}</Label>
-              <Select value={propertyDraft.ownerId} onValueChange={(v) => setPropertyDraft((s) => ({ ...s, ownerId: v }))}>
-                <SelectTrigger className="rounded-2xl">
-                  <SelectValue placeholder={t('Select owner', 'உரிமையாளரை தேர்ந்தெடு')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {owners.map((o: any) => (
-                    <SelectItem key={String(o._id || o.id)} value={String(o._id || o.id)}>
-                      {String(o.name || o.email || '')}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label>{t('Property Name', 'சொத்து பெயர்')}</Label>
-              <Input
-                value={propertyDraft.title}
-                onChange={(e) => setPropertyDraft((s) => ({ ...s, title: e.target.value }))}
-                className="rounded-2xl"
-                placeholder={t('e.g. Skyline Apartments', 'உதா. Skyline Apartments')}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>{t('Property Type', 'சொத்து வகை')}</Label>
-              <Select value={propertyDraft.propertyType} onValueChange={(v) => setPropertyDraft((s) => ({ ...s, propertyType: v }))}>
-                <SelectTrigger className="rounded-2xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Apartment">Apartment</SelectItem>
-                  <SelectItem value="House">House</SelectItem>
-                  <SelectItem value="Villa">Villa</SelectItem>
-                  <SelectItem value="Commercial">Commercial</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label>{t('Location', 'இடம்')}</Label>
-              <Input
-                value={propertyDraft.location}
-                onChange={(e) => setPropertyDraft((s) => ({ ...s, location: e.target.value }))}
-                className="rounded-2xl"
-                placeholder={t('City / Area', 'நகரம் / பகுதி')}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>{t('Monthly Rent', 'மாத வாடகை')}</Label>
-              <Input
-                value={propertyDraft.price}
-                onChange={(e) => setPropertyDraft((s) => ({ ...s, price: e.target.value }))}
-                className="rounded-2xl"
-                placeholder="10000"
-              />
-            </div>
-          </div>
-          <div className="mt-4 flex justify-end gap-2">
-            <Button variant="outline" className="h-10 rounded-2xl" onClick={() => setCreatePropertyOpen(false)}>
-              {t('Cancel', 'ரத்து')}
-            </Button>
-            <Button className="h-10 rounded-2xl bg-blue-600 hover:bg-blue-700" onClick={onCreateProperty} disabled={createProperty.isPending}>
-              {t('Create', 'உருவாக்கு')}
             </Button>
           </div>
         </DialogContent>

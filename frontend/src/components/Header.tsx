@@ -32,6 +32,9 @@ interface HeaderProps {
   onLogout?: () => void;
   onDashboardClick?: () => void;
   onHomeClick?: () => void;
+  onAboutClick?: () => void;
+  onRentClick?: () => void;
+  onBuyClick?: () => void;
   isDashboardActive?: boolean;
   onLoginClick?: () => void;
 }
@@ -40,6 +43,9 @@ export default function Header({
   onLogout, 
   onDashboardClick,
   onHomeClick,
+  onAboutClick,
+  onRentClick,
+  onBuyClick,
   isDashboardActive = false,
   onLoginClick
 }: HeaderProps) {
@@ -54,7 +60,7 @@ export default function Header({
   const isLoggingIn = isInitializing; // Simplified
 
   const navClass = (item: typeof activeNav) =>
-    `rounded-full px-4 py-2 transition-all hover:-translate-y-0.5 hover:bg-white/70 hover:text-blue-700 dark:hover:bg-blue-950/70 dark:hover:text-blue-200 ${
+    `whitespace-nowrap rounded-full px-3 py-2 transition-all hover:-translate-y-0.5 hover:bg-white/70 hover:text-blue-700 dark:hover:bg-blue-950/70 dark:hover:text-blue-200 lg:px-4 ${
       activeNav === item
         ? 'bg-white/85 text-blue-700 shadow-sm ring-1 ring-blue-100 dark:bg-blue-950/80 dark:text-blue-200 dark:ring-blue-800'
         : ''
@@ -63,6 +69,16 @@ export default function Header({
   const handleHomeNavigation = () => {
     setActiveNav('home');
     onHomeClick?.();
+  };
+
+  const handleRentNavigation = () => {
+    setActiveNav('rent');
+    onRentClick?.();
+  };
+
+  const handleBuyNavigation = () => {
+    setActiveNav('buy');
+    onBuyClick?.();
   };
 
   const handleLogout = async () => {
@@ -93,9 +109,9 @@ export default function Header({
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-blue-100/80 bg-gradient-to-r from-white/90 via-blue-50/85 to-emerald-50/80 shadow-sm shadow-blue-900/5 backdrop-blur-xl transition-colors dark:border-blue-900/70 dark:bg-none dark:bg-slate-950/85 dark:shadow-black/20">
-      <div className="container flex h-[76px] items-center justify-between">
+      <div className="container flex min-h-[76px] items-center gap-4 py-3 lg:gap-6">
         <div 
-          className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-slate-900 transition-all hover:-translate-y-0.5 hover:text-blue-700 dark:text-white dark:hover:text-blue-200"
+          className="flex shrink-0 items-center gap-2.5 text-xl font-bold tracking-tight text-slate-900 transition-all hover:-translate-y-0.5 hover:text-blue-700 dark:text-white dark:hover:text-blue-200"
           onClick={handleHomeNavigation}
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-600/20 transition-transform hover:rotate-3 hover:scale-105"><Building2 className="h-5 w-5" /></span>
@@ -103,26 +119,27 @@ export default function Header({
         </div>
 
         {/* Desktop Navigation */}
-        <div className="hidden items-center gap-2 md:flex">
-          <nav className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1 text-sm font-medium text-muted-foreground">
+        <div className="hidden min-w-0 flex-1 items-center justify-between gap-4 lg:flex">
+          <nav className="flex min-w-0 flex-1 items-center justify-center gap-1 text-sm font-medium text-muted-foreground">
             <button type="button" onClick={handleHomeNavigation} className={navClass('home')}>
               {t('Home', 'முகப்பு')}
             </button>
-            <a href="#about-us" onClick={() => setActiveNav('about')} className={navClass('about')}>
+            <button type="button" onClick={() => { setActiveNav('about'); onAboutClick?.(); }} className={navClass('about')}>
               {t('About us', 'எங்களைப் பற்றி')}
-            </a>
-            <button type="button" onClick={() => setActiveNav('rent')} className={navClass('rent')}>
+            </button>
+            <button type="button" onClick={handleRentNavigation} className={navClass('rent')}>
               {t('Rent', 'வாடகை')}
             </button>
-            <button type="button" onClick={() => setActiveNav('buy')} className={navClass('buy')}>
+            <button type="button" onClick={handleBuyNavigation} className={navClass('buy')}>
               {t('Buy', 'வாங்க')}
             </button>
             <button type="button" onClick={() => setActiveNav('list')} className={navClass('list')}>
               {t('List Property', 'சொத்தை பட்டியலிடுங்கள்')}
             </button>
           </nav>
+          <div className="flex shrink-0 items-center gap-2">
           <Select value={language} onValueChange={(val: any) => setLanguage(val)}>
-            <SelectTrigger className="h-10 w-[112px] rounded-full border-blue-100 bg-white/75 shadow-sm transition-colors hover:bg-white dark:border-blue-800 dark:bg-slate-900/70 dark:hover:bg-slate-900">
+            <SelectTrigger className="h-10 w-auto min-w-[108px] rounded-full border-blue-100 bg-white/75 px-3 shadow-sm transition-colors hover:bg-white dark:border-blue-800 dark:bg-slate-900/70 dark:hover:bg-slate-900">
               <Globe2 className="mr-1 h-4 w-4 text-blue-600" />
               <SelectValue placeholder={t('Language', 'மொழி')} />
             </SelectTrigger>
@@ -158,7 +175,7 @@ export default function Header({
           {isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2 rounded-full border-blue-100 bg-white/70 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white dark:border-blue-800 dark:bg-slate-900/70 dark:hover:bg-slate-900">
+                <Button variant="outline" className="max-w-[180px] gap-2 rounded-full border-blue-100 bg-white/70 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white dark:border-blue-800 dark:bg-slate-900/70 dark:hover:bg-slate-900">
                   <User className="h-4 w-4" />
                   <span className="max-w-[150px] truncate">
                     {userProfile?.name || user?.name || t('User', 'பயனர்')}
@@ -199,10 +216,11 @@ export default function Header({
               {t('Login', 'உள்நுழைய')}
             </Button>
           )}
+          </div>
         </div>
 
         {/* Mobile Navigation */}
-        <div className="md:hidden flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 lg:hidden">
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -238,6 +256,38 @@ export default function Header({
                     </SelectContent>
                   </Select>
                 </div>
+
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setActiveNav('about');
+                    onAboutClick?.();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full justify-start"
+                >
+                  {t('About us', 'எங்களைப் பற்றி')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    handleRentNavigation();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full justify-start"
+                >
+                  {t('Rent', 'வாடகை')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    handleBuyNavigation();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full justify-start"
+                >
+                  {t('Buy', 'வாங்க')}
+                </Button>
 
                 {isAuthenticated ? (
                   <div className="flex flex-col gap-2">

@@ -14,21 +14,87 @@ import { toast } from 'sonner';
 import { translateText } from '../lib/api';
 import HeroSection from './HeroSection';
 
-export default function PropertyListings() {
+interface PropertyListingsProps {
+  showAbout?: boolean;
+  initialTransactionType?: 'rent' | 'buy' | '';
+}
+
+export default function PropertyListings({ showAbout = false, initialTransactionType = '' }: PropertyListingsProps) {
   const { data: properties = [], isLoading } = useGetAllProperties();
   const { t, language } = useLanguage();
   const { isAuthenticated } = useAuth();
   const createRequest = useCreateRequest();
 
+  useEffect(() => {
+    if (!showAbout) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById('about-us')?.scrollIntoView({ behavior: 'auto', block: 'start' });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [showAbout]);
+
   // Filter states
   const [location, setLocation] = useState('');
   const [propertyType, setPropertyType] = useState('');
-  const [transactionType, setTransactionType] = useState('');
+  const [transactionType, setTransactionType] = useState<string>(initialTransactionType);
   const [priceRange, setPriceRange] = useState([0, 0]);
   const [selectedPropertyIndex, setSelectedPropertyIndex] = useState<number | null>(null);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  useEffect(() => {
+    setTransactionType(initialTransactionType);
+  }, [initialTransactionType]);
+
+  useEffect(() => {
+    if (!initialTransactionType) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById('property-listings')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [initialTransactionType]);
+
+  const normalizePropertyType = (value: unknown) => {
+    const normalized = String(value ?? '').trim().toLowerCase().replace(/[\s/_-]+/g, '');
+    if (
+      normalized === 'flat' ||
+      normalized === 'flats' ||
+      normalized === 'apartment' ||
+      normalized === 'apartments' ||
+      normalized === 'flatapartment'
+    ) {
+      return 'flat';
+    }
+    if (normalized === 'house' || normalized === 'houses' || normalized === 'villa' || normalized === 'villas') {
+      return 'house';
+    }
+    if (normalized === 'pg' || normalized === 'pgs' || normalized === 'hostel' || normalized === 'pghostel') {
+      return 'pg';
+    }
+    if (normalized === 'land' || normalized === 'plot' || normalized === 'plots') return 'land';
+    return normalized;
+  };
+
+  const normalizeTransactionType = (value: unknown) => {
+    const normalized = String(value ?? '').trim().toLowerCase().replace(/[\s/_-]+/g, '');
+    if (
+      normalized === 'buy' ||
+      normalized === 'purchase' ||
+      normalized === 'purchases' ||
+      normalized === 'sale' ||
+      normalized === 'sell' ||
+      normalized === 'forsale'
+    ) {
+      return 'purchase';
+    }
+    if (normalized === 'rent' || normalized === 'rental' || normalized === 'lease' || normalized === 'forrent') {
+      return 'rent';
+    }
+    return normalized;
+  };
 
   // Filter logic
   const filteredProperties = useMemo(() => {
@@ -37,11 +103,13 @@ export default function PropertyListings() {
       const filterLocation = String(location ?? '').toLowerCase();
       const locationMatch = propertyLocation.includes(filterLocation);
 
-      const propertyPropertyType = String((property as any)?.propertyType ?? '');
-      const typeMatch = propertyType ? propertyPropertyType === propertyType : true;
+      const propertyPropertyType = normalizePropertyType((property as any)?.propertyType);
+      const typeMatch = propertyType ? propertyPropertyType === normalizePropertyType(propertyType) : true;
 
-      const propertyTransactionType = String((property as any)?.transactionType ?? '');
-      const transactionMatch = transactionType ? propertyTransactionType === transactionType : true;
+      const propertyTransactionType = normalizeTransactionType((property as any)?.transactionType);
+      const transactionMatch = transactionType
+        ? propertyTransactionType === normalizeTransactionType(transactionType)
+        : true;
 
       const propertyPrice = Number((property as any)?.price ?? 0);
       const priceMatch = priceRange[1] === 0 || (propertyPrice >= priceRange[0] && propertyPrice <= priceRange[1]);
@@ -59,6 +127,16 @@ export default function PropertyListings() {
     setPropertyType('');
     setTransactionType('');
     setPriceRange([0, 0]);
+  };
+
+  const handlePropertyTypeChange = (value: string) => {
+    setPropertyType(value);
+    if (!value) return;
+
+    setTransactionType('rent');
+    requestAnimationFrame(() => {
+      document.getElementById('property-listings')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   };
 
   // Navigation for property details view
@@ -169,75 +247,85 @@ export default function PropertyListings() {
   return (
     <div className="container py-4 sm:py-6 lg:py-8 px-4 sm:px-6">
       <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
-        <HeroSection location={location} onLocationChange={setLocation} propertyType={propertyType} onPropertyTypeChange={setPropertyType} transactionType={transactionType} onTransactionTypeChange={setTransactionType} maxPrice={priceRange[1]} onMaxPriceChange={(value) => setPriceRange([0, value])} onSearch={() => document.getElementById('property-listings')?.scrollIntoView({ behavior: 'smooth' })} />
+        <HeroSection
+          location={location}
+          onLocationChange={setLocation}
+          propertyType={propertyType}
+          onPropertyTypeChange={handlePropertyTypeChange}
+          transactionType={transactionType}
+          onTransactionTypeChange={setTransactionType}
+          maxPrice={priceRange[1]}
+          onMaxPriceChange={(value) => setPriceRange([0, value])}
+          onSearch={() => document.getElementById('property-listings')?.scrollIntoView({ behavior: 'smooth' })}
+        />
 
-        <section id="about-us" className="scroll-mt-24 overflow-hidden rounded-[2rem] border border-blue-100/80 bg-card shadow-xl shadow-blue-950/10 dark:border-blue-900/70 dark:shadow-black/20">
-          <div className="grid lg:grid-cols-[0.9fr_1.1fr]">
-            <div className="relative min-h-[20rem] overflow-hidden bg-slate-900 lg:min-h-full">
-              <img
-                src="https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=85"
-                alt={t('Modern Reside home interior', 'Reside நவீன வீட்டு உட்புறம்')}
-                className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-950/65 via-blue-900/25 to-teal-950/55" />
-              <div className="relative flex h-full flex-col justify-between p-7 text-white sm:p-10">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500 shadow-lg shadow-blue-950/30">
-                  <Building2 className="h-6 w-6" />
-                </div>
-                <div className="mt-16">
-                  <p className="text-sm font-semibold uppercase tracking-[0.25em] text-blue-200">
-                    {t('About Reside', 'Reside பற்றி')}
-                  </p>
-                  <p className="mt-3 max-w-sm text-3xl font-semibold leading-tight">
-                    {t('Your Space, Your Story, Your Home.', 'உங்கள் இடம், உங்கள் கதை, உங்கள் வீடு.')}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-7 sm:p-10">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">
-                {t('Welcome to Reside', 'Reside-க்கு வரவேற்கிறோம்')}
-              </p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                {t('Find more than a property.', 'ஒரு சொத்தை விட அதிகமாகக் கண்டறியுங்கள்.')}
-              </h2>
-              <div className="mt-5 space-y-4 text-sm leading-7 text-muted-foreground">
-                <p>
-                  {t(
-                    'Welcome to Reside, your trusted destination for discovering properties and simplifying your housing journey. Whether you are looking for your dream home, searching for a rental property, or listing a property of your own, Reside makes the process simple, convenient, and accessible.',
-                    'சொத்துகளைக் கண்டறிந்து உங்கள் வீட்டு பயணத்தை எளிதாக்கும் நம்பகமான தளம் Reside. உங்கள் கனவு வீட்டைத் தேடினாலும், வாடகை வீட்டைத் தேடினாலும் அல்லது உங்கள் சொத்தைப் பட்டியலிட்டாலும், Reside செயல்முறையை எளிமையாகவும் வசதியாகவும் அணுகக்கூடியதாகவும் மாற்றுகிறது.'
-                  )}
-                </p>
-                <p>
-                  {t(
-                    'Our platform brings property seekers, owners, and brokers together with smart search options, personalized filters, and a user-friendly experience. With support for Tamil and English voice interactions, we aim to make property discovery easier for everyone.',
-                    'ஸ்மார்ட் தேடல், தனிப்பயன் வடிகட்டிகள் மற்றும் எளிய அனுபவத்தின் மூலம் சொத்தைத் தேடுபவர்கள், உரிமையாளர்கள் மற்றும் தரகர்களை எங்கள் தளம் இணைக்கிறது. தமிழ் மற்றும் ஆங்கில குரல் தொடர்பு ஆதரவுடன், அனைவருக்கும் சொத்து தேடலை எளிதாக்குகிறோம்.'
-                  )}
-                </p>
-              </div>
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                {[
-                  t('Trusted property discovery', 'நம்பகமான சொத்து தேடல்'),
-                  t('Tamil and English support', 'தமிழ் மற்றும் ஆங்கில ஆதரவு'),
-                ].map((item) => (
-                  <div key={item} className="flex items-center gap-2 rounded-xl border border-blue-200/70 bg-white/55 px-3 py-2.5 text-sm font-medium text-foreground dark:border-blue-900/70 dark:bg-slate-950/30">
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
-                    <span>{item}</span>
+        <section id="about-us" className="scroll-mt-32 overflow-hidden rounded-[2rem] border border-blue-100/80 bg-card shadow-xl shadow-blue-950/10 dark:border-blue-900/70 dark:shadow-black/20">
+            <div className="grid lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="relative min-h-[20rem] overflow-hidden bg-slate-900 lg:min-h-full">
+                <img
+                  src="https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=85"
+                  alt={t('Modern Reside home interior', 'Reside நவீன வீட்டு உட்புறம்')}
+                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-950/65 via-blue-900/25 to-teal-950/55" />
+                <div className="relative flex h-full flex-col justify-between p-7 text-white sm:p-10">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500 shadow-lg shadow-blue-950/30">
+                    <Building2 className="h-6 w-6" />
                   </div>
-                ))}
+                  <div className="mt-16">
+                    <p className="text-sm font-semibold uppercase tracking-[0.25em] text-blue-200">
+                      {t('About Reside', 'Reside பற்றி')}
+                    </p>
+                    <p className="mt-3 max-w-sm text-3xl font-semibold leading-tight">
+                      {t('Your Space, Your Story, Your Home.', 'உங்கள் இடம், உங்கள் கதை, உங்கள் வீடு.')}
+                    </p>
+                  </div>
+                </div>
               </div>
-              <p className="mt-7 border-l-2 border-primary pl-4 text-sm font-semibold italic text-foreground">
-                {t(
-                  'At Reside, finding the right place is more than finding a property — it is where life happens, memories grow, and dreams become reality.',
-                  'Reside-ல் சரியான இடத்தைக் கண்டுபிடிப்பது ஒரு சொத்தை கண்டுபிடிப்பதை விட அதிகம் — வாழ்க்கை நிகழும், நினைவுகள் வளரும், கனவுகள் நனவாகும் இடம் அது.'
-                )}
-              </p>
-              <p className="mt-5 text-base font-semibold text-primary">
-                {t('Reside — Find Your Place. Feel at Home.', 'Reside — உங்கள் இடத்தைக் கண்டறியுங்கள். வீட்டைப் போல் உணருங்கள்.')}
-              </p>
+
+              <div className="p-7 sm:p-10">
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">
+                  {t('Welcome to Reside', 'Reside-க்கு வரவேற்கிறோம்')}
+                </p>
+                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                  {t('Find more than a property.', 'ஒரு சொத்தை விட அதிகமாகக் கண்டறியுங்கள்.')}
+                </h2>
+                <div className="mt-5 space-y-4 text-sm leading-7 text-muted-foreground">
+                  <p>
+                    {t(
+                      'Welcome to Reside, your trusted destination for discovering properties and simplifying your housing journey. Whether you are looking for your dream home, searching for a rental property, or listing a property of your own, Reside makes the process simple, convenient, and accessible.',
+                      'சொத்துகளைக் கண்டறிந்து உங்கள் வீட்டு பயணத்தை எளிதாக்கும் நம்பகமான தளம் Reside. உங்கள் கனவு வீட்டைத் தேடினாலும், வாடகை வீட்டைத் தேடினாலும் அல்லது உங்கள் சொத்தைப் பட்டியலிட்டாலும், Reside செயல்முறையை எளிமையாகவும் வசதியாகவும் அணுகக்கூடியதாகவும் மாற்றுகிறது.'
+                    )}
+                  </p>
+                  <p>
+                    {t(
+                      'Our platform brings property seekers, owners, and brokers together with smart search options, personalized filters, and a user-friendly experience. With support for Tamil and English voice interactions, we aim to make property discovery easier for everyone.',
+                      'ஸ்மார்ட் தேடல், தனிப்பயன் வடிகட்டிகள் மற்றும் எளிய அனுபவத்தின் மூலம் சொத்தைத் தேடுபவர்கள், உரிமையாளர்கள் மற்றும் தரகர்களை எங்கள் தளம் இணைக்கிறது. தமிழ் மற்றும் ஆங்கில குரல் தொடர்பு ஆதரவுடன், அனைவருக்கும் சொத்து தேடலை எளிதாக்குகிறோம்.'
+                    )}
+                  </p>
+                </div>
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                  {[
+                    t('Trusted property discovery', 'நம்பகமான சொத்து தேடல்'),
+                    t('Tamil and English support', 'தமிழ் மற்றும் ஆங்கில ஆதரவு'),
+                  ].map((item) => (
+                    <div key={item} className="flex items-center gap-2 rounded-xl border border-blue-200/70 bg-white/55 px-3 py-2.5 text-sm font-medium text-foreground dark:border-blue-900/70 dark:bg-slate-950/30">
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-7 border-l-2 border-primary pl-4 text-sm font-semibold italic text-foreground">
+                  {t(
+                    'At Reside, finding the right place is more than finding a property — it is where life happens, memories grow, and dreams become reality.',
+                    'Reside-ல் சரியான இடத்தைக் கண்டுபிடிப்பது ஒரு சொத்தை கண்டுபிடிப்பதை விட அதிகம் — வாழ்க்கை நிகழும், நினைவுகள் வளரும், கனவுகள் நனவாகும் இடம் அது.'
+                  )}
+                </p>
+                <p className="mt-5 text-base font-semibold text-primary">
+                  {t('Reside — Find Your Place. Feel at Home.', 'Reside — உங்கள் இடத்தைக் கண்டறியுங்கள். வீட்டைப் போல் உணருங்கள்.')}
+                </p>
+              </div>
             </div>
-          </div>
         </section>
 
         <div className="grid gap-4 sm:grid-cols-3">
@@ -361,7 +449,12 @@ export default function PropertyListings() {
               </div>
               <div className="flex items-center gap-2">
                 {['All', 'Apartments', 'Villas'].map((category) => (
-                  <button key={category} type="button" onClick={() => setPropertyType(category === 'All' ? '' : category === 'Apartments' ? 'flat' : 'house')} className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${propertyType === (category === 'All' ? '' : category === 'Apartments' ? 'flat' : 'house') ? 'border-blue-600 bg-blue-600 text-white' : 'border-border bg-card text-muted-foreground hover:border-blue-300 hover:text-blue-600'}`}>
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => handlePropertyTypeChange(category === 'All' ? '' : category === 'Apartments' ? 'flat' : 'house')}
+                    className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${propertyType === (category === 'All' ? '' : category === 'Apartments' ? 'flat' : 'house') ? 'border-blue-600 bg-blue-600 text-white' : 'border-border bg-card text-muted-foreground hover:border-blue-300 hover:text-blue-600'}`}
+                  >
                     {t(category, category === 'All' ? 'அனைத்தும்' : category === 'Apartments' ? 'அபார்ட்மென்ட்கள்' : 'வில்லாக்கள்')}
                   </button>
                 ))}
