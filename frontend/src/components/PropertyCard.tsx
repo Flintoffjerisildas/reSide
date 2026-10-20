@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Building2, MapPin, IndianRupee, Send, Edit, Trash2, Heart, BedDouble, Bath, Ruler, ImageOff } from 'lucide-react';
+import { Building2, MapPin, IndianRupee, Send, Edit, Trash2, BedDouble, Bath, Ruler, ImageOff } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +22,6 @@ export default function PropertyCard({ property, compact = false, showRequestBut
   const createRequest = useCreateRequest();
   const [translatedTitle, setTranslatedTitle] = useState<string | null>(null);
   const [translatedLocation, setTranslatedLocation] = useState<string | null>(null);
-  const [isFavorite, setIsFavorite] = useState(false);
 
   const displayTitle = useMemo(() => {
     if (language !== 'ta') return property.title;
@@ -193,10 +192,6 @@ export default function PropertyCard({ property, compact = false, showRequestBut
             </div>
           </div>
         )}
-        <div className="absolute left-3 top-3 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">✓ {t('Verified', 'சரிபார்க்கப்பட்டது')}</div>
-        <button type="button" aria-label={t('Save property', 'சொத்தை சேமிக்கவும்')} onClick={(e) => { e.stopPropagation(); setIsFavorite((value) => !value); }} className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow-sm transition hover:scale-105 ${isFavorite ? 'text-rose-500' : 'text-slate-500'}`}>
-          <Heart className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`} />
-        </button>
       </div>
 
       <CardHeader className="pb-2 sm:pb-3">

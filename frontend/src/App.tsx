@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
@@ -45,6 +45,116 @@ function LoadingScreen() {
   );
 }
 
+function useLoginPointerEffects() {
+  const shellRef = useRef<HTMLDivElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const pointerRef = useRef({ targetX: 50, targetY: 50, x: 50, y: 50, active: false });
+  const canInteractRef = useRef(false);
+
+  useEffect(() => {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const finePointer = window.matchMedia('(pointer: fine)');
+    canInteractRef.current = !reducedMotion.matches && finePointer.matches;
+
+    const updatePointerCapability = () => {
+      canInteractRef.current = !reducedMotion.matches && finePointer.matches;
+      if (!canInteractRef.current) {
+        pointerRef.current.active = false;
+        shellRef.current?.style.setProperty('--pointer-opacity', '0');
+      }
+    };
+
+    reducedMotion.addEventListener('change', updatePointerCapability);
+    finePointer.addEventListener('change', updatePointerCapability);
+
+    return () => {
+      reducedMotion.removeEventListener('change', updatePointerCapability);
+      finePointer.removeEventListener('change', updatePointerCapability);
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
+
+  const animatePointer = () => {
+    const shell = shellRef.current;
+    const pointer = pointerRef.current;
+    if (!shell || !canInteractRef.current) {
+      animationFrameRef.current = null;
+      return;
+    }
+
+    pointer.x += (pointer.targetX - pointer.x) * 0.12;
+    pointer.y += (pointer.targetY - pointer.y) * 0.12;
+    const distance = Math.hypot(pointer.targetX - pointer.x, pointer.targetY - pointer.y);
+    const speed = Math.min(distance / 12, 1);
+    const shiftX = (pointer.x - 50) * 0.2;
+    const shiftY = (pointer.y - 50) * 0.14;
+
+    shell.style.setProperty('--pointer-x', `${pointer.x}%`);
+    shell.style.setProperty('--pointer-y', `${pointer.y}%`);
+    shell.style.setProperty('--pointer-trail-opacity', `${speed.toFixed(3)}`);
+    shell.style.setProperty('--pointer-trail-opacity-secondary', `${(speed * 0.7).toFixed(3)}`);
+    shell.style.setProperty('--pointer-ripple-scale', (1 + speed).toFixed(3));
+    shell.style.setProperty('--pointer-trail-scale', (0.86 + speed * 0.2).toFixed(3));
+    shell.style.setProperty('--pointer-trail-scale-secondary', (0.8 + speed * 0.24).toFixed(3));
+    shell.style.setProperty('--pointer-shift-x', `${shiftX.toFixed(2)}px`);
+    shell.style.setProperty('--pointer-shift-y', `${shiftY.toFixed(2)}px`);
+    shell.style.setProperty('--particle-shift-x', `${(shiftX * 1.8).toFixed(2)}px`);
+    shell.style.setProperty('--particle-shift-y', `${(shiftY * 1.8).toFixed(2)}px`);
+
+    if (pointer.active || distance > 0.05) {
+      animationFrameRef.current = requestAnimationFrame(animatePointer);
+    } else {
+      animationFrameRef.current = null;
+    }
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!canInteractRef.current || event.pointerType !== 'mouse') {
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    pointerRef.current.targetX = ((event.clientX - bounds.left) / bounds.width) * 100;
+    pointerRef.current.targetY = ((event.clientY - bounds.top) / bounds.height) * 100;
+    pointerRef.current.active = true;
+    shellRef.current?.style.setProperty('--pointer-opacity', '1');
+
+    if (animationFrameRef.current === null) {
+      animationFrameRef.current = requestAnimationFrame(animatePointer);
+    }
+  };
+
+  const handlePointerLeave = () => {
+    pointerRef.current.active = false;
+    shellRef.current?.style.setProperty('--pointer-opacity', '0');
+  };
+
+  const handleCardPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
+    if (!canInteractRef.current || event.pointerType !== 'mouse') {
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    event.currentTarget.style.setProperty('--card-pointer-x', `${event.clientX - bounds.left}px`);
+    event.currentTarget.style.setProperty('--card-pointer-y', `${event.clientY - bounds.top}px`);
+    event.currentTarget.style.setProperty('--card-pointer-opacity', '1');
+  };
+
+  const handleCardPointerLeave = (event: ReactPointerEvent<HTMLElement>) => {
+    event.currentTarget.style.setProperty('--card-pointer-opacity', '0');
+  };
+
+  return {
+    shellRef,
+    handlePointerMove,
+    handlePointerLeave,
+    handleCardPointerMove,
+    handleCardPointerLeave,
+  };
+}
+
 function LoginPage() {
   const { t } = useLanguage();
   const {
@@ -67,6 +177,13 @@ function LoginPage() {
   const [otpEmail, setOtpEmail] = useState('');
   const [otpCountdown, setOtpCountdown] = useState(0);
   const [devOtp, setDevOtp] = useState<string | null>(null);
+  const {
+    shellRef,
+    handlePointerMove,
+    handlePointerLeave,
+    handleCardPointerMove,
+    handleCardPointerLeave,
+  } = useLoginPointerEffects();
 
   useEffect(() => {
     if (view === 'register-otp' || view === 'forgot-otp') {
@@ -267,13 +384,42 @@ function LoginPage() {
             : t('Enter the OTP and your new password', 'OTP மற்றும் உங்கள் புதிய கடவுச்சொல்லை உள்ளிடவும்');
 
   return (
-    <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center overflow-hidden bg-gradient-to-br from-blue-50 via-background to-teal-50/50 px-4 py-10 dark:from-[#081426] dark:via-background dark:to-[#102d3d]">
-      <div className="pointer-events-none absolute -left-24 top-12 h-72 w-72 rounded-full bg-blue-400/20 blur-3xl transition-opacity duration-500 dark:bg-blue-500/10" />
-      <div className="pointer-events-none absolute -right-20 bottom-0 h-80 w-80 rounded-full bg-teal-300/20 blur-3xl transition-opacity duration-500 dark:bg-teal-500/10" />
-      <div className="absolute inset-x-0 bottom-0 h-1/2 rounded-t-[3rem] bg-white/45 backdrop-blur-3xl dark:bg-[#0c1a2b]/55" />
+    <div
+      ref={shellRef}
+      className="login-shell relative flex min-h-[calc(100vh-4rem)] items-center justify-center overflow-hidden px-4 py-10"
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+    >
+      <div className="login-background pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="login-cursor-glow" />
+        <div className="login-cursor-ripple" />
+        <div className="login-orb login-orb-blue" />
+        <div className="login-orb login-orb-cyan" />
+        <div className="login-orb login-orb-mint" />
+        <div className="login-orb login-orb-sky" />
+        <div className="login-center-glow" />
+        <div className="login-waves">
+          <span className="login-wave login-wave-one" />
+          <span className="login-wave login-wave-two" />
+          <span className="login-wave login-wave-three" />
+          <span className="login-wave-trail login-wave-trail-one" />
+          <span className="login-wave-trail login-wave-trail-two" />
+        </div>
+        <div className="login-particles">
+          <span className="login-particle login-particle-one" />
+          <span className="login-particle login-particle-two" />
+          <span className="login-particle login-particle-three" />
+          <span className="login-particle login-particle-four" />
+          <span className="login-particle login-particle-five" />
+        </div>
+      </div>
 
-      <div className="relative grid w-full max-w-5xl gap-6 lg:grid-cols-[1fr_420px] lg:items-stretch">
-        <aside className="group relative hidden overflow-hidden rounded-[2rem] border border-blue-100/80 bg-gradient-to-br from-white via-blue-50 to-teal-50 p-8 text-slate-900 shadow-2xl shadow-blue-950/15 transition-all duration-500 hover:-translate-y-1 hover:shadow-blue-900/25 md:block dark:border-blue-900/60 dark:bg-none dark:bg-slate-950 dark:text-white">
+      <div className="relative z-10 grid w-full max-w-5xl gap-6 lg:grid-cols-[1fr_420px] lg:items-stretch">
+        <aside
+          className="login-interactive-card group relative hidden overflow-hidden rounded-[2rem] border border-blue-100/80 bg-gradient-to-br from-white via-blue-50 to-teal-50 p-8 text-slate-900 shadow-2xl shadow-blue-950/15 transition-all duration-500 hover:-translate-y-1 hover:shadow-blue-900/25 md:block dark:border-blue-900/60 dark:bg-none dark:bg-slate-950 dark:text-white"
+          onPointerMove={handleCardPointerMove}
+          onPointerLeave={handleCardPointerLeave}
+        >
         <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-400/20 blur-3xl transition-transform duration-700 group-hover:scale-125 dark:bg-blue-500/30" />
         <div className="absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-teal-300/25 blur-3xl transition-transform duration-700 group-hover:scale-125 dark:bg-teal-400/20" />
         <div className="relative flex h-full flex-col justify-between">
@@ -313,7 +459,11 @@ function LoginPage() {
         </div>
         </aside>
 
-        <div className="group relative w-full rounded-[2rem] border border-blue-100/70 bg-card/95 shadow-2xl shadow-blue-950/10 backdrop-blur transition-all duration-500 hover:border-blue-300/80 hover:shadow-blue-900/20 dark:border-blue-900/60 dark:shadow-black/30 dark:hover:border-blue-700/80">
+        <div
+          className="login-interactive-card group relative w-full rounded-[2rem] border border-blue-100/70 bg-card/95 shadow-2xl shadow-blue-950/10 backdrop-blur transition-all duration-500 hover:border-blue-300/80 hover:shadow-blue-900/20 dark:border-blue-900/60 dark:shadow-black/30 dark:hover:border-blue-700/80"
+          onPointerMove={handleCardPointerMove}
+          onPointerLeave={handleCardPointerLeave}
+        >
         <div className="pointer-events-none absolute right-6 top-6 text-blue-500/20 transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110">
           <Sparkles className="h-8 w-8" />
         </div>

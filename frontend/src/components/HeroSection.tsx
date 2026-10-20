@@ -36,7 +36,8 @@ export default function HeroSection({
           <Sparkles className="h-3.5 w-3.5 text-amber-300" /> {t('YOUR NEXT CHAPTER STARTS HERE', 'உங்கள் அடுத்த அத்தியாயம் இங்கே தொடங்குகிறது')}
         </div>
         <h1 className="max-w-xl text-4xl font-semibold leading-[1.2] tracking-tight sm:text-6xl sm:leading-[1.18]">
-          {t('Find a place that feels like ', 'வீடு போல் உணரும் இடத்தைக் ')}<span className="text-blue-400">{t('home.', 'கண்டறியுங்கள்.')}</span>
+          {t('Find a place that feels like ', 'வீடு போல் உணரும் இடத்தைக் ')}
+          <span className="text-blue-300">{t('home.', 'கண்டறியுங்கள்.')}</span>
         </h1>
         <p className="mt-5 max-w-md text-base leading-7 text-slate-200 sm:text-lg">{t('Explore verified properties with your bilingual real-estate assistant.', 'உங்கள் இருமொழி ரியல் எஸ்டேட் உதவியாளருடன் சரிபார்க்கப்பட்ட சொத்துகளை ஆராயுங்கள்.')}</p>
       </div>
