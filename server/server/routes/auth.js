@@ -30,6 +30,13 @@ router.get('/me', async (req, res) => {
 
     const decoded = jwt.verify(token, 'secret');
     const user = await User.findById(decoded.user.id).select('-password');
+    if (!user) return res.status(404).json({ msg: 'User not found' });
+
+    if (user.role === 'user' && !user.approved) {
+      user.approved = true;
+      await user.save();
+    }
+
     res.json(user);
   } catch (err) {
     res.status(401).json({ msg: 'Token is not valid' });

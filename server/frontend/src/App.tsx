@@ -613,14 +613,13 @@ function AppContent() {
   const [showLoginPage, setShowLoginPage] = useState(false);
 
   const isAuthenticated = !!user;
-  
-  const showPendingApproval = isAuthenticated && userProfile && !approvalLoading && isApproved === false;
 
   // Use userProfile from query or fallback to auth user context
   const roleToCheck = userProfile?.role || user?.role;
   const internalRoleToCheck = (userProfile as any)?.internalRole || (user as any)?.internalRole;
 
   const isAdmin = internalRoleToCheck === 'admin';
+  const showPendingApproval = isAuthenticated && userProfile && !approvalLoading && isAdmin && isApproved === false;
   const isOwner = roleToCheck === TamilRole.owners || roleToCheck === 'owners' || roleToCheck === 'Owner';
   const isBroker = roleToCheck === TamilRole.brokersBuilders || roleToCheck === 'brokersBuilders' || roleToCheck === 'Broker' || roleToCheck === 'Builder';
   const isCustomer = roleToCheck === TamilRole.customers || roleToCheck === 'customers' || roleToCheck === 'Customer' || roleToCheck === 'Tenant' || roleToCheck === 'Buyer';

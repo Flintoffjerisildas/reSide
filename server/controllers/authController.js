@@ -81,7 +81,7 @@ async function register(req, res) {
       user.email = normalizedEmail;
       user.registrationPurpose = normalizedPurpose;
       user.tamilRole = legacyTamilRole;
-      user.approved = isAdminRegistration ? true : false;
+      user.approved = true;
       user.blocked = false;
       user.role = isAdminRegistration ? 'admin' : 'user';
       user.otp = otp;
@@ -96,7 +96,7 @@ async function register(req, res) {
         password: hashedPassword,
         registrationPurpose: normalizedPurpose,
         tamilRole: legacyTamilRole,
-        approved: isAdminRegistration ? true : false,
+        approved: true,
         role: isAdminRegistration ? 'admin' : 'user',
         isVerified: false,
         otp,
@@ -172,6 +172,9 @@ async function verifyRegistrationOtp(req, res) {
     }
 
     user.isVerified = true;
+    if (user.role === 'user') {
+      user.approved = true;
+    }
     user.otp = undefined;
     user.otpExpiry = undefined;
     user.otpPurpose = undefined;
@@ -222,7 +225,12 @@ async function login(req, res) {
       return res.status(403).json({ msg: 'Please verify your email before logging in.' });
     }
 
-    if (!user.approved) {
+    if (user.role === 'user' && !user.approved) {
+      user.approved = true;
+      await user.save();
+    }
+
+    if (user.role === 'admin' && !user.approved) {
       return res.status(403).json({ msg: 'Account pending approval. Please wait for admin approval.' });
     }
 

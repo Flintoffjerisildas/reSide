@@ -665,14 +665,14 @@ function AppContent() {
   const [browseTransactionType, setBrowseTransactionType] = useState<'rent' | 'buy' | ''>('');
 
   const isAuthenticated = !!user;
-  
-  const showPendingApproval = isAuthenticated && userProfile && !approvalLoading && isApproved === false;
 
   // Use userProfile from query or fallback to auth user context
   const roleToCheck = userProfile?.role || user?.role;
   const internalRoleToCheck = (userProfile as any)?.internalRole || (user as any)?.internalRole;
 
   const isAdmin = internalRoleToCheck === 'admin' || roleToCheck === 'admin' || roleToCheck === TamilRole.admin;
+
+  const showPendingApproval = isAuthenticated && userProfile && !approvalLoading && isAdmin && isApproved === false;
 
   console.log('Debug App State:', {
     isAuthenticated,
