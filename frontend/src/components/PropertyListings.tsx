@@ -4,7 +4,7 @@ import PropertyCard from './PropertyCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { X, ChevronLeft, ChevronRight, Send, ArrowUpRight, Home, Search, Mic2, Building2, CheckCircle2 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Send, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Property } from '../types';
 import AuthDialog from './AuthDialog';
@@ -15,25 +15,15 @@ import { translateText } from '../lib/api';
 import HeroSection from './HeroSection';
 
 interface PropertyListingsProps {
-  showAbout?: boolean;
   initialTransactionType?: 'rent' | 'buy' | '';
+  onLoginClick?: () => void;
 }
 
-export default function PropertyListings({ showAbout = false, initialTransactionType = '' }: PropertyListingsProps) {
+export default function PropertyListings({ initialTransactionType = '', onLoginClick }: PropertyListingsProps) {
   const { data: properties = [], isLoading } = useGetAllProperties();
   const { t, language } = useLanguage();
   const { isAuthenticated } = useAuth();
   const createRequest = useCreateRequest();
-
-  useEffect(() => {
-    if (!showAbout) return;
-
-    const frame = window.requestAnimationFrame(() => {
-      document.getElementById('about-us')?.scrollIntoView({ behavior: 'auto', block: 'start' });
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [showAbout]);
 
   // Filter states
   const [location, setLocation] = useState('');
@@ -228,7 +218,7 @@ export default function PropertyListings({ showAbout = false, initialTransaction
 
   const handleRequestProperty = () => {
     if (!isAuthenticated) {
-      setShowAuthDialog(true);
+      onLoginClick?.();
       return;
     }
 
@@ -258,103 +248,20 @@ export default function PropertyListings({ showAbout = false, initialTransaction
   };
 
   return (
-    <div className="container py-4 sm:py-6 lg:py-8 px-4 sm:px-6">
-      <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
-        <HeroSection
-          location={location}
-          onLocationChange={setLocation}
-          propertyType={propertyType}
-          onPropertyTypeChange={handlePropertyTypeChange}
-          transactionType={transactionType}
-          onTransactionTypeChange={handleTransactionTypeChange}
-          maxPrice={priceRange[1]}
-          onMaxPriceChange={(value) => setPriceRange([0, value])}
-          onSearch={() => document.getElementById('property-listings')?.scrollIntoView({ behavior: 'smooth' })}
-        />
+    <div className="w-full">
+      <HeroSection
+        location={location}
+        onLocationChange={setLocation}
+        propertyType={propertyType}
+        onPropertyTypeChange={handlePropertyTypeChange}
+        transactionType={transactionType}
+        onTransactionTypeChange={handleTransactionTypeChange}
+        maxPrice={priceRange[1]}
+        onMaxPriceChange={(value) => setPriceRange([0, value])}
+        onSearch={() => document.getElementById('property-listings')?.scrollIntoView({ behavior: 'smooth' })}
+      />
 
-        <section id="about-us" className="scroll-mt-32 overflow-hidden rounded-[2rem] border border-blue-100/80 bg-card shadow-xl shadow-blue-950/10 dark:border-blue-900/70 dark:shadow-black/20">
-            <div className="grid lg:grid-cols-[0.9fr_1.1fr]">
-              <div className="relative min-h-[20rem] overflow-hidden bg-slate-900 lg:min-h-full">
-                <img
-                  src="https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=85"
-                  alt={t('Modern Reside home interior', 'Reside நவீன வீட்டு உட்புறம்')}
-                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-950/65 via-blue-900/25 to-teal-950/55" />
-                <div className="relative flex h-full flex-col justify-between p-7 text-white sm:p-10">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500 shadow-lg shadow-blue-950/30">
-                    <Building2 className="h-6 w-6" />
-                  </div>
-                  <div className="mt-16">
-                    <p className="text-sm font-semibold uppercase tracking-[0.25em] text-blue-200">
-                      {t('About Reside', 'Reside பற்றி')}
-                    </p>
-                    <p className="mt-3 max-w-sm text-3xl font-semibold leading-tight">
-                      {t('Your Space, Your Story, Your Home.', 'உங்கள் இடம், உங்கள் கதை, உங்கள் வீடு.')}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-7 sm:p-10">
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">
-                  {t('Welcome to Reside', 'Reside-க்கு வரவேற்கிறோம்')}
-                </p>
-                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                  {t('Find more than a property.', 'ஒரு சொத்தை விட அதிகமாகக் கண்டறியுங்கள்.')}
-                </h2>
-                <div className="mt-5 space-y-4 text-sm leading-7 text-muted-foreground">
-                  <p>
-                    {t(
-                      'Welcome to Reside, your trusted destination for discovering properties and simplifying your housing journey. Whether you are looking for your dream home, searching for a rental property, or listing a property of your own, Reside makes the process simple, convenient, and accessible.',
-                      'சொத்துகளைக் கண்டறிந்து உங்கள் வீட்டு பயணத்தை எளிதாக்கும் நம்பகமான தளம் Reside. உங்கள் கனவு வீட்டைத் தேடினாலும், வாடகை வீட்டைத் தேடினாலும் அல்லது உங்கள் சொத்தைப் பட்டியலிட்டாலும், Reside செயல்முறையை எளிமையாகவும் வசதியாகவும் அணுகக்கூடியதாகவும் மாற்றுகிறது.'
-                    )}
-                  </p>
-                  <p>
-                    {t(
-                      'Our platform brings property seekers, owners, and brokers together with smart search options, personalized filters, and a user-friendly experience. With support for Tamil and English voice interactions, we aim to make property discovery easier for everyone.',
-                      'ஸ்மார்ட் தேடல், தனிப்பயன் வடிகட்டிகள் மற்றும் எளிய அனுபவத்தின் மூலம் சொத்தைத் தேடுபவர்கள், உரிமையாளர்கள் மற்றும் தரகர்களை எங்கள் தளம் இணைக்கிறது. தமிழ் மற்றும் ஆங்கில குரல் தொடர்பு ஆதரவுடன், அனைவருக்கும் சொத்து தேடலை எளிதாக்குகிறோம்.'
-                    )}
-                  </p>
-                </div>
-                <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                  {[
-                    t('Trusted property discovery', 'நம்பகமான சொத்து தேடல்'),
-                    t('Tamil and English support', 'தமிழ் மற்றும் ஆங்கில ஆதரவு'),
-                  ].map((item) => (
-                    <div key={item} className="flex items-center gap-2 rounded-xl border border-blue-200/70 bg-white/55 px-3 py-2.5 text-sm font-medium text-foreground dark:border-blue-900/70 dark:bg-slate-950/30">
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
-                      <span>{item}</span>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-7 border-l-2 border-primary pl-4 text-sm font-semibold italic text-foreground">
-                  {t(
-                    'At Reside, finding the right place is more than finding a property — it is where life happens, memories grow, and dreams become reality.',
-                    'Reside-ல் சரியான இடத்தைக் கண்டுபிடிப்பது ஒரு சொத்தை கண்டுபிடிப்பதை விட அதிகம் — வாழ்க்கை நிகழும், நினைவுகள் வளரும், கனவுகள் நனவாகும் இடம் அது.'
-                  )}
-                </p>
-                <p className="mt-5 text-base font-semibold text-primary">
-                  {t('Reside — Find Your Place. Feel at Home.', 'Reside — உங்கள் இடத்தைக் கண்டறியுங்கள். வீட்டைப் போல் உணருங்கள்.')}
-                </p>
-              </div>
-            </div>
-        </section>
-
-        <div className="grid gap-4 sm:grid-cols-3">
-          {[
-            { icon: Home, title: t('List your property', 'உங்கள் சொத்தை பட்டியலிடுங்கள்'), text: t('Reach genuine buyers and tenants with our trusted platform.', 'நம்பகமான தளத்தின் மூலம் உண்மையான வாங்குபவர்களை அடையுங்கள்.') },
-            { icon: Search, title: t('Smart property search', 'ஸ்மார்ட் சொத்து தேடல்'), text: t('Find the perfect home with advanced filters and recommendations.', 'மேம்பட்ட வடிகட்டிகளுடன் சரியான வீட்டைக் கண்டறியுங்கள்.') },
-            { icon: Mic2, title: t('Tamil & English voice assistant', 'தமிழ் மற்றும் ஆங்கில குரல் உதவியாளர்'), text: t('Ask, search and explore properties in your preferred language.', 'உங்கள் விருப்ப மொழியில் கேட்டு சொத்துகளை ஆராயுங்கள்.') },
-          ].map(({ icon: Icon, title, text }) => (
-            <div key={title} className="group relative overflow-hidden rounded-2xl border border-border/60 bg-card p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
-              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950"><Icon className="h-5 w-5" /></div>
-              <h3 className="pr-8 text-lg font-semibold">{title}</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p>
-              <span className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-full border border-border transition group-hover:bg-blue-600 group-hover:text-white"><ArrowUpRight className="h-4 w-4" /></span>
-            </div>
-          ))}
-        </div>
-
+      <div className="mx-auto w-[calc(100%-2rem)] sm:w-[calc(100%-4rem)] lg:w-[calc(100%-6rem)] px-2 sm:px-3 space-y-6 sm:space-y-8 pb-12">
         {/* Property Listings */}
         <div className="space-y-4 sm:space-y-6">
           {/* Filters Section */}
@@ -451,11 +358,13 @@ export default function PropertyListings({ showAbout = false, initialTransaction
           <div id="property-listings">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
-                <h2 className="flex items-center gap-2 text-xl font-bold tracking-tight sm:text-2xl">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950"><Home className="h-4 w-4" /></span>
+                <h2 className="flex items-center gap-2.5 text-xl font-bold tracking-tight sm:text-2xl">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/80 shadow-sm border border-blue-100/80 dark:border-blue-900/80">
+                    <Home className="h-4 w-4" />
+                  </span>
                   {t('Homes picked for you', 'உங்களுக்காக தேர்ந்தெடுக்கப்பட்ட வீடுகள்')}
                 </h2>
-                <p className="text-xs sm:text-sm text-muted-foreground">
+                <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
                   {t('Explore handpicked spaces worth seeing', 'பார்க்க வேண்டிய சிறந்த இடங்களை ஆராயுங்கள்')}
                 </p>
               </div>
@@ -481,10 +390,10 @@ export default function PropertyListings({ showAbout = false, initialTransaction
             </div>
 
             {isLoading ? (
-              <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="space-y-3">
-                    <Skeleton className="h-40 sm:h-48 w-full rounded-lg" />
+              <div className="grid gap-5 sm:gap-6 grid-cols-[repeat(auto-fill,minmax(270px,1fr))]">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="space-y-2">
+                    <Skeleton className="h-32 sm:h-36 w-full rounded-lg" />
                     <Skeleton className="h-4 w-3/4" />
                     <Skeleton className="h-4 w-1/2" />
                   </div>
@@ -515,14 +424,19 @@ export default function PropertyListings({ showAbout = false, initialTransaction
                 </p>
               </div>
             ) : (
-              <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-5 sm:gap-6 grid-cols-[repeat(auto-fill,minmax(270px,1fr))]">
                 {filteredProperties.map((property, index) => (
                   <div
                     key={String((property as any)?.id ?? (property as any)?._id ?? index)}
                     onClick={() => handleCardClick(index)}
-                    className="cursor-pointer transition-transform hover:scale-105"
+                    className="w-full cursor-pointer transition-transform hover:scale-[1.03]"
                   >
-                    <PropertyCard property={property} showRequestButton={false} />
+                    <PropertyCard
+                      property={property}
+                      showRequestButton={false}
+                      className="rounded-xl shadow-sm"
+                      imageClassName="h-32 sm:h-36"
+                    />
                   </div>
                 ))}
               </div>

@@ -15,9 +15,11 @@ interface PropertyCardProps {
   showRequestButton?: boolean;
   onEdit?: (property: Property) => void;
   onDelete?: (property: Property) => void;
+  className?: string;
+  imageClassName?: string;
 }
 
-export default function PropertyCard({ property, compact = false, showRequestButton = true, onEdit, onDelete }: PropertyCardProps) {
+export default function PropertyCard({ property, compact = false, showRequestButton = true, onEdit, onDelete, className = '', imageClassName = '' }: PropertyCardProps) {
   const { t, language } = useLanguage();
   const createRequest = useCreateRequest();
   const [translatedTitle, setTranslatedTitle] = useState<string | null>(null);
@@ -175,9 +177,9 @@ export default function PropertyCard({ property, compact = false, showRequestBut
   }
 
   return (
-    <Card className="overflow-hidden rounded-2xl border-border/60 bg-card shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl">
+    <Card className={`glass-surface overflow-hidden rounded-xl py-0 gap-0 transition duration-300 hover:-translate-y-1 hover:shadow-xl ${className}`}>
       {/* Property Image */}
-      <div className="relative h-44 w-full overflow-hidden bg-muted sm:h-48">
+      <div className={`relative h-32 w-full overflow-hidden bg-muted sm:h-36 ${imageClassName}`}>
         {property.images && property.images.length > 0 ? (
           <img 
             src={property.images[0]} 
@@ -186,26 +188,26 @@ export default function PropertyCard({ property, compact = false, showRequestBut
           />
         ) : (
           <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-gradient-to-br from-blue-50 via-slate-100 to-teal-50 dark:from-blue-950/60 dark:via-slate-900 dark:to-teal-950/50">
-            <div className="absolute -right-8 -top-12 h-40 w-40 rounded-full bg-blue-200/40 blur-2xl dark:bg-blue-500/10" />
-            <div className="absolute -bottom-16 -left-8 h-40 w-40 rounded-full bg-teal-200/40 blur-2xl dark:bg-teal-500/10" />
-            <div className="relative flex flex-col items-center gap-2 text-blue-600/80 dark:text-blue-300/80">
-              <Building2 className="h-12 w-12" strokeWidth={1.4} />
-              <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider">
-                <ImageOff className="h-3 w-3" /> {t('Image unavailable', 'படம் இல்லை')}
+            <div className="absolute -right-8 -top-12 h-32 w-32 rounded-full bg-blue-200/40 blur-2xl dark:bg-blue-500/10" />
+            <div className="absolute -bottom-16 -left-8 h-32 w-32 rounded-full bg-teal-200/40 blur-2xl dark:bg-teal-500/10" />
+            <div className="relative flex flex-col items-center gap-1.5 text-blue-600/80 dark:text-blue-300/80">
+              <Building2 className="h-9 w-9" strokeWidth={1.4} />
+              <span className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider">
+                <ImageOff className="h-2.5 w-2.5" /> {t('Image unavailable', 'படம் இல்லை')}
               </span>
             </div>
           </div>
         )}
       </div>
 
-      <CardHeader className="pb-2 sm:pb-3">
-        <div className="flex items-start justify-between gap-2">
+      <CardHeader className="p-3 pb-1 sm:p-3.5 sm:pb-1.5 gap-1">
+        <div className="flex items-start justify-between gap-1.5">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10 text-lg sm:text-xl flex-shrink-0">
+            <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-primary/10 text-base sm:text-lg flex-shrink-0">
               {getPropertyIcon(property.propertyType)}
             </div>
             <div className="min-w-0 flex-1">
-              <CardTitle className="text-base sm:text-lg truncate">{displayTitle}</CardTitle>
+              <CardTitle className="text-sm sm:text-base font-semibold truncate">{displayTitle}</CardTitle>
               <p className="text-[10px] sm:text-xs text-muted-foreground capitalize">{getPropertyTypeLabel(property.propertyType)}</p>
             </div>
           </div>
@@ -213,33 +215,33 @@ export default function PropertyCard({ property, compact = false, showRequestBut
           {!showRequestButton && getOccupancyBadge()}
         </div>
       </CardHeader>
-      <CardContent className="space-y-2 sm:space-y-3">
-        <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-          <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+      <CardContent className="p-3 pt-0 sm:p-3.5 sm:pt-0 space-y-1.5 sm:space-y-2">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <MapPin className="h-3 w-3 flex-shrink-0" />
           <span className="truncate">{displayLocation}</span>
         </div>
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-1">
-            <IndianRupee className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-            <span className="text-lg sm:text-xl font-bold text-primary">{formatPrice(property.price)}</span>
+        <div className="flex items-center justify-between flex-wrap gap-1.5">
+          <div className="flex items-center gap-0.5">
+            <IndianRupee className="h-3.5 w-3.5 text-primary" />
+            <span className="text-base sm:text-lg font-bold text-primary">{formatPrice(property.price)}</span>
           </div>
           {getTransactionBadge(property.transactionType)}
         </div>
         {(property.totalArea || property.bedrooms || property.facing) && (
-          <div className="mt-4 flex items-center gap-3 border-t border-border/60 pt-3 text-[10px] text-muted-foreground sm:text-xs">
+          <div className="mt-2 flex items-center gap-2.5 border-t border-border/50 pt-2 text-[10px] text-muted-foreground sm:text-[11px]">
             {property.totalArea && (
               <div className="flex items-center gap-1">
-                <Ruler className="h-3.5 w-3.5" /><span>{property.totalArea} {t('sq.ft', 'சதுர அடி')}</span>
+                <Ruler className="h-3 w-3" /><span>{property.totalArea} {t('sq.ft', 'சதுர அடி')}</span>
               </div>
             )}
             {property.bedrooms && (
               <div className="flex items-center gap-1">
-                <BedDouble className="h-3.5 w-3.5" /><span>{property.bedrooms} {t('Beds', 'படுக்கைகள்')}</span>
+                <BedDouble className="h-3 w-3" /><span>{property.bedrooms} {t('Beds', 'படுக்கைகள்')}</span>
               </div>
             )}
             {property.facing && (
               <div className="flex items-center gap-1">
-                <Bath className="h-3.5 w-3.5" /><span>{t('Baths', 'குளியலறைகள்')}</span>
+                <Bath className="h-3 w-3" /><span>{t('Baths', 'குளியலறைகள்')}</span>
               </div>
             )}
           </div>

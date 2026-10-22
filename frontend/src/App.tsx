@@ -14,6 +14,8 @@ import {
 import Header from './components/Header';
 import Footer from './components/Footer';
 import PropertyListings from './components/PropertyListings';
+import AboutUs from './components/AboutUs';
+import ListPropertyPage from './components/ListPropertyPage';
 import FloatingChat from './components/FloatingChat';
 import { AIProvider } from './contexts/AIContext';
 import { PropertyProvider } from './contexts/PropertyContext';
@@ -811,6 +813,7 @@ function AppContent() {
   const [showDashboard, setShowDashboard] = useState(() => !!localStorage.getItem('token'));
   const [showLoginPage, setShowLoginPage] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [showListProperty, setShowListProperty] = useState(false);
   const [browseTransactionType, setBrowseTransactionType] = useState<'rent' | 'buy' | ''>('');
 
   const isAuthenticated = !!user;
@@ -855,6 +858,7 @@ function AppContent() {
     setShowDashboard(false);
     setShowLoginPage(false);
     setShowAbout(false);
+    setShowListProperty(false);
     setBrowseTransactionType('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -863,6 +867,7 @@ function AppContent() {
     setShowDashboard(false);
     setShowLoginPage(false);
     setShowAbout(false);
+    setShowListProperty(false);
     setBrowseTransactionType(transactionType);
     requestAnimationFrame(() => {
       document.getElementById('property-listings')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -873,6 +878,14 @@ function AppContent() {
     setShowDashboard(false);
     setShowLoginPage(false);
     setShowAbout(true);
+    setShowListProperty(false);
+  };
+
+  const handleListPropertyClick = () => {
+    setShowAbout(false);
+    setShowLoginPage(!isAuthenticated);
+    setShowDashboard(false);
+    setShowListProperty(isAuthenticated);
   };
 
   useEffect(() => {
@@ -894,8 +907,7 @@ function AppContent() {
         onDashboardClick={handleDashboardClick}
         onHomeClick={handleHomeClick}
         onAboutClick={handleAboutClick}
-        onRentClick={() => handleBrowseProperties('rent')}
-        onBuyClick={() => handleBrowseProperties('buy')}
+        onListPropertyClick={handleListPropertyClick}
         onLoginClick={handleLoginClick}
         isDashboardActive={showDashboard}
       />
@@ -921,8 +933,12 @@ function AppContent() {
           )
         ) : showLoginPage && !isAuthenticated ? (
           <LoginPage />
+        ) : showListProperty && isAuthenticated ? (
+          <ListPropertyPage onClose={handleHomeClick} />
+        ) : showAbout ? (
+          <AboutUs />
         ) : (
-          <PropertyListings showAbout={showAbout} initialTransactionType={browseTransactionType} />
+          <PropertyListings initialTransactionType={browseTransactionType} onLoginClick={handleLoginClick} />
         )}
         <FloatingChat />
       </main>
