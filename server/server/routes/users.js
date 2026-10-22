@@ -7,6 +7,7 @@ const MaintenanceRequest = require('../models/MaintenanceRequest');
 const Request = require('../models/Request');
 const Payment = require('../models/Payment');
 const RentRecord = require('../models/RentRecord');
+const Announcement = require('../models/Announcement');
 const auth = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
@@ -712,25 +713,151 @@ router.put('/:id/tamilRole', auth, auth.requireAdmin, async (req, res) => {
   }
 });
 
+// @route   POST /api/users/admin/announcement
+// @desc    Create a platform announcement (Admin only)
+// @access  Private (Admin)
 router.post('/admin/announcement', auth, auth.requireAdmin, async (req, res) => {
   try {
-    const title = String(req.body?.title || '').trim();
-    const message = String(req.body?.message || '').trim();
-    if (!title || !message) {
+    const rawTitle = req.body?.title;
+    const rawMessage = req.body?.message;
+
+    if (typeof rawTitle !== 'string' || typeof rawMessage !== 'string') {
       return res.status(400).json({ msg: 'title and message are required' });
     }
 
-    const doc = {
+    const title = rawTitle.trim();
+    const message = rawMessage.trim();
+
+    if (!title || !message) {
+      return res.status(400).json({ msg: 'title and message cannot be empty' });
+    }
+
+    if (title.length > 200) {
+      return res.status(400).json({ msg: 'title must not exceed 200 characters' });
+    }
+
+    if (message.length > 5000) {
+      return res.status(400).json({ msg: 'message must not exceed 5000 characters' });
+    }
+
+    const announcement = new Announcement({
       title,
       message,
       createdAt: new Date(),
       createdBy: req.user?.id ? new mongoose.Types.ObjectId(req.user.id) : null
-    };
+    });
 
-    await mongoose.connection.collection('announcements').insertOne(doc);
-    return res.json({ ok: true });
+    await announcement.save();
+    await announcement.populate('createdBy', 'name email role');
+
+    return res.status(201).json({
+      ok: true,
+      announcement
+    });
   } catch (err) {
-    console.error(err?.message || err);
+    console.error('Error creating announcement:', err?.message || err);
+    return res.status(500).send('Server Error');
+  }
+});
+
+// @route   GET /api/users/admin/announcements
+// @desc    Retrieve announcement history for administrators (Admin only)
+// @access  Private (Admin)
+router.get('/admin/announcements', auth, auth.requireAdmin, async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const skip = (page - 1) * limit;
+
+    const [total, rawAnnouncements] = await Promise.all([
+      Announcement.countDocuments(),
+      Announcement.find()
+        .sort({ createdAt: -1, _id: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('createdBy', 'name email role')
+        .lean()
+    ]);
+
+    const announcements = rawAnnouncements.map((a) => {
+      const createdAt = a.createdAt
+        ? new Date(a.createdAt).toISOString()
+        : a._id && typeof a._id.getTimestamp === 'function'
+        ? a._id.getTimestamp().toISOString()
+        : new Date().toISOString();
+
+      return {
+        _id: String(a._id),
+        title: a.title || 'Untitled Announcement',
+        message: a.message || '',
+        createdAt,
+        createdBy: a.createdBy
+          ? {
+              _id: String(a.createdBy._id || ''),
+              name: a.createdBy.name || 'Admin',
+              email: a.createdBy.email || '',
+              role: a.createdBy.role || 'admin'
+            }
+          : null
+      };
+    });
+
+    return res.json({
+      announcements,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit) || 1
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching admin announcements:', err?.message || err);
+    return res.status(500).send('Server Error');
+  }
+});
+
+// @route   GET /api/users/announcements
+// @desc    Retrieve announcements for eligible authenticated users (tenants, owners, admins)
+// @access  Private
+router.get('/announcements', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user?.id).select('role tamilRole blocked approved');
+    if (!user) {
+      return res.status(401).json({ msg: 'User not found' });
+    }
+
+    if (user.blocked) {
+      return res.status(403).json({ msg: 'Account is blocked' });
+    }
+
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+
+    const rawAnnouncements = await Announcement.find()
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(limit)
+      .populate('createdBy', 'name')
+      .lean();
+
+    const announcements = rawAnnouncements.map((a) => {
+      const createdAt = a.createdAt
+        ? new Date(a.createdAt).toISOString()
+        : a._id && typeof a._id.getTimestamp === 'function'
+        ? a._id.getTimestamp().toISOString()
+        : new Date().toISOString();
+
+      return {
+        _id: String(a._id),
+        title: a.title || 'Untitled Announcement',
+        message: a.message || '',
+        createdAt,
+        creatorName: a.createdBy?.name || 'Administrator'
+      };
+    });
+
+    return res.json(announcements);
+  } catch (err) {
+    console.error('Error fetching announcements:', err?.message || err);
     return res.status(500).send('Server Error');
   }
 });

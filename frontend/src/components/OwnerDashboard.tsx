@@ -13,7 +13,8 @@ import {
   useGetOwnerRentHistory,
   useOwnerRentReport,
   useOwnerOccupancyReport,
-  useOwnerMaintenanceReport
+  useOwnerMaintenanceReport,
+  useAnnouncements
 } from '../hooks/useQueries';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -35,7 +36,10 @@ import {
   FileText,
   Download,
   Printer,
-  Loader2
+  Loader2,
+  Calendar,
+  Megaphone,
+  RefreshCcw
 } from 'lucide-react';
 import PropertyForm from './PropertyForm';
 import PropertyCard from './PropertyCard';
@@ -78,6 +82,12 @@ export default function OwnerDashboard({ onBrowseProperties }: OwnerDashboardPro
   const { data: myProperties = [] } = useGetMyProperties();
   const { data: requests = [] } = useGetOwnerRequests();
   const { data: rentHistory } = useGetOwnerRentHistory();
+  const {
+    data: announcements = [],
+    isLoading: announcementsLoading,
+    isError: announcementsError,
+    refetch: refetchAnnouncements
+  } = useAnnouncements();
   const approveRequest = useApproveRequest();
   const rejectRequest = useRejectRequest();
   const deletePropertyMutation = useDeleteProperty();
@@ -1233,7 +1243,7 @@ export default function OwnerDashboard({ onBrowseProperties }: OwnerDashboardPro
 
         {/* Navigation Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1">
             <TabsTrigger value="overview">
               <Home className="w-4 h-4 mr-2" />
               {t('Overview', 'கண்ணோட்டம்')}
@@ -1245,6 +1255,15 @@ export default function OwnerDashboard({ onBrowseProperties }: OwnerDashboardPro
             <TabsTrigger value="requests">
               <Inbox className="w-4 h-4 mr-2" />
               {t('Requests', 'கோரிக்கைகள்')}
+            </TabsTrigger>
+            <TabsTrigger value="announcements">
+              <Megaphone className="w-4 h-4 mr-2" />
+              {t('Announcements', 'அறிவிப்புகள்')}
+              {announcements.length > 0 && (
+                <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs">
+                  {announcements.length}
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="reports">
               <FileText className="w-4 h-4 mr-2" />
@@ -1474,6 +1493,121 @@ export default function OwnerDashboard({ onBrowseProperties }: OwnerDashboardPro
                 role="owner"
               />
             </div>
+
+            {announcements.length > 0 && (
+              <Card className="mt-8">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <div>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Megaphone className="h-4 w-4 text-blue-600" />
+                      {t('Recent Announcements', 'சமீபத்திய அறிவிப்புகள்')}
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      {t('Official notices from management', 'நிர்வாகத்தின் அதிகாரப்பூர்வ அறிவிப்புகள்')}
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setActiveTab('announcements')}
+                    className="text-xs text-blue-600 hover:text-blue-700"
+                  >
+                    {t('View All', 'அனைத்தையும் பார்க்க')} ({announcements.length})
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {announcements.slice(0, 2).map((ann) => (
+                    <div
+                      key={ann._id}
+                      className="border rounded-xl p-3 bg-muted/20 hover:bg-muted/40 transition-colors"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <h4 className="font-semibold text-sm text-foreground">{ann.title}</h4>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {new Date(ann.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{ann.message}</p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Announcements Tab */}
+          <TabsContent value="announcements" className="mt-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
+                <div>
+                  <CardTitle className="text-xl flex items-center gap-2">
+                    <Megaphone className="h-5 w-5 text-blue-600" />
+                    {t('Platform Announcements', 'தள அறிவிப்புகள்')}
+                  </CardTitle>
+                  <CardDescription>
+                    {t('Important updates and official announcements from administration.', 'நிர்வாகத்திடமிருந்து முக்கியமான அறிவிப்புகள் மற்றும் புதுப்பிப்புகள்.')}
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetchAnnouncements()}
+                  disabled={announcementsLoading}
+                  className="rounded-xl h-8 text-xs"
+                >
+                  <RefreshCcw className={`mr-1.5 h-3.5 w-3.5 ${announcementsLoading ? 'animate-spin' : ''}`} />
+                  {t('Refresh', 'புதுப்பி')}
+                </Button>
+              </CardHeader>
+              <CardContent className="p-6">
+                {announcementsLoading ? (
+                  <div className="py-16 text-center text-muted-foreground space-y-3">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
+                    <p className="text-sm">{t('Loading announcements...', 'அறிவிப்புகள் ஏற்றப்படுகின்றன...')}</p>
+                  </div>
+                ) : announcementsError ? (
+                  <div className="py-12 text-center space-y-3">
+                    <p className="text-sm text-destructive">{t('Failed to load announcements.', 'அறிவிப்புகளை ஏற்ற முடியவில்லை.')}</p>
+                    <Button variant="outline" size="sm" onClick={() => refetchAnnouncements()} className="rounded-xl h-8">
+                      {t('Retry', 'மீண்டும் முயற்சி')}
+                    </Button>
+                  </div>
+                ) : announcements.length === 0 ? (
+                  <div className="py-16 text-center text-muted-foreground space-y-3">
+                    <Megaphone className="h-12 w-12 mx-auto opacity-30" />
+                    <p className="text-base font-medium">{t('No announcements at this time.', 'தற்போது அறிவிப்புகள் எதுவும் இல்லை.')}</p>
+                    <p className="text-xs text-muted-foreground">{t('Check back later for updates and news from management.', 'நிர்வாகத்தின் புதுப்பிப்புகள் மற்றும் செய்திகளுக்குப் பின்னர் சரிபார்க்கவும்.')}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {announcements.map((ann) => (
+                      <div
+                        key={ann._id}
+                        className="rounded-2xl border bg-card p-5 space-y-3 shadow-sm hover:shadow transition"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3 className="font-semibold text-base text-foreground">{ann.title}</h3>
+                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                              <Calendar className="h-3.5 w-3.5" />
+                              <span>{new Date(ann.createdAt).toLocaleString()}</span>
+                              <span>•</span>
+                              <span>{ann.creatorName || t('Administrator', 'நிர்வாகி')}</span>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="rounded-full text-xs shrink-0 border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-300">
+                            {t('Announcement', 'அறிவிப்பு')}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed bg-muted/30 p-4 rounded-xl border">
+                          {ann.message}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* My Properties Tab */}

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import type { Property, UserProfile, PropertyStatus, PropertyRequest } from '../types';
+import type { Property, UserProfile, PropertyStatus, PropertyRequest, Announcement, AdminAnnouncementsResponse } from '../types';
 import { TamilRole } from '../types';
 
 // Define simplified types that might be used in components
@@ -638,10 +638,39 @@ export function useAdminCreateUser() {
 }
 
 export function useAdminSendAnnouncement() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: { title: string; message: string }) => {
       const res = await api.post('/users/admin/announcement', data);
-      return res.data as { ok: boolean };
+      return res.data as { ok: boolean; announcement?: Announcement };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminAnnouncements'] });
+      queryClient.invalidateQueries({ queryKey: ['userAnnouncements'] });
+    }
+  });
+}
+
+export function useAdminAnnouncements(page: number = 1, limit: number = 20) {
+  return useQuery<AdminAnnouncementsResponse>({
+    queryKey: ['adminAnnouncements', page, limit],
+    queryFn: async () => {
+      const res = await api.get('/users/admin/announcements', {
+        params: { page, limit }
+      });
+      return res.data;
+    }
+  });
+}
+
+export function useAnnouncements(limit: number = 20) {
+  return useQuery<Announcement[]>({
+    queryKey: ['userAnnouncements', limit],
+    queryFn: async () => {
+      const res = await api.get('/users/announcements', {
+        params: { limit }
+      });
+      return Array.isArray(res.data) ? res.data : [];
     }
   });
 }

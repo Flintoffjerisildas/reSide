@@ -154,3 +154,28 @@ export interface ExternalBlob {
   name: string;
   contentType: string;
 }
+
+export interface Announcement {
+  _id: string;
+  title: string;
+  message: string;
+  createdAt: string;
+  createdBy?: {
+    _id: string;
+    name?: string;
+    email?: string;
+    role?: string;
+  } | null;
+  creatorName?: string;
+}
+
+export interface AdminAnnouncementsResponse {
+  announcements: Announcement[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+  };
+}
+

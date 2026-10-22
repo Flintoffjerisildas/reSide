@@ -31,8 +31,10 @@ import {
   Building,
   CreditCard,
   Download,
+  History,
   Home,
   LineChart as LineChartIcon,
+  Megaphone,
   Plus,
   RefreshCcw,
   Search,
@@ -56,6 +58,7 @@ import {
   useAdminPayments,
   useAdminProperties,
   useAdminSendAnnouncement,
+  useAdminAnnouncements,
   useAdminPaymentStatusReport,
   useAdminPropertyPerformanceReport,
   useAdminOccupancyReport,
@@ -122,9 +125,18 @@ function AdminDashboardModern() {
   const [createdCredentials, setCreatedCredentials] = useState<null | { email: string; password: string; name: string; tamilRole: string }>(null);
   const [userDraft, setUserDraft] = useState({ name: '', email: '', phone: '', tamilRole: 'customers' });
   const [announcementOpen, setAnnouncementOpen] = useState(false);
+  const [announcementHistoryOpen, setAnnouncementHistoryOpen] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
   const [announcementDraft, setAnnouncementDraft] = useState({ title: '', message: '' });
   const [manualActivities, setManualActivities] = useState<Array<{ id: string; title: string; subtitle: string; icon: any; ts: number }>>([]);
   const [maintenanceStatusDraft, setMaintenanceStatusDraft] = useState('pending');
+
+  const {
+    data: adminAnnouncementsData,
+    isLoading: announcementsLoading,
+    isError: announcementsError,
+    refetch: refetchAnnouncements
+  } = useAdminAnnouncements(historyPage, 10);
 
   const scrollTo = useCallback((id: string) => {
     const el = document.getElementById(id);
@@ -684,6 +696,14 @@ function AdminDashboardModern() {
               <Button
                 variant="outline"
                 className="h-10 justify-start rounded-2xl border-slate-200 bg-white px-4 dark:border-blue-800 dark:bg-slate-900/80 dark:hover:bg-slate-800"
+                onClick={() => setAnnouncementHistoryOpen(true)}
+              >
+                <History className="mr-2 h-4 w-4" />
+                {t('Announcement History', 'அறிவிப்பு வரலாறு')}
+              </Button>
+              <Button
+                variant="outline"
+                className="h-10 justify-start rounded-2xl border-slate-200 bg-white px-4 dark:border-blue-800 dark:bg-slate-900/80 dark:hover:bg-slate-800"
                 onClick={() => {
                   downloadCsv(
                     'properties-report.csv',
@@ -1085,14 +1105,137 @@ function AdminDashboardModern() {
               />
             </div>
           </div>
-          <div className="mt-4 flex justify-end gap-2">
-            <Button variant="outline" className="h-10 rounded-2xl" onClick={() => setAnnouncementOpen(false)}>
-              {t('Cancel', 'ரத்து')}
+          <div className="mt-4 flex items-center justify-between gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-10 rounded-2xl text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                setAnnouncementOpen(false);
+                setAnnouncementHistoryOpen(true);
+              }}
+            >
+              <History className="mr-1.5 h-4 w-4" />
+              {t('View History', 'வரலாற்றைக் காண்க')}
             </Button>
-            <Button className="h-10 rounded-2xl bg-blue-600 hover:bg-blue-700" onClick={onSendAnnouncement} disabled={sendAnnouncement.isPending}>
-              {t('Send', 'அனுப்பு')}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" className="h-10 rounded-2xl" onClick={() => setAnnouncementOpen(false)}>
+                {t('Cancel', 'ரத்து')}
+              </Button>
+              <Button className="h-10 rounded-2xl bg-blue-600 hover:bg-blue-700" onClick={onSendAnnouncement} disabled={sendAnnouncement.isPending}>
+                {t('Send', 'அனுப்பு')}
+              </Button>
+            </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={announcementHistoryOpen} onOpenChange={setAnnouncementHistoryOpen}>
+        <DialogContent className="max-h-[85vh] overflow-hidden flex flex-col rounded-3xl sm:max-w-[700px]">
+          <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-3 border-b pr-8">
+            <div>
+              <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                <History className="h-5 w-5 text-blue-600" />
+                {t('Announcement History', 'அறிவிப்பு வரலாறு')}
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground mt-1">
+                {t('Review past broadcast messages sent to platform users.', 'பயனர்களுக்கு அனுப்பப்பட்ட முந்தைய அறிவிப்புகளை மதிப்பாய்வு செய்யவும்.')}
+              </DialogDescription>
+            </div>
+            <Button
+              size="sm"
+              className="h-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-xs shrink-0"
+              onClick={() => {
+                setAnnouncementHistoryOpen(false);
+                setAnnouncementOpen(true);
+              }}
+            >
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              {t('New', 'புதிய')}
+            </Button>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto py-3 space-y-3 pr-1">
+            {announcementsLoading ? (
+              <div className="py-12 flex flex-col items-center justify-center text-muted-foreground gap-2">
+                <RefreshCcw className="h-6 w-6 animate-spin text-blue-600" />
+                <p className="text-xs">{t('Loading announcement history...', 'அறிவிப்பு வரலாறு ஏற்றப்படுகிறது...')}</p>
+              </div>
+            ) : announcementsError ? (
+              <div className="py-8 text-center space-y-3">
+                <p className="text-sm text-destructive">{t('Failed to load announcements.', 'அறிவிப்புகளை ஏற்ற முடியவில்லை.')}</p>
+                <Button variant="outline" size="sm" onClick={() => refetchAnnouncements()} className="rounded-xl h-8">
+                  <RefreshCcw className="mr-1.5 h-3.5 w-3.5" />
+                  {t('Retry', 'மீண்டும் முயற்சி')}
+                </Button>
+              </div>
+            ) : !adminAnnouncementsData?.announcements?.length ? (
+              <div className="py-12 text-center text-muted-foreground space-y-2">
+                <Megaphone className="h-10 w-10 mx-auto opacity-30" />
+                <p className="text-sm font-medium">{t('No announcements sent yet.', 'இதுவரை எந்த அறிவிப்பும் அனுப்பப்படவில்லை.')}</p>
+                <p className="text-xs text-muted-foreground">{t('Announcements you broadcast will appear here in persistent history.', 'நீங்கள் அனுப்பும் அறிவிப்புகள் இங்கு வரலாற்றுப் பதிவாகக் காட்டப்படும்.')}</p>
+              </div>
+            ) : (
+              adminAnnouncementsData.announcements.map((ann) => (
+                <div
+                  key={ann._id}
+                  className="rounded-2xl border border-slate-200 dark:border-blue-900/60 bg-card p-4 space-y-2 shadow-sm hover:shadow transition"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h4 className="font-semibold text-sm text-slate-900 dark:text-slate-100">{ann.title}</h4>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                        <span>{new Date(ann.createdAt).toLocaleString()}</span>
+                        {ann.createdBy?.name && (
+                          <>
+                            <span>•</span>
+                            <span className="truncate">{ann.createdBy.name}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="rounded-full text-[11px] shrink-0 border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-300">
+                      {t('Broadcast', 'அனைவருக்கும்')}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed bg-muted/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                    {ann.message}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+
+          {Number(adminAnnouncementsData?.pagination?.pages || 0) > 1 && (
+            <div className="flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
+              <span>
+                {t('Total:', 'மொத்தம்:')} {adminAnnouncementsData?.pagination?.total || 0}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs rounded-lg"
+                  disabled={historyPage <= 1}
+                  onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                >
+                  {t('Previous', 'முந்தைய')}
+                </Button>
+                <span>
+                  {historyPage} / {adminAnnouncementsData?.pagination?.pages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs rounded-lg"
+                  disabled={historyPage >= (adminAnnouncementsData?.pagination?.pages || 1)}
+                  onClick={() => setHistoryPage((p) => p + 1)}
+                >
+                  {t('Next', 'அடுத்த')}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
