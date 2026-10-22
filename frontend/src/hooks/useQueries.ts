@@ -40,7 +40,8 @@ export function useGetCallerUserProfile() {
             id: primaryUser._id || primaryUser.id,
             name: primaryUser.name,
             email: primaryUser.email,
-            role: primaryUser.tamilRole as TamilRole,
+            role: primaryUser.role || (primaryUser.tamilRole === 'admin' ? 'admin' : 'user'),
+            registrationPurpose: primaryUser.registrationPurpose || (primaryUser.tamilRole === 'owners' ? 'Owner' : primaryUser.tamilRole === 'brokersBuilders' ? 'Builder' : 'Customer'),
             approved: primaryUser.approved,
             internalRole: primaryUser.role,
             blocked: primaryUser.blocked,
@@ -84,13 +85,15 @@ export function useRegisterUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ name, email, role, password }: { name: string; email: string; role: TamilRole; password?: string }) => {
+    mutationFn: async ({ name, email, role, registrationPurpose, password }: { name: string; email: string; role?: TamilRole | string; registrationPurpose?: string; password?: string }) => {
       const finalPassword = password || 'defaultPassword123';
+      const finalPurpose = registrationPurpose || role || 'Customer';
       const res = await api.post('/auth/register', { 
         name, 
         email, 
         password: finalPassword, 
-        tamilRole: role 
+        registrationPurpose: finalPurpose,
+        tamilRole: role || finalPurpose 
       });
       return res.data;
     },

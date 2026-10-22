@@ -187,6 +187,11 @@ router.post('/', auth, async (req, res) => {
       return res.status(404).json({ msg: 'Property not found' });
     }
 
+    // Check if user is the owner of this property
+    if (property.owner && property.owner.toString() === req.user.id) {
+      return res.status(400).json({ msg: 'You cannot submit a request for your own property' });
+    }
+
     // Check if request already exists
     const existingRequest = await Request.findOne({
       property: propertyId,

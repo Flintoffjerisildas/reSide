@@ -73,9 +73,15 @@ import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer,
 
 interface OwnerDashboardProps {
   onBrowseProperties?: (transactionType: 'rent' | 'buy') => void;
+  initialTab?: string;
+  hideHeaderActions?: boolean;
 }
 
-export default function OwnerDashboard({ onBrowseProperties }: OwnerDashboardProps) {
+export default function OwnerDashboard({
+  onBrowseProperties,
+  initialTab = 'overview',
+  hideHeaderActions = false
+}: OwnerDashboardProps = {}) {
   const { t, language } = useLanguage();
   const { data: userProfile, refetch: refetchUserProfile } = useGetCallerUserProfile();
 
@@ -97,7 +103,13 @@ export default function OwnerDashboard({ onBrowseProperties }: OwnerDashboardPro
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [deletingProperty, setDeletingProperty] = useState<Property | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
   const [idProofImage, setIdProofImage] = useState<string | null>(null);
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);

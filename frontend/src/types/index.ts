@@ -107,6 +107,10 @@ export interface Message {
   properties?: Property[];
 }
 
+export type SystemRole = 'admin' | 'user';
+
+export type RegistrationPurpose = 'Owner' | 'Builder' | 'Dealer' | 'Customer';
+
 export enum TamilRole {
   owners = 'owners',
   brokersBuilders = 'brokersBuilders',
@@ -118,7 +122,8 @@ export interface UserProfile {
   id: string;
   name: string;
   email: string;
-  role: TamilRole;
+  role: SystemRole | TamilRole | string;
+  registrationPurpose?: RegistrationPurpose | string;
   approved: boolean;
   internalRole?: 'admin' | 'user' | string;
   blocked?: boolean;

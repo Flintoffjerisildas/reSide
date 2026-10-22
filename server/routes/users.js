@@ -528,15 +528,34 @@ router.post('/admin/create-user', auth, auth.requireAdmin, async (req, res) => {
     const name = String(req.body?.name || '').trim();
     const email = String(req.body?.email || '').trim().toLowerCase();
     const phone = String(req.body?.phone || '').trim();
-    const tamilRoleRaw = req.body?.tamilRole;
-    const tamilRole = String(tamilRoleRaw || 'customers').trim();
+    const rawPurpose = req.body?.registrationPurpose || req.body?.tamilRole;
+    const purposeStr = String(rawPurpose || 'Customer').trim();
 
     if (!name || !email) {
       return res.status(400).json({ msg: 'Name and email are required' });
     }
 
-    if (!['owners', 'brokersBuilders', 'customers', 'admin'].includes(tamilRole)) {
-      return res.status(400).json({ msg: 'Invalid tamilRole' });
+    let normalizedPurpose = 'Customer';
+    let tamilRole = 'customers';
+    let role = 'user';
+
+    const pLower = purposeStr.toLowerCase();
+    if (pLower === 'admin') {
+      tamilRole = 'admin';
+      role = 'admin';
+      normalizedPurpose = 'Owner';
+    } else if (pLower === 'owner' || pLower === 'owners') {
+      normalizedPurpose = 'Owner';
+      tamilRole = 'owners';
+    } else if (pLower === 'builder' || pLower === 'builders') {
+      normalizedPurpose = 'Builder';
+      tamilRole = 'brokersBuilders';
+    } else if (pLower === 'dealer' || pLower === 'dealers' || pLower === 'brokersbuilders') {
+      normalizedPurpose = 'Dealer';
+      tamilRole = 'brokersBuilders';
+    } else {
+      normalizedPurpose = 'Customer';
+      tamilRole = 'customers';
     }
 
     const existing = await User.findOne({ email }).select('_id isVerified');
@@ -558,8 +577,9 @@ router.post('/admin/create-user', auth, auth.requireAdmin, async (req, res) => {
       name,
       email,
       password: hashedPassword,
+      registrationPurpose: normalizedPurpose,
       tamilRole,
-      role: tamilRole === 'admin' ? 'admin' : 'user',
+      role,
       approved: true,
       blocked: false,
       isVerified: true,
@@ -575,6 +595,7 @@ router.post('/admin/create-user', auth, auth.requireAdmin, async (req, res) => {
         id: String(user._id),
         name: user.name,
         email: user.email,
+        registrationPurpose: user.registrationPurpose,
         tamilRole: user.tamilRole,
         role: user.role,
         approved: user.approved,
@@ -910,6 +931,9 @@ router.put('/profile', auth, async (req, res) => {
       } else if (typeof notificationsEnabled === 'string') {
         user.notificationsEnabled = notificationsEnabled === 'true' || notificationsEnabled === 'on';
       }
+    }
+    if (req.body?.registrationPurpose && ['Owner', 'Builder', 'Dealer', 'Customer'].includes(req.body.registrationPurpose)) {
+      user.registrationPurpose = req.body.registrationPurpose;
     }
 
     const completionFields = [

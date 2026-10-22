@@ -6,15 +6,17 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: string; // tamilRole
-  internalRole?: string; // admin/user
+  role: string; // 'admin' | 'user'
+  registrationPurpose?: string; // 'Owner' | 'Builder' | 'Dealer' | 'Customer'
+  tamilRole?: string;
+  internalRole?: string; // 'admin' | 'user'
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, tamilRole: string) => Promise<any>;
+  register: (name: string, email: string, password: string, registrationPurpose: string, tamilRole?: string) => Promise<any>;
   verifyRegisterOtp: (email: string, otp: string) => Promise<void>;
   forgotPasswordStart: (email: string) => Promise<any>;
   resetPasswordWithOtp: (email: string, otp: string, newPassword: string) => Promise<void>;
@@ -90,7 +92,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         id: apiUser._id || apiUser.id,
         name: apiUser.name,
         email: apiUser.email,
-        role: apiUser.tamilRole,
+        role: apiUser.role || (apiUser.internalRole === 'admin' ? 'admin' : 'user'),
+        registrationPurpose: apiUser.registrationPurpose || (apiUser.tamilRole === 'owners' ? 'Owner' : apiUser.tamilRole === 'brokersBuilders' ? 'Builder' : 'Customer'),
+        tamilRole: apiUser.tamilRole,
         internalRole: apiUser.internalRole || apiUser.role,
       };
       localStorage.setItem('token', res.data.token);
@@ -104,10 +108,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (name: string, email: string, password: string, tamilRole: string) => {
+  const register = async (name: string, email: string, password: string, registrationPurpose: string, tamilRole?: string) => {
     setLoading(true);
     try {
-      const res = await api.post('/auth/register', { name, email, password, tamilRole });
+      const res = await api.post('/auth/register', { 
+        name, 
+        email, 
+        password, 
+        registrationPurpose, 
+        tamilRole: tamilRole || registrationPurpose 
+      });
       return res.data;
     } finally {
       setLoading(false);
@@ -123,7 +133,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         id: apiUser._id || apiUser.id,
         name: apiUser.name,
         email: apiUser.email,
-        role: apiUser.tamilRole,
+        role: apiUser.role || (apiUser.internalRole === 'admin' ? 'admin' : 'user'),
+        registrationPurpose: apiUser.registrationPurpose || (apiUser.tamilRole === 'owners' ? 'Owner' : apiUser.tamilRole === 'brokersBuilders' ? 'Builder' : 'Customer'),
+        tamilRole: apiUser.tamilRole,
         internalRole: apiUser.internalRole || apiUser.role,
       };
       localStorage.setItem('token', res.data.token);

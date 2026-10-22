@@ -58,7 +58,17 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
-export default function CustomerDashboard() {
+interface CustomerDashboardProps {
+  onBrowseProperties?: (transactionType: 'rent' | 'buy') => void;
+  initialTab?: string;
+  hideHeaderActions?: boolean;
+}
+
+export default function CustomerDashboard({
+  onBrowseProperties,
+  initialTab = 'overview',
+  hideHeaderActions = false
+}: CustomerDashboardProps = {}) {
   const { t, language } = useLanguage();
   const { data: userProfile, refetch: refetchUserProfile } = useGetCallerUserProfile();
   const { data: tenantRequests = [] } = useGetTenantRequests();
@@ -70,7 +80,13 @@ export default function CustomerDashboard() {
     isError: announcementsError,
     refetch: refetchAnnouncements
   } = useAnnouncements();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
   const [idProofImage, setIdProofImage] = useState<string | null>(null);
   const [agreements, setAgreements] = useState<any[]>([]);

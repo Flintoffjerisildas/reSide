@@ -23,20 +23,35 @@ function createTokenForUser(user) {
 
 async function register(req, res) {
   try {
-    const { name, email, password, tamilRole } = req.body;
+    const { name, email, password, tamilRole, registrationPurpose } = req.body;
 
-    if (!name || !email || !password || !tamilRole) {
+    // Support either registrationPurpose or legacy tamilRole
+    const purposeInput = registrationPurpose || tamilRole;
+    if (!name || !email || !password || !purposeInput) {
       return res.status(400).json({ msg: 'All fields are required' });
     }
 
-    const normalizedTamilRole = String(tamilRole);
-    if (!['owners', 'brokersBuilders', 'customers', 'admin'].includes(normalizedTamilRole)) {
-      return res.status(400).json({ msg: 'Invalid role' });
+    // Determine registration purpose and whether this is an admin request
+    let normalizedPurpose = 'Customer';
+    let isAdminRegistration = false;
+
+    const rawLower = String(purposeInput).trim().toLowerCase();
+    if (rawLower === 'admin') {
+      isAdminRegistration = true;
+    } else if (rawLower === 'owner' || rawLower === 'owners') {
+      normalizedPurpose = 'Owner';
+    } else if (rawLower === 'builder' || rawLower === 'builders') {
+      normalizedPurpose = 'Builder';
+    } else if (rawLower === 'dealer' || rawLower === 'dealers' || rawLower === 'brokersbuilders' || rawLower === 'broker') {
+      normalizedPurpose = 'Dealer';
+    } else if (rawLower === 'customer' || rawLower === 'customers' || rawLower === 'tenant' || rawLower === 'buyer') {
+      normalizedPurpose = 'Customer';
+    } else {
+      return res.status(400).json({ msg: 'Invalid registration purpose. Must be Owner, Builder, Dealer, or Customer.' });
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
     const initialAdminEmails = parseInitialAdminEmails();
-    const isAdminRegistration = normalizedTamilRole === 'admin';
 
     if (isAdminRegistration && !initialAdminEmails.has(normalizedEmail)) {
       return res.status(403).json({ msg: 'Admin registration is not enabled for this email' });
@@ -52,11 +67,20 @@ async function register(req, res) {
     const otp = generateNumericOtp(6);
     const otpExpiry = new Date(Date.now() + OTP_VALIDITY_MS);
 
+    const legacyTamilRole = isAdminRegistration
+      ? 'admin'
+      : normalizedPurpose === 'Owner'
+        ? 'owners'
+        : normalizedPurpose === 'Customer'
+          ? 'customers'
+          : 'brokersBuilders';
+
     if (user && !user.isVerified) {
       user.name = name;
       user.password = hashedPassword;
       user.email = normalizedEmail;
-      user.tamilRole = normalizedTamilRole;
+      user.registrationPurpose = normalizedPurpose;
+      user.tamilRole = legacyTamilRole;
       user.approved = isAdminRegistration ? true : false;
       user.blocked = false;
       user.role = isAdminRegistration ? 'admin' : 'user';
@@ -70,7 +94,8 @@ async function register(req, res) {
         name,
         email: normalizedEmail,
         password: hashedPassword,
-        tamilRole: normalizedTamilRole,
+        registrationPurpose: normalizedPurpose,
+        tamilRole: legacyTamilRole,
         approved: isAdminRegistration ? true : false,
         role: isAdminRegistration ? 'admin' : 'user',
         isVerified: false,
@@ -162,7 +187,8 @@ async function verifyRegistrationOtp(req, res) {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.tamilRole,
+        role: user.role,
+        registrationPurpose: user.registrationPurpose || (user.tamilRole === 'owners' ? 'Owner' : user.tamilRole === 'brokersBuilders' ? 'Builder' : 'Customer'),
         tamilRole: user.tamilRole,
         internalRole: user.role
       }
@@ -208,7 +234,8 @@ async function login(req, res) {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.tamilRole,
+        role: user.role,
+        registrationPurpose: user.registrationPurpose || (user.tamilRole === 'owners' ? 'Owner' : user.tamilRole === 'brokersBuilders' ? 'Builder' : 'Customer'),
         tamilRole: user.tamilRole,
         internalRole: user.role
       }

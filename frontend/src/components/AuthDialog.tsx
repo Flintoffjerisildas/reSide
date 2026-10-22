@@ -35,7 +35,7 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [otp, setOtp] = useState('');
-  const [role, setRole] = useState<TamilRole | ''>('');
+  const [registrationPurpose, setRegistrationPurpose] = useState<string>('Customer');
   const [otpEmail, setOtpEmail] = useState('');
   const [otpCountdown, setOtpCountdown] = useState(0);
   
@@ -50,7 +50,7 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
       setNewPassword('');
       setConfirmNewPassword('');
       setOtp('');
-      setRole('');
+      setRegistrationPurpose('Customer');
       setOtpEmail('');
       setOtpCountdown(0);
     }
@@ -102,12 +102,12 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim() || !name.trim() || !role) {
+    if (!email.trim() || !password.trim() || !name.trim() || !registrationPurpose) {
       toast.error(t('Please fill in all required fields', 'அனைத்து கட்டாய புலங்களையும் நிரப்பவும்'));
       return;
     }
     try {
-      const data = await register(name, email, password, role as string);
+      const data = await register(name, email, password, registrationPurpose);
       setOtpEmail(email);
       if (data?.devOtp) {
         setOtp(data.devOtp);
@@ -347,29 +347,29 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="role">
-                {t('Role', 'பாத்திரம்')} <span className="text-destructive">*</span>
+              <Label htmlFor="registrationPurpose">
+                {t('Registration Purpose', 'பதிவு நோக்கம்')} <span className="text-destructive">*</span>
               </Label>
               <Select
-                value={role}
-                onValueChange={(value) => setRole(value as TamilRole)}
+                value={registrationPurpose}
+                onValueChange={(value) => setRegistrationPurpose(value)}
                 disabled={loading}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder={t('Select a role', 'பாத்திரத்தை தேர்ந்தெடுக்கவும்')} />
+                <SelectTrigger id="registrationPurpose">
+                  <SelectValue placeholder={t('Select registration purpose', 'பதிவு நோக்கத்தைத் தேர்ந்தெடுக்கவும்')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={TamilRole.admin}>
-                    {t('Admin', 'நிர்வாகம்')}
+                  <SelectItem value="Owner">
+                    {t('Owner', 'சொத்து உரிமையாளர்')}
                   </SelectItem>
-                  <SelectItem value={TamilRole.owners}>
-                    {t('Owner', 'உரிமையாளர்')}
+                  <SelectItem value="Builder">
+                    {t('Builder', 'கட்டுமான நிறுவனம்')}
                   </SelectItem>
-                  <SelectItem value={TamilRole.brokersBuilders}>
-                    {t('Broker/Builder', 'தரகர்/கட்டுபவர்')}
+                  <SelectItem value="Dealer">
+                    {t('Dealer', 'முகவர் / டீலர்')}
                   </SelectItem>
-                  <SelectItem value={TamilRole.customers}>
-                    {t('Customer (Tenant/Buyer)', 'வாடிக்கையாளர்')}
+                  <SelectItem value="Customer">
+                    {t('Customer', 'வாடிக்கையாளர் / வாடகைதாரர்')}
                   </SelectItem>
                 </SelectContent>
               </Select>

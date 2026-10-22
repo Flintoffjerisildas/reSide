@@ -9,9 +9,14 @@ const userSchema = new mongoose.Schema({
     enum: ['owners', 'brokersBuilders', 'customers', 'admin'],
     default: 'customers'
   },
+  registrationPurpose: {
+    type: String,
+    enum: ['Owner', 'Builder', 'Dealer', 'Customer'],
+    default: 'Customer'
+  },
   approved: { type: Boolean, default: false },
   blocked: { type: Boolean, default: false },
-  role: { type: String, default: 'user' }, // internal role (admin/user)
+  role: { type: String, enum: ['admin', 'user'], default: 'user' }, // System role: 'admin' | 'user'
   phone: { type: String },
   address: { type: String },
   aadhar: { type: String },
@@ -33,7 +38,27 @@ const userSchema = new mongoose.Schema({
   otp: { type: String },
   otpExpiry: { type: Date },
   otpPurpose: { type: String },
-  otpAttempts: { type: Number, default: 0 }
+});
+
+userSchema.pre('save', function () {
+  // Synchronize registrationPurpose and legacy tamilRole
+  if (this.registrationPurpose) {
+    if (this.registrationPurpose === 'Owner') this.tamilRole = 'owners';
+    else if (this.registrationPurpose === 'Builder') this.tamilRole = 'brokersBuilders';
+    else if (this.registrationPurpose === 'Dealer') this.tamilRole = 'brokersBuilders';
+    else if (this.registrationPurpose === 'Customer') this.tamilRole = 'customers';
+  } else if (this.tamilRole) {
+    if (this.tamilRole === 'owners') this.registrationPurpose = 'Owner';
+    else if (this.tamilRole === 'brokersBuilders') this.registrationPurpose = 'Builder';
+    else if (this.tamilRole === 'customers') this.registrationPurpose = 'Customer';
+  }
+
+  // Ensure system role is strictly 'admin' or 'user'
+  if (this.tamilRole === 'admin') {
+    this.role = 'admin';
+  } else if (!this.role || this.role !== 'admin') {
+    this.role = 'user';
+  }
 });
 
 module.exports = mongoose.model('User', userSchema);

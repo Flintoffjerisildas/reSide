@@ -24,6 +24,7 @@ import OwnerDashboard from './components/OwnerDashboard';
 import BrokerDashboard from './components/BrokerDashboard';
 import CustomerDashboard from './components/CustomerDashboard';
 import AdminDashboard from './components/AdminDashboard';
+import UserDashboard from './components/UserDashboard';
 import PendingApprovalScreen from './components/PendingApprovalScreen';
 import { useQueryClient } from '@tanstack/react-query';
 import { TamilRole } from './types';
@@ -63,7 +64,7 @@ function LoginPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [otp, setOtp] = useState('');
-  const [role, setRole] = useState<TamilRole | ''>('');
+  const [registrationPurpose, setRegistrationPurpose] = useState<string>('Customer');
   const [otpEmail, setOtpEmail] = useState('');
   const [otpCountdown, setOtpCountdown] = useState(0);
   const [devOtp, setDevOtp] = useState<string | null>(null);
@@ -113,12 +114,12 @@ function LoginPage() {
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim() || !name.trim() || !role) {
+    if (!email.trim() || !password.trim() || !name.trim() || !registrationPurpose) {
       toast.error(t('Please fill in all required fields', 'அனைத்து கட்டாய புலங்களையும் நிரப்பவும்'));
       return;
     }
     try {
-      const data = await register(name, email, password, role as string);
+      const data = await register(name, email, password, registrationPurpose);
       setOtpEmail(email);
       if (data?.devOtp) {
         setDevOtp(data.devOtp);
@@ -422,29 +423,29 @@ function LoginPage() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="register-role">
-                  {t('Role', 'பாத்திரம்')} <span className="text-destructive">*</span>
+                <Label htmlFor="register-purpose">
+                  {t('Registration Purpose', 'பதிவு நோக்கம்')} <span className="text-destructive">*</span>
                 </Label>
                 <Select
-                  value={role}
-                  onValueChange={(value) => setRole(value as TamilRole)}
+                  value={registrationPurpose}
+                  onValueChange={(value) => setRegistrationPurpose(value)}
                   disabled={loading}
                 >
-                  <SelectTrigger id="register-role">
-                    <SelectValue placeholder={t('Select a role', 'பாத்திரத்தை தேர்ந்தெடுக்கவும்')} />
+                  <SelectTrigger id="register-purpose">
+                    <SelectValue placeholder={t('Select registration purpose', 'பதிவு நோக்கத்தைத் தேர்ந்தெடுக்கவும்')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={TamilRole.admin}>
-                      {t('Admin', 'நிர்வாகம்')}
+                    <SelectItem value="Owner">
+                      {t('Owner', 'சொத்து உரிமையாளர்')}
                     </SelectItem>
-                    <SelectItem value={TamilRole.owners}>
-                      {t('Owner', 'உரிமையாளர்')}
+                    <SelectItem value="Builder">
+                      {t('Builder', 'கட்டுமான நிறுவனம்')}
                     </SelectItem>
-                    <SelectItem value={TamilRole.brokersBuilders}>
-                      {t('Broker/Builder', 'தரகர்/கட்டுபவர்')}
+                    <SelectItem value="Dealer">
+                      {t('Dealer', 'முகவர் / டீலர்')}
                     </SelectItem>
-                    <SelectItem value={TamilRole.customers}>
-                      {t('Customer (Tenant/Buyer)', 'வாடிக்கையாளர்')}
+                    <SelectItem value="Customer">
+                      {t('Customer', 'வாடிக்கையாளர் / வாடகைதாரர்')}
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -671,20 +672,15 @@ function AppContent() {
   const roleToCheck = userProfile?.role || user?.role;
   const internalRoleToCheck = (userProfile as any)?.internalRole || (user as any)?.internalRole;
 
-  const isAdmin = internalRoleToCheck === 'admin';
-  const isOwner = roleToCheck === TamilRole.owners || roleToCheck === 'owners' || roleToCheck === 'Owner';
-  const isBroker = roleToCheck === TamilRole.brokersBuilders || roleToCheck === 'brokersBuilders' || roleToCheck === 'Broker' || roleToCheck === 'Builder';
-  const isCustomer = roleToCheck === TamilRole.customers || roleToCheck === 'customers' || roleToCheck === 'Customer' || roleToCheck === 'Tenant' || roleToCheck === 'Buyer';
+  const isAdmin = internalRoleToCheck === 'admin' || roleToCheck === 'admin' || roleToCheck === TamilRole.admin;
 
   console.log('Debug App State:', {
     isAuthenticated,
     userProfile,
     role: userProfile?.role,
+    isAdmin,
     isApproved,
-    showPendingApproval,
-    isOwner,
-    isBroker,
-    isCustomer
+    showPendingApproval
   });
 
   const handleLogout = () => {
@@ -755,19 +751,8 @@ function AppContent() {
         ) : showDashboard && isAuthenticated ? (
           isAdmin ? (
             <AdminDashboard />
-          ) : isOwner ? (
-            <OwnerDashboard onBrowseProperties={handleBrowseProperties} />
-          ) : isBroker ? (
-            <BrokerDashboard onBrowseProperties={handleBrowseProperties} />
-          ) : isCustomer ? (
-            <CustomerDashboard />
           ) : (
-            <div className="flex h-[50vh] items-center justify-center flex-col gap-4">
-              <p className="text-lg font-medium text-muted-foreground">
-                Dashboard not available for your role ({String(roleToCheck || 'Unknown')}).
-              </p>
-              <p className="text-sm text-muted-foreground">Please contact support if this is an error.</p>
-            </div>
+            <UserDashboard onBrowseProperties={handleBrowseProperties} />
           )
         ) : showLoginPage && !isAuthenticated ? (
           <LoginPage />
