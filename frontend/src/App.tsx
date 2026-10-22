@@ -416,18 +416,18 @@ function LoginPage() {
 
       <div className="relative z-10 grid w-full max-w-5xl gap-6 lg:grid-cols-[1fr_420px] lg:items-stretch">
         <aside
-          className="login-interactive-card group relative hidden overflow-hidden rounded-[2rem] border border-blue-100/80 bg-gradient-to-br from-white via-blue-50 to-teal-50 p-8 text-slate-900 shadow-2xl shadow-blue-950/15 transition-all duration-500 hover:-translate-y-1 hover:shadow-blue-900/25 md:block dark:border-blue-900/60 dark:bg-none dark:bg-slate-950 dark:text-white"
+          className="login-interactive-card welcome-ambient-card welcome-cosmic-card group relative hidden overflow-visible rounded-[2rem] border border-blue-200/70 p-8 text-slate-900 shadow-none transition-all duration-500 hover:-translate-y-1 md:block dark:border-blue-400/30 dark:text-white"
           onPointerMove={handleCardPointerMove}
           onPointerLeave={handleCardPointerLeave}
         >
-        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-400/20 blur-3xl transition-transform duration-700 group-hover:scale-125 dark:bg-blue-500/30" />
-        <div className="absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-teal-300/25 blur-3xl transition-transform duration-700 group-hover:scale-125 dark:bg-teal-400/20" />
-        <div className="relative flex h-full flex-col justify-between">
+        <span className="welcome-card-glow welcome-card-glow-blur" aria-hidden="true" />
+        <span className="welcome-card-glow welcome-card-glow-beam" aria-hidden="true" />
+        <div className="relative z-10 flex h-full flex-col justify-between">
           <div>
             <div className="mb-12 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500 shadow-lg shadow-blue-500/30 transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110">
               <Building2 className="h-6 w-6" />
             </div>
-            <p className="mb-3 text-sm font-semibold uppercase tracking-[0.25em] text-blue-600 dark:text-blue-300">
+            <p className="mb-3 text-sm font-semibold uppercase tracking-[0.25em] text-blue-600 dark:text-cyan-200">
               {t('Welcome to Reside', 'Reside-க்கு வரவேற்கிறோம்')}
             </p>
             <h2 className="max-w-md text-4xl font-semibold leading-tight tracking-tight text-slate-900 dark:text-white">
@@ -448,11 +448,11 @@ function LoginPage() {
             ].map(({ icon: Icon, text }) => (
               <div
                 key={text}
-                className="flex items-center gap-3 rounded-2xl border border-blue-200/70 bg-white/65 px-4 py-3 text-sm text-slate-700 shadow-sm backdrop-blur transition-all duration-300 hover:translate-x-1 hover:border-blue-300 hover:bg-white/90 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:border-blue-300/40 dark:hover:bg-white/15"
+                className="welcome-card-pill flex items-center gap-3 rounded-2xl border border-blue-200/70 bg-white/65 px-4 py-3 text-sm text-slate-700 shadow-sm backdrop-blur transition-all duration-300 hover:translate-x-1 hover:border-blue-300 hover:bg-white/90 dark:border-cyan-200/20 dark:bg-white/10 dark:text-slate-200 dark:hover:border-cyan-300/40 dark:hover:bg-white/15"
               >
-                <Icon className="h-5 w-5 text-blue-600 dark:text-blue-300" />
+                <Icon className="h-5 w-5 text-blue-600 dark:text-cyan-300" />
                 <span>{text}</span>
-                <ArrowUpRight className="ml-auto h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 dark:text-slate-400" />
+                <ArrowUpRight className="ml-auto h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 dark:text-cyan-200/70" />
               </div>
             ))}
           </div>

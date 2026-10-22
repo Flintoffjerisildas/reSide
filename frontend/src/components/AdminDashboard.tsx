@@ -298,9 +298,9 @@ function AdminDashboardModern() {
 
   const statusBadge = (active: boolean) =>
     active ? (
-      <Badge className="rounded-full bg-emerald-600 hover:bg-emerald-600">Active</Badge>
+      <Badge className="admin-status-badge admin-status-active rounded-full bg-emerald-600 hover:bg-emerald-600">Active</Badge>
     ) : (
-      <Badge variant="secondary" className="rounded-full">
+      <Badge variant="secondary" className="admin-status-badge admin-status-inactive rounded-full">
         Inactive
       </Badge>
     );
@@ -308,9 +308,9 @@ function AdminDashboardModern() {
   const paymentBadge = (status: string) => {
     const s = String(status || '').toLowerCase();
     return s === 'paid' ? (
-      <Badge className="rounded-full bg-emerald-600 hover:bg-emerald-600">Paid</Badge>
+      <Badge className="admin-status-badge admin-status-paid rounded-full bg-emerald-600 hover:bg-emerald-600">Paid</Badge>
     ) : (
-      <Badge variant="secondary" className="rounded-full">
+      <Badge variant="secondary" className="admin-status-badge admin-status-pending rounded-full">
         Pending
       </Badge>
     );
@@ -318,10 +318,10 @@ function AdminDashboardModern() {
 
   const maintenanceBadge = (status: string) => {
     const s = String(status || '').toLowerCase();
-    if (s === 'completed') return <Badge className="rounded-full bg-emerald-600 hover:bg-emerald-600">Completed</Badge>;
-    if (s === 'in-progress') return <Badge className="rounded-full bg-blue-600 hover:bg-blue-600">In Progress</Badge>;
+    if (s === 'completed') return <Badge className="admin-status-badge admin-status-completed rounded-full bg-emerald-600 hover:bg-emerald-600">Completed</Badge>;
+    if (s === 'in-progress') return <Badge className="admin-status-badge admin-status-progress rounded-full bg-blue-600 hover:bg-blue-600">In Progress</Badge>;
     return (
-      <Badge variant="secondary" className="rounded-full">
+      <Badge variant="secondary" className="admin-status-badge admin-status-pending rounded-full">
         Pending
       </Badge>
     );
@@ -399,7 +399,7 @@ function AdminDashboardModern() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="admin-dashboard min-h-screen bg-background">
       <div className="mx-auto grid w-full max-w-[1600px] grid-cols-1 items-start gap-5 px-4 py-4 xl:grid-cols-[minmax(0,1fr)_380px] sm:px-6">
         <main className="space-y-5">
           <div className="relative">
@@ -737,7 +737,7 @@ function AdminDashboardModern() {
       </div>
 
       <Dialog open={!!summaryModal} onOpenChange={(open) => (!open ? setSummaryModal(null) : null)}>
-        <DialogContent className="max-h-[85vh] overflow-auto rounded-3xl sm:max-w-[860px]">
+        <DialogContent className={`admin-summary-modal max-h-[85vh] overflow-auto rounded-3xl sm:max-w-[860px] ${summaryModal === 'properties' ? 'admin-properties-modal' : ''}`}>
           <DialogHeader>
             <DialogTitle>
               {summaryModal === 'properties'
@@ -765,7 +765,7 @@ function AdminDashboardModern() {
                 <div className="text-sm text-slate-500">{t('Showing', 'காட்டப்படுகிறது')} {Math.min(filteredProps.length, 12)} / {filteredProps.length}</div>
                 <Button
                   variant="outline"
-                  className="h-9 rounded-2xl border-slate-200 bg-white px-3"
+                  className="admin-open-section h-9 rounded-2xl border-slate-200 bg-white px-3"
                   onClick={() => {
                     setSummaryModal(null);
                     scrollTo('admin-properties-section');
@@ -774,7 +774,7 @@ function AdminDashboardModern() {
                   {t('Open section', 'பகுதி திற')}
                 </Button>
               </div>
-              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <div className="admin-properties-table overflow-x-auto rounded-2xl border border-slate-200">
                 <Table className="min-w-[780px]">
                   <TableHeader>
                     <TableRow>
@@ -811,7 +811,7 @@ function AdminDashboardModern() {
                 <div className="text-sm text-slate-500">{t('Showing', 'காட்டப்படுகிறது')} {Math.min(filteredTenantUsers.length, 12)} / {filteredTenantUsers.length}</div>
                 <Button
                   variant="outline"
-                  className="h-9 rounded-2xl border-slate-200 bg-white px-3"
+                  className="admin-modal-action h-9 rounded-2xl border-slate-200 bg-white px-3"
                   onClick={() => {
                     setSummaryModal(null);
                     scrollTo('admin-tenants-section');
@@ -820,7 +820,7 @@ function AdminDashboardModern() {
                   {t('Open section', 'பகுதி திற')}
                 </Button>
               </div>
-              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <div className="admin-modal-table overflow-x-auto rounded-2xl border border-slate-200">
                 <Table className="min-w-[640px]">
                   <TableHeader>
                     <TableRow>
@@ -846,16 +846,16 @@ function AdminDashboardModern() {
           {summaryModal === 'revenue' ? (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                <div className="admin-summary-stat rounded-2xl border border-slate-200 bg-white p-3">
                   <div className="text-xs text-slate-500">{t('This month', 'இந்த மாதம்')}</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">₹{Number(totals.monthlyRevenue).toLocaleString()}</div>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                <div className="admin-summary-stat rounded-2xl border border-slate-200 bg-white p-3">
                   <div className="text-xs text-slate-500">{t('Months shown', 'காட்டப்படும் மாதங்கள்')}</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">{Number(revenueSummaryRows.length).toLocaleString()}</div>
                 </div>
               </div>
-              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <div className="admin-modal-table overflow-x-auto rounded-2xl border border-slate-200">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -884,7 +884,7 @@ function AdminDashboardModern() {
               <div className="flex justify-end">
                 <Button
                   variant="outline"
-                  className="h-9 rounded-2xl border-slate-200 bg-white px-3"
+                  className="admin-modal-action h-9 rounded-2xl border-slate-200 bg-white px-3"
                   onClick={() => {
                     setSummaryModal(null);
                     scrollTo('admin-charts-section');
@@ -902,7 +902,7 @@ function AdminDashboardModern() {
                 <div className="text-sm text-slate-500">{t('Open', 'திறந்தது')} {openMaintenanceRows.length}</div>
                 <Button
                   variant="outline"
-                  className="h-9 rounded-2xl border-slate-200 bg-white px-3"
+                  className="admin-modal-action h-9 rounded-2xl border-slate-200 bg-white px-3"
                   onClick={() => {
                     setSummaryModal(null);
                     scrollTo('admin-maintenance-section');
@@ -911,7 +911,7 @@ function AdminDashboardModern() {
                   {t('Open section', 'பகுதி திற')}
                 </Button>
               </div>
-              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <div className="admin-modal-table overflow-x-auto rounded-2xl border border-slate-200">
                 <Table className="min-w-[720px]">
                   <TableHeader>
                     <TableRow>
@@ -926,7 +926,7 @@ function AdminDashboardModern() {
                     {openMaintenanceRows.slice(0, 12).map((m: any) => (
                       <TableRow
                         key={String(m?._id || m?.id)}
-                        className="cursor-pointer hover:bg-slate-50"
+                        className="admin-maintenance-row cursor-pointer hover:bg-slate-50"
                         onClick={() => {
                           setSummaryModal(null);
                           setSelectedMaintenanceRow(m);
@@ -942,7 +942,7 @@ function AdminDashboardModern() {
                   </TableBody>
                 </Table>
               </div>
-              <div className="text-xs text-slate-500">
+              <div className="admin-modal-tip text-xs text-slate-500">
                 {t('Tip: Click a row to open the request details.', 'குறிப்பு: விவரம் காண ஒரு வரியை கிளிக் செய்யவும்.')}
               </div>
             </div>
