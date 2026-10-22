@@ -37,7 +37,7 @@ export default function FloatingChat() {
         <Button
           onClick={handleToggle}
           size="icon"
-          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 h-12 w-12 sm:h-14 sm:w-14 rounded-full shadow-lg transition-transform hover:scale-110 touch-manipulation"
+          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-blue-600 text-white shadow-xl shadow-blue-600/30 transition-transform hover:scale-110 touch-manipulation hover:bg-blue-700"
         >
           <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" />
           <span className="sr-only">Open AI Assistant</span>
@@ -46,9 +46,9 @@ export default function FloatingChat() {
 
       {/* Floating Chat Window */}
       {isOpen && !isMinimized && (
-        <Card className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col overflow-hidden shadow-2xl w-[calc(100vw-2rem)] sm:w-[400px] h-[calc(100vh-8rem)] sm:h-[600px] max-h-[600px]">
+        <Card className="glass-panel fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col overflow-hidden shadow-2xl w-[calc(100vw-2rem)] sm:w-[400px] h-[calc(100vh-8rem)] sm:h-[600px] max-h-[600px] border-primary/20 backdrop-blur-2xl">
           {/* Chat Header */}
-          <div className="flex items-center justify-between border-b border-border bg-primary px-3 sm:px-4 py-2 sm:py-3 text-primary-foreground flex-shrink-0">
+          <div className="flex items-center justify-between border-b border-white/15 bg-primary/95 px-3 sm:px-4 py-2 sm:py-3 text-primary-foreground backdrop-blur-md flex-shrink-0">
             <div className="flex items-center gap-2">
               <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-primary-foreground/20">
                 <span className="text-base sm:text-lg">🤖</span>

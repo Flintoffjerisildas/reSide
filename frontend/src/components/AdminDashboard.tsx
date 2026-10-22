@@ -411,7 +411,7 @@ function AdminDashboardModern() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-transparent">
       <div className="mx-auto grid w-full max-w-[1600px] grid-cols-1 items-start gap-5 px-4 py-4 xl:grid-cols-[minmax(0,1fr)_380px] sm:px-6">
         <main className="space-y-5">
           <div className="relative">
@@ -420,12 +420,12 @@ function AdminDashboardModern() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t('Search properties, tenants, requests...', 'சொத்துகள், வாடகையாளர்கள், கோரிக்கைகள்...')}
-              className="h-10 rounded-2xl border-slate-200 bg-white pl-10 shadow-sm dark:border-blue-900/70 dark:bg-slate-950/70"
+              className="h-10 rounded-2xl glass-surface pl-10 shadow-sm text-foreground placeholder:text-muted-foreground"
             />
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card
-              className="cursor-pointer rounded-3xl border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-blue-900/70 dark:bg-slate-950/70"
+              className="cursor-pointer rounded-3xl glass-card shadow-sm transition hover:shadow-md"
               onClick={() => setSummaryModal('properties')}
             >
               <CardContent className="flex items-center justify-between p-5">
@@ -433,13 +433,13 @@ function AdminDashboardModern() {
                   <div className="text-sm text-slate-500 dark:text-slate-300">{t('Total Properties', 'மொத்த சொத்துகள்')}</div>
                   <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">{Number(totals.totalProperties).toLocaleString()}</div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl glass-pill bg-blue-500/10 text-blue-600 dark:text-blue-400">
                   <Building className="h-5 w-5" />
                 </div>
               </CardContent>
             </Card>
             <Card
-              className="cursor-pointer rounded-3xl border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-blue-900/70 dark:bg-slate-950/70"
+              className="cursor-pointer rounded-3xl glass-card shadow-sm transition hover:shadow-md"
               onClick={() => setSummaryModal('tenants')}
             >
               <CardContent className="flex items-center justify-between p-5">
@@ -447,13 +447,13 @@ function AdminDashboardModern() {
                   <div className="text-sm text-slate-500 dark:text-slate-300">{t('Total Tenants', 'மொத்த வாடகையாளர்கள்')}</div>
                   <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">{Number(totals.totalTenants).toLocaleString()}</div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl glass-pill bg-blue-500/10 text-blue-600 dark:text-blue-400">
                   <Users className="h-5 w-5" />
                 </div>
               </CardContent>
             </Card>
             <Card
-              className="cursor-pointer rounded-3xl border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-blue-900/70 dark:bg-slate-950/70"
+              className="cursor-pointer rounded-3xl glass-card shadow-sm transition hover:shadow-md"
               onClick={() => setSummaryModal('revenue')}
             >
               <CardContent className="flex items-center justify-between p-5">
@@ -461,13 +461,13 @@ function AdminDashboardModern() {
                   <div className="text-sm text-slate-500 dark:text-slate-300">{t('Monthly Rent Collection', 'மாதாந்திர வாடகை வசூல்')}</div>
                   <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">₹{Number(totals.monthlyRevenue).toLocaleString()}</div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl glass-pill bg-blue-500/10 text-blue-600 dark:text-blue-400">
                   <CreditCard className="h-5 w-5" />
                 </div>
               </CardContent>
             </Card>
             <Card
-              className="cursor-pointer rounded-3xl border-slate-200 bg-white shadow-sm transition hover:shadow-md dark:border-blue-900/70 dark:bg-slate-950/70"
+              className="cursor-pointer rounded-3xl glass-card shadow-sm transition hover:shadow-md"
               onClick={() => setSummaryModal('maintenance')}
             >
               <CardContent className="flex items-center justify-between p-5">
@@ -475,7 +475,7 @@ function AdminDashboardModern() {
                   <div className="text-sm text-slate-500 dark:text-slate-300">{t('Open Maintenance Requests', 'திறந்த பராமரிப்பு கோரிக்கைகள்')}</div>
                   <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">{Number(totals.openMaintenance).toLocaleString()}</div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl glass-pill bg-blue-500/10 text-blue-600 dark:text-blue-400">
                   <Wrench className="h-5 w-5" />
                 </div>
               </CardContent>
@@ -483,7 +483,7 @@ function AdminDashboardModern() {
           </div>
 
           <div id="admin-charts-section" className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Card className="rounded-3xl border-slate-200 bg-white shadow-sm dark:border-blue-900/70 dark:bg-slate-950/70">
+            <Card className="rounded-3xl glass-card shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Rent Collection Trend', 'வாடகை வசூல் போக்கு')}</CardTitle>
               </CardHeader>
@@ -500,7 +500,7 @@ function AdminDashboardModern() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-3xl border-slate-200 bg-white shadow-sm dark:border-blue-900/70 dark:bg-slate-950/70">
+            <Card className="rounded-3xl glass-card shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Property Occupancy Rate', 'சொத்து குடியேற்ற விகிதம்')}</CardTitle>
               </CardHeader>
@@ -519,7 +519,7 @@ function AdminDashboardModern() {
             </Card>
           </div>
 
-          <Card id="admin-properties-section" className="rounded-3xl border-slate-200 bg-white shadow-sm dark:border-blue-900/70 dark:bg-slate-950/70">
+          <Card id="admin-properties-section" className="rounded-3xl glass-card shadow-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Property Management', 'சொத்து நிர்வாகம்')}</CardTitle>
             </CardHeader>
@@ -551,7 +551,7 @@ function AdminDashboardModern() {
                       const vacant = Math.max(0, units - occupied);
                       const active = String(p?.status || '').toLowerCase() === 'approved';
                       return (
-                        <TableRow key={String(p?._id || p?.id)} className="hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                        <TableRow key={String(p?._id || p?.id)} className="hover:bg-primary/5 dark:hover:bg-white/5">
                           <TableCell className="font-medium">{String(p?.title || '-')}</TableCell>
                           <TableCell>{String(p?.owner?.name || '-')}</TableCell>
                           <TableCell>{units}</TableCell>
@@ -559,7 +559,7 @@ function AdminDashboardModern() {
                           <TableCell>{vacant}</TableCell>
                           <TableCell>{statusBadge(active)}</TableCell>
                           <TableCell className="text-right">
-                            <Button variant="outline" className="h-9 rounded-2xl border-slate-200 bg-white px-3 dark:border-blue-800 dark:bg-slate-900/80 dark:hover:bg-slate-800" onClick={() => setSelectedProperty(p)}>
+                            <Button variant="outline" className="h-9 rounded-2xl glass-pill px-3" onClick={() => setSelectedProperty(p)}>
                               {t('View', 'பார்')}
                             </Button>
                           </TableCell>
@@ -572,7 +572,7 @@ function AdminDashboardModern() {
             </CardContent>
           </Card>
 
-          <Card id="admin-tenants-section" className="rounded-3xl border-slate-200 bg-white shadow-sm dark:border-blue-900/70 dark:bg-slate-950/70">
+          <Card id="admin-tenants-section" className="rounded-3xl glass-card shadow-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Recent Tenants', 'சமீபத்திய வாடகையாளர்கள்')}</CardTitle>
             </CardHeader>
@@ -598,7 +598,7 @@ function AdminDashboardModern() {
                     recentTenants.map((r) => (
                       <TableRow
                         key={r.id}
-                        className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                        className="cursor-pointer hover:bg-primary/5 dark:hover:bg-white/5"
                         onClick={() => setSelectedTenantRow(r)}
                       >
                         <TableCell className="font-medium">{r.tenantName}</TableCell>
@@ -614,7 +614,7 @@ function AdminDashboardModern() {
             </CardContent>
           </Card>
 
-          <Card id="admin-maintenance-section" className="rounded-3xl border-slate-200 bg-white shadow-sm dark:border-blue-900/70 dark:bg-slate-950/70">
+          <Card id="admin-maintenance-section" className="rounded-3xl glass-card shadow-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Maintenance Overview', 'பராமரிப்பு மேலோட்டம்')}</CardTitle>
             </CardHeader>
@@ -640,7 +640,7 @@ function AdminDashboardModern() {
                     filteredMaintenance.slice(0, 10).map((m: any) => (
                       <TableRow
                         key={String(m?._id || m?.id)}
-                        className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                        className="cursor-pointer hover:bg-primary/5 dark:hover:bg-white/5"
                         onClick={() => setSelectedMaintenanceRow(m)}
                       >
                         <TableCell className="font-medium">{String(m?.issue || '-')}</TableCell>
@@ -658,14 +658,14 @@ function AdminDashboardModern() {
         </main>
 
         <aside className="h-fit space-y-5 xl:sticky xl:top-4">
-          <Card className="rounded-3xl border-slate-200 bg-white shadow-sm dark:border-blue-900/70 dark:bg-slate-950/70">
+          <Card className="rounded-3xl glass-card shadow-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Quick Actions', 'விரைவு செயல்கள்')}</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2">
               <Button
                 variant="outline"
-                className="h-10 justify-start rounded-2xl border-slate-200 bg-white px-4 dark:border-blue-800 dark:bg-slate-900/80 dark:hover:bg-slate-800"
+                className="h-10 justify-start rounded-2xl glass-pill px-4"
                 onClick={() => {
                   setUserDraft({ name: '', email: '', phone: '', tamilRole: 'customers' });
                   setCreateUserOpen(true);
@@ -676,7 +676,7 @@ function AdminDashboardModern() {
               </Button>
               <Button
                 variant="outline"
-                className="h-10 justify-start rounded-2xl border-slate-200 bg-white px-4 dark:border-blue-800 dark:bg-slate-900/80 dark:hover:bg-slate-800"
+                className="h-10 justify-start rounded-2xl glass-pill px-4"
                 onClick={() => {
                   setUserDraft({ name: '', email: '', phone: '', tamilRole: 'owners' });
                   setCreateUserOpen(true);
@@ -687,7 +687,7 @@ function AdminDashboardModern() {
               </Button>
               <Button
                 variant="outline"
-                className="h-10 justify-start rounded-2xl border-slate-200 bg-white px-4 dark:border-blue-800 dark:bg-slate-900/80 dark:hover:bg-slate-800"
+                className="h-10 justify-start rounded-2xl glass-pill px-4"
                 onClick={() => setAnnouncementOpen(true)}
               >
                 <Bell className="mr-2 h-4 w-4" />
@@ -695,7 +695,7 @@ function AdminDashboardModern() {
               </Button>
               <Button
                 variant="outline"
-                className="h-10 justify-start rounded-2xl border-slate-200 bg-white px-4 dark:border-blue-800 dark:bg-slate-900/80 dark:hover:bg-slate-800"
+                className="h-10 justify-start rounded-2xl glass-pill px-4"
                 onClick={() => setAnnouncementHistoryOpen(true)}
               >
                 <History className="mr-2 h-4 w-4" />
@@ -703,7 +703,7 @@ function AdminDashboardModern() {
               </Button>
               <Button
                 variant="outline"
-                className="h-10 justify-start rounded-2xl border-slate-200 bg-white px-4 dark:border-blue-800 dark:bg-slate-900/80 dark:hover:bg-slate-800"
+                className="h-10 justify-start rounded-2xl glass-pill px-4"
                 onClick={() => {
                   downloadCsv(
                     'properties-report.csv',
@@ -725,7 +725,7 @@ function AdminDashboardModern() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-3xl border-slate-200 bg-white shadow-sm dark:border-blue-900/70 dark:bg-slate-950/70">
+          <Card className="rounded-3xl glass-card shadow-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Recent Activity', 'சமீப செயல்பாடு')}</CardTitle>
             </CardHeader>
@@ -738,9 +738,9 @@ function AdminDashboardModern() {
                   return (
                     <div
                       key={a.id}
-                      className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-3 py-2 shadow-sm transition hover:border-slate-200 dark:border-blue-900/60 dark:bg-slate-900/80 dark:hover:border-blue-700"
+                      className="flex items-center gap-3 rounded-2xl glass-surface px-3 py-2 shadow-sm transition hover:scale-[1.01]"
                     >
-                      <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-2xl glass-pill bg-blue-500/10 text-blue-600 dark:text-blue-400">
                         <Icon className="h-4 w-4" />
                       </div>
                       <div className="min-w-0">
@@ -785,7 +785,7 @@ function AdminDashboardModern() {
                 <div className="text-sm text-slate-500">{t('Showing', 'காட்டப்படுகிறது')} {Math.min(filteredProps.length, 12)} / {filteredProps.length}</div>
                 <Button
                   variant="outline"
-                  className="h-9 rounded-2xl border-slate-200 bg-white px-3"
+                  className="h-9 rounded-2xl glass-pill px-3"
                   onClick={() => {
                     setSummaryModal(null);
                     scrollTo('admin-properties-section');
@@ -794,7 +794,7 @@ function AdminDashboardModern() {
                   {t('Open section', 'பகுதி திற')}
                 </Button>
               </div>
-              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <div className="overflow-x-auto rounded-2xl glass-surface border border-white/20">
                 <Table className="min-w-[780px]">
                   <TableHeader>
                     <TableRow>
@@ -810,7 +810,7 @@ function AdminDashboardModern() {
                       const occupancy = String(p?.occupancyStatus || (p?.tenant ? 'occupied' : 'vacant'));
                       const active = String(p?.status || '').toLowerCase() === 'approved';
                       return (
-                        <TableRow key={String(p?._id || p?.id)} className="hover:bg-slate-50">
+                        <TableRow key={String(p?._id || p?.id)} className="hover:bg-primary/5 dark:hover:bg-white/5">
                           <TableCell className="font-medium">{String(p?.title || '-')}</TableCell>
                           <TableCell>{String(p?.owner?.name || p?.owner?.email || '-')}</TableCell>
                           <TableCell>{String(p?.location || '-')}</TableCell>
@@ -831,7 +831,7 @@ function AdminDashboardModern() {
                 <div className="text-sm text-slate-500">{t('Showing', 'காட்டப்படுகிறது')} {Math.min(filteredTenantUsers.length, 12)} / {filteredTenantUsers.length}</div>
                 <Button
                   variant="outline"
-                  className="h-9 rounded-2xl border-slate-200 bg-white px-3"
+                  className="h-9 rounded-2xl glass-pill px-3"
                   onClick={() => {
                     setSummaryModal(null);
                     scrollTo('admin-tenants-section');
@@ -840,7 +840,7 @@ function AdminDashboardModern() {
                   {t('Open section', 'பகுதி திற')}
                 </Button>
               </div>
-              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <div className="overflow-x-auto rounded-2xl glass-surface border border-white/20">
                 <Table className="min-w-[640px]">
                   <TableHeader>
                     <TableRow>
@@ -851,7 +851,7 @@ function AdminDashboardModern() {
                   </TableHeader>
                   <TableBody>
                     {filteredTenantUsers.slice(0, 12).map((u: any) => (
-                      <TableRow key={String(u?._id || u?.id || u?.email)} className="hover:bg-slate-50">
+                      <TableRow key={String(u?._id || u?.id || u?.email)} className="hover:bg-primary/5 dark:hover:bg-white/5">
                         <TableCell className="font-medium">{String(u?.name || '-')}</TableCell>
                         <TableCell>{String(u?.email || '-')}</TableCell>
                         <TableCell>{String(u?.phone || '-')}</TableCell>
@@ -866,16 +866,16 @@ function AdminDashboardModern() {
           {summaryModal === 'revenue' ? (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                <div className="rounded-2xl glass-surface p-3">
                   <div className="text-xs text-slate-500">{t('This month', 'இந்த மாதம்')}</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">₹{Number(totals.monthlyRevenue).toLocaleString()}</div>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                <div className="rounded-2xl glass-surface p-3">
                   <div className="text-xs text-slate-500">{t('Months shown', 'காட்டப்படும் மாதங்கள்')}</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">{Number(revenueSummaryRows.length).toLocaleString()}</div>
                 </div>
               </div>
-              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <div className="overflow-x-auto rounded-2xl glass-surface border border-white/20">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -892,7 +892,7 @@ function AdminDashboardModern() {
                       </TableRow>
                     ) : (
                       revenueSummaryRows.map((r: any, idx: number) => (
-                        <TableRow key={String(r?.month || idx)} className="hover:bg-slate-50">
+                        <TableRow key={String(r?.month || idx)} className="hover:bg-primary/5 dark:hover:bg-white/5">
                           <TableCell className="font-medium">{String(r?.month || '')}</TableCell>
                           <TableCell className="text-right">₹{Number(r?.revenue || 0).toLocaleString()}</TableCell>
                         </TableRow>
@@ -904,7 +904,7 @@ function AdminDashboardModern() {
               <div className="flex justify-end">
                 <Button
                   variant="outline"
-                  className="h-9 rounded-2xl border-slate-200 bg-white px-3"
+                  className="h-9 rounded-2xl glass-pill px-3"
                   onClick={() => {
                     setSummaryModal(null);
                     scrollTo('admin-charts-section');
@@ -922,7 +922,7 @@ function AdminDashboardModern() {
                 <div className="text-sm text-slate-500">{t('Open', 'திறந்தது')} {openMaintenanceRows.length}</div>
                 <Button
                   variant="outline"
-                  className="h-9 rounded-2xl border-slate-200 bg-white px-3"
+                  className="h-9 rounded-2xl glass-pill px-3"
                   onClick={() => {
                     setSummaryModal(null);
                     scrollTo('admin-maintenance-section');
@@ -931,7 +931,7 @@ function AdminDashboardModern() {
                   {t('Open section', 'பகுதி திற')}
                 </Button>
               </div>
-              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <div className="overflow-x-auto rounded-2xl glass-surface border border-white/20">
                 <Table className="min-w-[720px]">
                   <TableHeader>
                     <TableRow>
@@ -946,7 +946,7 @@ function AdminDashboardModern() {
                     {openMaintenanceRows.slice(0, 12).map((m: any) => (
                       <TableRow
                         key={String(m?._id || m?.id)}
-                        className="cursor-pointer hover:bg-slate-50"
+                        className="cursor-pointer hover:bg-primary/5 dark:hover:bg-white/5"
                         onClick={() => {
                           setSummaryModal(null);
                           setSelectedMaintenanceRow(m);
@@ -1034,11 +1034,11 @@ function AdminDashboardModern() {
           <div className="grid gap-3">
             <div className="grid gap-1">
               <div className="text-xs text-slate-500">{t('Email', 'மின்னஞ்சல்')}</div>
-              <div className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="flex items-center justify-between gap-2 rounded-2xl glass-surface px-3 py-2">
                 <div className="min-w-0 truncate text-sm font-medium text-slate-900">{createdCredentials?.email || ''}</div>
                 <Button
                   variant="outline"
-                  className="h-8 rounded-2xl border-slate-200 bg-white px-3"
+                  className="h-8 rounded-2xl glass-pill px-3"
                   onClick={async () => {
                     try {
                       await navigator.clipboard.writeText(String(createdCredentials?.email || ''));
@@ -1054,11 +1054,11 @@ function AdminDashboardModern() {
             </div>
             <div className="grid gap-1">
               <div className="text-xs text-slate-500">{t('Temporary Password', 'தற்காலிக கடவுச்சொல்')}</div>
-              <div className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="flex items-center justify-between gap-2 rounded-2xl glass-surface px-3 py-2">
                 <div className="min-w-0 truncate text-sm font-medium text-slate-900">{createdCredentials?.password || ''}</div>
                 <Button
                   variant="outline"
-                  className="h-8 rounded-2xl border-slate-200 bg-white px-3"
+                  className="h-8 rounded-2xl glass-pill px-3"
                   onClick={async () => {
                     try {
                       await navigator.clipboard.writeText(String(createdCredentials?.password || ''));
@@ -1506,16 +1506,16 @@ export default function AdminDashboard() {
     URL.revokeObjectURL(url);
   }, []);
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
+    <div className="min-h-screen bg-transparent">
+      <header className="sticky top-0 z-10 glass-nav backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
-            <h1 className="text-lg font-semibold text-slate-900">{sectionTitle}</h1>
+            <h1 className="text-lg font-semibold text-foreground">{sectionTitle}</h1>
           </div>
           <div className="flex items-center gap-3">
             <Button
               variant="outline"
-              className="h-9 rounded-xl border-slate-200 bg-white"
+              className="glass-pill h-9 rounded-xl border border-border/60"
               onClick={async () => {
                 await Promise.all([
                   queryClient.invalidateQueries({ queryKey: ['adminUsers'] }),
@@ -1527,7 +1527,7 @@ export default function AdminDashboard() {
               <RefreshCcw className="mr-2 h-4 w-4" />
               {t('Refresh', 'புதுப்பி')}
             </Button>
-            <div className="hidden sm:block text-sm text-slate-500">{me?.email || ''}</div>
+            <div className="hidden sm:block text-sm text-muted-foreground">{me?.email || ''}</div>
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm">
               {(me?.name || me?.email || 'A').slice(0, 1).toUpperCase()}
             </div>
@@ -1536,39 +1536,49 @@ export default function AdminDashboard() {
       </header>
 
       <div className="mx-auto grid max-w-7xl grid-cols-1 items-start gap-6 px-4 py-6 lg:grid-cols-[240px_1fr] sm:px-6">
-        <aside className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <aside className="glass-panel rounded-2xl p-3 shadow-md">
           <nav className="space-y-1">
             <button
               onClick={() => setActiveNav('dashboard')}
-              className={`flex h-10 w-full items-center gap-3 rounded-xl px-3 text-sm transition hover:bg-blue-50 ${activeNav === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'text-slate-700'}`}
+              className={`flex h-10 w-full items-center gap-3 rounded-xl px-3 text-sm transition-all ${
+                activeNav === 'dashboard' ? 'glass-pill font-semibold text-primary border-primary/30 shadow-sm' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+              }`}
             >
               <Home className="h-4 w-4" />
               <span className="font-medium">Dashboard</span>
             </button>
             <button
               onClick={() => setActiveNav('users')}
-              className={`flex h-10 w-full items-center gap-3 rounded-xl px-3 text-sm transition hover:bg-blue-50 ${activeNav === 'users' ? 'bg-blue-50 text-blue-700' : 'text-slate-700'}`}
+              className={`flex h-10 w-full items-center gap-3 rounded-xl px-3 text-sm transition-all ${
+                activeNav === 'users' ? 'glass-pill font-semibold text-primary border-primary/30 shadow-sm' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+              }`}
             >
               <Users className="h-4 w-4" />
               <span className="font-medium">Users</span>
             </button>
             <button
               onClick={() => setActiveNav('properties')}
-              className={`flex h-10 w-full items-center gap-3 rounded-xl px-3 text-sm transition hover:bg-blue-50 ${activeNav === 'properties' ? 'bg-blue-50 text-blue-700' : 'text-slate-700'}`}
+              className={`flex h-10 w-full items-center gap-3 rounded-xl px-3 text-sm transition-all ${
+                activeNav === 'properties' ? 'glass-pill font-semibold text-primary border-primary/30 shadow-sm' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+              }`}
             >
               <Building className="h-4 w-4" />
               <span className="font-medium">Properties</span>
             </button>
             <button
               onClick={() => setActiveNav('reports')}
-              className={`flex h-10 w-full items-center gap-3 rounded-xl px-3 text-sm transition hover:bg-blue-50 ${activeNav === 'reports' ? 'bg-blue-50 text-blue-700' : 'text-slate-700'}`}
+              className={`flex h-10 w-full items-center gap-3 rounded-xl px-3 text-sm transition-all ${
+                activeNav === 'reports' ? 'glass-pill font-semibold text-primary border-primary/30 shadow-sm' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+              }`}
             >
               <LineChartIcon className="h-4 w-4" />
               <span className="font-medium">Reports</span>
             </button>
             <button
               onClick={() => setActiveNav('settings')}
-              className={`flex h-10 w-full items-center gap-3 rounded-xl px-3 text-sm transition hover:bg-blue-50 ${activeNav === 'settings' ? 'bg-blue-50 text-blue-700' : 'text-slate-700'}`}
+              className={`flex h-10 w-full items-center gap-3 rounded-xl px-3 text-sm transition-all ${
+                activeNav === 'settings' ? 'glass-pill font-semibold text-primary border-primary/30 shadow-sm' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+              }`}
             >
               <Wrench className="h-4 w-4" />
               <span className="font-medium">Settings</span>
@@ -1579,12 +1589,12 @@ export default function AdminDashboard() {
         <main className="space-y-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full sm:w-[460px]">
-              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t('Search users, properties, locations', 'பயனர்கள், சொத்துகள், இடங்கள் தேட...')}
-                className="h-10 rounded-xl border-slate-200 bg-white pl-10"
+                className="glass-surface h-10 rounded-xl pl-10"
               />
             </div>
           </div>
@@ -1592,20 +1602,20 @@ export default function AdminDashboard() {
           {activeNav === 'dashboard' ? (
             <>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <Card className="h-full rounded-2xl border-slate-200 bg-white shadow-sm transition hover:shadow-md">
+                <Card className="h-full rounded-2xl shadow-sm transition hover:shadow-md">
                   <CardContent className="grid grid-cols-[40px_1fr] items-center gap-3 p-5">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                       <Building className="h-5 w-5" />
                     </div>
                     <div className="space-y-0.5">
-                      <div className="text-2xl font-semibold leading-none text-slate-900">{totals.properties}</div>
-                      <div className="text-xs text-slate-500">Total Properties</div>
+                      <div className="text-2xl font-semibold leading-none text-foreground">{totals.properties}</div>
+                      <div className="text-xs text-muted-foreground">Total Properties</div>
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="h-full rounded-2xl border-slate-200 bg-white shadow-sm transition hover:shadow-md">
+                <Card className="h-full rounded-2xl glass-card shadow-sm transition hover:shadow-md">
                   <CardContent className="grid grid-cols-[40px_1fr] items-center gap-3 p-5">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl glass-pill bg-blue-500/10 text-blue-600 dark:text-blue-400">
                       <Users className="h-5 w-5" />
                     </div>
                     <div className="space-y-0.5">
@@ -1614,9 +1624,9 @@ export default function AdminDashboard() {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="h-full rounded-2xl border-slate-200 bg-white shadow-sm transition hover:shadow-md">
+                <Card className="h-full rounded-2xl glass-card shadow-sm transition hover:shadow-md">
                   <CardContent className="grid grid-cols-[40px_1fr] items-center gap-3 p-5">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl glass-pill bg-blue-500/10 text-blue-600 dark:text-blue-400">
                       <Users className="h-5 w-5" />
                     </div>
                     <div className="space-y-0.5">
@@ -1625,9 +1635,9 @@ export default function AdminDashboard() {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="h-full rounded-2xl border-slate-200 bg-white shadow-sm transition hover:shadow-md">
+                <Card className="h-full rounded-2xl glass-card shadow-sm transition hover:shadow-md">
                   <CardContent className="grid grid-cols-[40px_1fr] items-center gap-3 p-5">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl glass-pill bg-blue-500/10 text-blue-600 dark:text-blue-400">
                       <Home className="h-5 w-5" />
                     </div>
                     <div className="space-y-0.5">
@@ -1639,7 +1649,7 @@ export default function AdminDashboard() {
               </div>
 
               <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
-                <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+                <Card className="rounded-2xl glass-card shadow-sm">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base text-slate-900">Recent Activities</CardTitle>
                   </CardHeader>
@@ -1648,8 +1658,8 @@ export default function AdminDashboard() {
                       recentActivities.map((a) => {
                         const Icon = a.icon;
                         return (
-                          <div key={a.id} className="grid grid-cols-[32px_1fr] items-start gap-3 rounded-xl border border-slate-200 bg-white p-3">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+                          <div key={a.id} className="grid grid-cols-[32px_1fr] items-start gap-3 rounded-xl glass-surface p-3">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg glass-pill bg-blue-500/10 text-blue-600 dark:text-blue-400">
                               <Icon className="h-4 w-4" />
                             </div>
                             <div className="min-w-0">
@@ -1666,12 +1676,12 @@ export default function AdminDashboard() {
                 </Card>
 
                 <div className="space-y-6">
-                  <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+                  <Card className="rounded-2xl glass-card shadow-sm">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base text-slate-900">User Management</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="overflow-x-auto rounded-xl border border-slate-200">
+                      <div className="overflow-x-auto rounded-xl glass-surface border border-white/20">
                         <Table className="min-w-[860px]">
                           <TableHeader>
                             <TableRow>
@@ -1722,12 +1732,12 @@ export default function AdminDashboard() {
                     </CardContent>
                   </Card>
 
-                  <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+                  <Card className="rounded-2xl glass-card shadow-sm">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base text-slate-900">Property Monitoring</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="overflow-x-auto rounded-xl border border-slate-200">
+                      <div className="overflow-x-auto rounded-xl glass-surface border border-white/20">
                         <Table className="min-w-[860px]">
                           <TableHeader>
                             <TableRow>
@@ -1768,7 +1778,7 @@ export default function AdminDashboard() {
                     </CardContent>
                   </Card>
 
-                  <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+                  <Card className="rounded-2xl glass-card shadow-sm">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base text-slate-900">Reports</CardTitle>
                     </CardHeader>
@@ -1796,7 +1806,7 @@ export default function AdminDashboard() {
                         </Button>
                         <Button
                           variant="outline"
-                          className="h-10 rounded-xl border-slate-200 bg-white px-4"
+                          className="h-10 rounded-xl glass-pill px-4"
                           onClick={() => {
                             downloadCsv(
                               'user-report.csv',
@@ -1816,7 +1826,7 @@ export default function AdminDashboard() {
                         </Button>
                         <Button
                           variant="outline"
-                          className="h-10 rounded-xl border-slate-200 bg-white px-4"
+                          className="h-10 rounded-xl glass-pill px-4"
                           onClick={() => {
                             downloadCsv(
                               'occupancy-report.csv',
@@ -1838,12 +1848,12 @@ export default function AdminDashboard() {
           ) : null}
 
           {activeNav === 'users' ? (
-            <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+            <Card className="rounded-2xl glass-card shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base text-slate-900">User Management</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <div className="overflow-x-auto rounded-xl glass-surface border border-white/20">
                   <Table className="min-w-[860px]">
                     <TableHeader>
                       <TableRow>
@@ -1896,12 +1906,12 @@ export default function AdminDashboard() {
           ) : null}
 
           {activeNav === 'properties' ? (
-            <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+            <Card className="rounded-2xl glass-card shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base text-slate-900">Property Monitoring</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <div className="overflow-x-auto rounded-xl glass-surface border border-white/20">
                   <Table className="min-w-[860px]">
                     <TableHeader>
                       <TableRow>
@@ -1941,7 +1951,7 @@ export default function AdminDashboard() {
           ) : null}
 
           {activeNav === 'reports' ? (
-            <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+            <Card className="rounded-2xl glass-card shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base text-slate-900">Reports</CardTitle>
               </CardHeader>
@@ -1969,7 +1979,7 @@ export default function AdminDashboard() {
                   </Button>
                   <Button
                     variant="outline"
-                    className="h-10 rounded-xl border-slate-200 bg-white px-4"
+                    className="h-10 rounded-xl glass-pill px-4"
                     onClick={() => {
                       downloadCsv(
                         'user-report.csv',
@@ -1984,7 +1994,7 @@ export default function AdminDashboard() {
                   </Button>
                   <Button
                     variant="outline"
-                    className="h-10 rounded-xl border-slate-200 bg-white px-4"
+                    className="h-10 rounded-xl glass-pill px-4"
                     onClick={() => {
                       downloadCsv(
                         'occupancy-report.csv',
@@ -2003,7 +2013,7 @@ export default function AdminDashboard() {
           ) : null}
 
           {activeNav === 'settings' ? (
-            <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+            <Card className="rounded-2xl glass-card shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base text-slate-900">Settings</CardTitle>
               </CardHeader>
@@ -2409,18 +2419,17 @@ function AdminOverview({
             <div
               key={c.key}
               onClick={() => onNavigate(c.nav)}
-              className={`group cursor-pointer rounded-2xl bg-gradient-to-br ${c.gradient} p-[1px] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg`}
+              className="glass-card group relative cursor-pointer overflow-hidden rounded-2xl border p-4 shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
             >
-              <div className="rounded-2xl bg-black/10 p-4 text-white backdrop-blur-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium text-white/90">{c.title}</div>
-                    <div className="mt-1 text-3xl font-semibold tracking-tight">{c.value}</div>
-                    <div className="mt-1 text-xs text-white/80">{c.subtitle}</div>
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 transition-transform duration-200 group-hover:scale-105">
-                    <Icon className="h-5 w-5 text-white" />
-                  </div>
+              <div className={`absolute inset-0 bg-gradient-to-br ${c.gradient} opacity-10 dark:opacity-20 pointer-events-none transition-opacity group-hover:opacity-25`} />
+              <div className="relative z-10 flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground">{c.title}</div>
+                  <div className="mt-1 text-3xl font-semibold tracking-tight text-foreground">{c.value}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{c.subtitle}</div>
+                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform duration-200 group-hover:scale-110">
+                  <Icon className="h-5 w-5" />
                 </div>
               </div>
             </div>
@@ -2433,12 +2442,13 @@ function AdminOverview({
           <div
             key={r.key}
             onClick={() => setOpenReport(r.key)}
-            className={`group cursor-pointer rounded-2xl bg-gradient-to-br ${r.gradient} p-[1px] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg`}
+            className="glass-card group relative cursor-pointer overflow-hidden rounded-2xl border p-5 shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
           >
-            <div className="rounded-2xl bg-black/10 p-5 text-white backdrop-blur-sm">
-              <div className="text-base font-semibold">{r.title}</div>
-              <div className="mt-1 text-xs text-white/80">{r.subtitle}</div>
-              <div className="mt-3 inline-flex items-center text-xs font-medium text-white/90">
+            <div className={`absolute inset-0 bg-gradient-to-br ${r.gradient} opacity-10 dark:opacity-20 pointer-events-none transition-opacity group-hover:opacity-25`} />
+            <div className="relative z-10">
+              <div className="text-base font-semibold text-foreground">{r.title}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{r.subtitle}</div>
+              <div className="mt-3 inline-flex items-center text-xs font-semibold text-primary transition-transform group-hover:translate-x-1">
                 {t('Open report', 'அறிக்கையை திற')}
                 <ChevronRight className="ml-1 h-4 w-4" />
               </div>
@@ -2480,7 +2490,7 @@ function AdminOverview({
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-xl border bg-background p-4">
+                <div className="rounded-xl glass-surface p-4">
                   <div className="text-sm font-medium">{t('Summary', 'சுருக்கம்')}</div>
                   <div className="mt-3 grid gap-2 text-sm">
                     <div className="flex items-center justify-between gap-3">
@@ -2507,7 +2517,7 @@ function AdminOverview({
                   </div>
                 </div>
 
-                <div className="rounded-xl border bg-background p-4">
+                <div className="rounded-xl glass-surface p-4">
                   <div className="text-sm font-medium">{t('Yearly Revenue', 'வருட வருமானம்')}</div>
                   <div className="mt-3 space-y-2">
                     {reportByYear.length === 0 ? (
@@ -2524,7 +2534,7 @@ function AdminOverview({
                 </div>
               </div>
 
-              <div className="rounded-xl border bg-background">
+              <div className="rounded-xl glass-surface">
                 <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
                   <div className="text-sm font-medium">{t('Monthly Revenue', 'மாத வருமானம்')}</div>
                   <Badge variant="secondary">{Number(reportByMonth.length).toLocaleString()}</Badge>
@@ -2588,29 +2598,29 @@ function AdminOverview({
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border bg-background p-3">
+                <div className="rounded-xl glass-surface p-3">
                   <div className="text-xs text-muted-foreground">{t('Paid tenants', 'செலுத்தியவர்கள்')}</div>
                   <div className="mt-1 text-2xl font-semibold">{Number(paymentSummary.paidTenants ?? 0).toLocaleString()}</div>
                 </div>
-                <div className="rounded-xl border bg-background p-3">
+                <div className="rounded-xl glass-surface p-3">
                   <div className="text-xs text-muted-foreground">{t('Unpaid tenants', 'செலுத்தாதவர்கள்')}</div>
                   <div className="mt-1 text-2xl font-semibold">{Number(paymentSummary.unpaidTenants ?? 0).toLocaleString()}</div>
                 </div>
-                <div className="rounded-xl border bg-background p-3">
+                <div className="rounded-xl glass-surface p-3">
                   <div className="text-xs text-muted-foreground">{t('Overdue payments', 'காலாவதி')}</div>
                   <div className="mt-1 text-2xl font-semibold">{Number(paymentSummary.overduePayments ?? 0).toLocaleString()}</div>
                 </div>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border bg-background p-3">
+                <div className="rounded-xl glass-surface p-3">
                   <div className="text-xs text-muted-foreground">{t('Collected', 'வசூல்')}</div>
                   <div className="mt-1 text-xl font-semibold">{money(paymentSummary.collected ?? 0)}</div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     {t('Expected', 'எதிர்பார்ப்பு')}: {money(paymentSummary.expectedRent ?? 0)}
                   </div>
                 </div>
-                <div className="rounded-xl border bg-background p-3">
+                <div className="rounded-xl glass-surface p-3">
                   <div className="text-xs text-muted-foreground">{t('Outstanding', 'நிலுவை')}</div>
                   <div className="mt-1 text-xl font-semibold">{money(paymentSummary.outstanding ?? 0)}</div>
                   <div className="mt-1 text-xs text-muted-foreground">
@@ -2619,7 +2629,7 @@ function AdminOverview({
                 </div>
               </div>
 
-              <div className="rounded-xl border bg-background">
+              <div className="rounded-xl glass-surface">
                 <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
                   <div className="text-sm font-medium">{t('Tenant Payments', 'வாடகையாளர் கட்டணங்கள்')}</div>
                   <Badge variant="secondary">{Number(paymentRows.length).toLocaleString()}</Badge>
@@ -2680,14 +2690,14 @@ function AdminOverview({
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border bg-background p-4">
+                <div className="rounded-xl glass-surface p-4">
                   <div className="text-xs text-muted-foreground">{t('Total properties', 'மொத்த சொத்துகள்')}</div>
                   <div className="mt-1 text-3xl font-semibold">{Number(occupancyReportData?.totalProperties ?? 0).toLocaleString()}</div>
                   <div className="mt-2 text-sm text-muted-foreground">
                     {t('Occupancy', 'குடியேற்றம்')}: {Number(occupancyReportData?.occupancyPercent ?? 0).toFixed(1)}%
                   </div>
                 </div>
-                <div className="rounded-xl border bg-background p-4">
+                <div className="rounded-xl glass-surface p-4">
                   <div className="grid gap-2 text-sm">
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-muted-foreground">{t('Occupied', 'குடியிருப்பு')}</div>
@@ -2733,14 +2743,14 @@ function AdminOverview({
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border bg-background p-4">
+                <div className="rounded-xl glass-surface p-4">
                   <div className="text-xs text-muted-foreground">{t('Best property', 'சிறந்த சொத்து')}</div>
                   <div className="mt-1 text-sm font-medium">{String(bestProperty?.propertyTitle || t('N/A', 'இல்லை'))}</div>
                   <div className="mt-2 text-sm text-muted-foreground">
                     {t('Income', 'வருமானம்')}: {money(bestProperty?.incomeGenerated ?? 0)}
                   </div>
                 </div>
-                <div className="rounded-xl border bg-background p-4">
+                <div className="rounded-xl glass-surface p-4">
                   <div className="text-xs text-muted-foreground">{t('Problem property', 'பிரச்சனை சொத்து')}</div>
                   <div className="mt-1 text-sm font-medium">{String(problemProperty?.propertyTitle || t('N/A', 'இல்லை'))}</div>
                   <div className="mt-2 text-sm text-muted-foreground">
@@ -2750,7 +2760,7 @@ function AdminOverview({
                 </div>
               </div>
 
-              <div className="rounded-xl border bg-background">
+              <div className="rounded-xl glass-surface">
                 <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
                   <div className="text-sm font-medium">{t('Per-property performance', 'சொத்து வாரியாக')}</div>
                   <Badge variant="secondary">{Number(propertyRows.length).toLocaleString()}</Badge>
@@ -2825,7 +2835,7 @@ function AdminOverview({
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border bg-background p-4">
+                <div className="rounded-xl glass-surface p-4">
                   <div className="text-xs text-muted-foreground">{t('Total complaints', 'மொத்த புகார்கள்')}</div>
                   <div className="mt-1 text-3xl font-semibold">{Number(maintenanceSummary.totalComplaints ?? 0).toLocaleString()}</div>
                   <div className="mt-2 grid gap-1 text-sm">
@@ -2844,7 +2854,7 @@ function AdminOverview({
                   </div>
                 </div>
 
-                <div className="rounded-xl border bg-background">
+                <div className="rounded-xl glass-surface">
                   <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
                     <div className="text-sm font-medium">{t('Issue types', 'வகைகள்')}</div>
                     <Badge variant="secondary">{Number(maintenanceByCategory.length).toLocaleString()}</Badge>
@@ -2878,7 +2888,7 @@ function AdminOverview({
                 </div>
               </div>
 
-              <div className="rounded-xl border bg-background">
+              <div className="rounded-xl glass-surface">
                 <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
                   <div className="text-sm font-medium">{t('Recent complaints', 'சமீபத்திய புகார்கள்')}</div>
                   <Badge variant="secondary">{Number(maintenanceRows.length).toLocaleString()}</Badge>
@@ -2924,7 +2934,7 @@ function AdminOverview({
       </Dialog>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="rounded-2xl border bg-background/80 shadow-sm lg:col-span-2">
+        <Card className="rounded-2xl glass-card shadow-sm lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">{t('Revenue Trend', 'வருமான போக்கு')}</CardTitle>
             <Button variant="ghost" className="h-9 rounded-xl px-3" onClick={() => onNavigate('analytics')}>
@@ -2945,7 +2955,7 @@ function AdminOverview({
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border bg-background/80 shadow-sm">
+        <Card className="rounded-2xl glass-card shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">{t('Occupancy', 'குடியேற்றம்')}</CardTitle>
             <Button variant="ghost" className="h-9 rounded-xl px-3" onClick={() => onNavigate('analytics')}>
@@ -2969,7 +2979,7 @@ function AdminOverview({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="rounded-2xl border bg-background/80 shadow-sm">
+        <Card className="rounded-2xl glass-card shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">{t('Alerts', 'எச்சரிக்கைகள்')}</CardTitle>
             <Button variant="ghost" className="h-9 rounded-xl px-3" onClick={() => onNavigate('notifications')}>
@@ -2997,7 +3007,7 @@ function AdminOverview({
                     key={String(a?.key)}
                     type="button"
                     onClick={() => onNavigate(nav)}
-                    className="flex w-full items-center justify-between gap-3 rounded-xl border bg-background px-3 py-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                    className="flex w-full items-center justify-between gap-3 rounded-xl glass-surface px-3 py-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${left}`}>
@@ -3023,7 +3033,7 @@ function AdminOverview({
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border bg-background/80 shadow-sm">
+        <Card className="rounded-2xl glass-card shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">{t('Activity Feed', 'சமீப நடவடிக்கைகள்')}</CardTitle>
             <Button variant="ghost" className="h-9 rounded-xl px-3" onClick={() => onNavigate('overview')}>
@@ -3041,7 +3051,7 @@ function AdminOverview({
                     key={a.id}
                     type="button"
                     onClick={() => onNavigate(a.nav)}
-                    className="flex w-full items-center justify-between gap-3 rounded-xl border bg-background px-3 py-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                    className="flex w-full items-center justify-between gap-3 rounded-xl glass-surface px-3 py-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-foreground">
@@ -3083,7 +3093,7 @@ function AdminUsers({ searchQuery }: { searchQuery: string }) {
   }, [q, safeUsers]);
 
   return (
-    <Card className="rounded-2xl border bg-background/80 shadow-sm">
+    <Card className="rounded-2xl glass-card shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle>{t('User Management', 'பயனர் நிர்வாகம்')}</CardTitle>
         <Badge variant="secondary">{Number(filtered.length).toLocaleString()}</Badge>
@@ -3331,7 +3341,7 @@ function AdminProperties({ searchQuery, createSignal }: { searchQuery: string; c
         </Button>
       </div>
 
-      <Card className="rounded-2xl border bg-background/80 shadow-sm">
+      <Card className="rounded-2xl glass-card shadow-sm">
         <CardContent className="pt-6">
           <div className="overflow-auto">
             <Table>
@@ -3552,7 +3562,7 @@ function AdminMaintenance({ searchQuery }: { searchQuery: string }) {
         </Select>
       </div>
 
-      <Card className="rounded-2xl border bg-background/80 shadow-sm">
+      <Card className="rounded-2xl glass-card shadow-sm">
         <CardContent className="pt-6">
           <div className="overflow-auto">
             <Table>
@@ -3645,7 +3655,7 @@ function AdminPayments({ searchQuery }: { searchQuery: string }) {
         </Select>
       </div>
 
-      <Card className="rounded-2xl border bg-background/80 shadow-sm">
+      <Card className="rounded-2xl glass-card shadow-sm">
         <CardHeader>
           <CardTitle>{t('Payments', 'கட்டணங்கள்')}</CardTitle>
         </CardHeader>
@@ -3681,7 +3691,7 @@ function AdminPayments({ searchQuery }: { searchQuery: string }) {
         </CardContent>
       </Card>
 
-      <Card className="rounded-2xl border bg-background/80 shadow-sm">
+      <Card className="rounded-2xl glass-card shadow-sm">
         <CardHeader>
           <CardTitle>{t('Overdue', 'காலாவதி')}</CardTitle>
         </CardHeader>
@@ -3724,7 +3734,7 @@ function AdminAnalytics({ analytics }: { analytics: any }) {
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <Card className="rounded-2xl border bg-background/80 shadow-sm">
+      <Card className="rounded-2xl glass-card shadow-sm">
         <CardHeader>
           <CardTitle>{t('Revenue', 'வருமானம்')}</CardTitle>
         </CardHeader>
@@ -3741,7 +3751,7 @@ function AdminAnalytics({ analytics }: { analytics: any }) {
         </CardContent>
       </Card>
 
-      <Card className="rounded-2xl border bg-background/80 shadow-sm">
+      <Card className="rounded-2xl glass-card shadow-sm">
         <CardHeader>
           <CardTitle>{t('Occupancy', 'குடியேற்றம்')}</CardTitle>
         </CardHeader>
@@ -3775,7 +3785,7 @@ function AdminNotifications({ notifications, searchQuery }: { notifications: any
   }, [items, q, t]);
 
   return (
-    <Card className="rounded-2xl border bg-background/80 shadow-sm">
+    <Card className="rounded-2xl glass-card shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle>{t('Notifications', 'அறிவிப்புகள்')}</CardTitle>
         <Badge variant="secondary">{Number(filtered.length).toLocaleString()}</Badge>
@@ -3797,7 +3807,7 @@ function AdminNotifications({ notifications, searchQuery }: { notifications: any
             return (
               <div
                 key={String(n.key)}
-                className="flex items-center justify-between gap-3 rounded-xl border bg-background px-3 py-2 transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                className="flex items-center justify-between gap-3 rounded-xl glass-surface px-3 py-2 transition-all hover:-translate-y-0.5 hover:shadow-sm"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${left}`}>

@@ -6,10 +6,10 @@ export default function PendingApprovalScreen() {
   return (
     <div className="container py-8 sm:py-12 lg:py-16 px-4 sm:px-6">
       <div className="mx-auto max-w-2xl">
-        <Card className="border-2">
+        <Card className="glass-panel border shadow-xl">
           <CardHeader className="text-center space-y-3 sm:space-y-4">
-            <div className="mx-auto flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-secondary/20">
-              <Clock className="h-8 w-8 sm:h-10 sm:w-10 text-secondary-foreground" />
+            <div className="mx-auto flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-primary/10 text-primary shadow-inner">
+              <Clock className="h-8 w-8 sm:h-10 sm:w-10 text-primary animate-pulse" />
             </div>
             <div>
               <CardTitle className="text-xl sm:text-2xl">Account Pending Approval</CardTitle>
@@ -19,8 +19,8 @@ export default function PendingApprovalScreen() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4 sm:space-y-6">
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
+            <Alert className="glass-surface border-primary/20">
+              <AlertCircle className="h-4 w-4 text-primary" />
               <AlertDescription className="text-xs sm:text-sm">
                 Your registration has been submitted successfully. An administrator will review and approve your account shortly.
                 <br />
@@ -64,7 +64,7 @@ export default function PendingApprovalScreen() {
               </div>
             </div>
 
-            <div className="rounded-lg bg-muted/50 p-3 sm:p-4 text-center">
+            <div className="glass-surface rounded-xl p-3 sm:p-4 text-center">
               <p className="text-xs sm:text-sm text-muted-foreground">
                 Please check back later or contact the administrator if you have any questions.
                 <br />

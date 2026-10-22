@@ -39,7 +39,7 @@ export default function ChatInterface() {
       </div>
 
       {/* Chat Input */}
-      <div className="border-t border-border bg-background p-4">
+      <div className="border-t border-border/40 glass-surface p-4">
         <InputArea />
       </div>
     </>

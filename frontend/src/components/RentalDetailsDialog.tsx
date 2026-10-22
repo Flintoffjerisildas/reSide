@@ -885,7 +885,7 @@ export default function RentalDetailsDialog({
                         (language === 'ta'
                           ? lastDescriptionTranslation.tamilText.trim() !== lastDescriptionTranslation.originalText.trim()
                           : lastDescriptionTranslation.englishText.trim() !== lastDescriptionTranslation.originalText.trim()) && (
-                          <div className="rounded-md border border-border bg-background p-3">
+                          <div className="rounded-md glass-surface p-3">
                             <p className="text-xs text-muted-foreground">{t('Original', 'அசல்')}</p>
                             <p className="text-sm whitespace-pre-wrap break-words">
                               {lastDescriptionTranslation.originalText}

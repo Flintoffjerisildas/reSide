@@ -76,18 +76,18 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
   return (
     <div className="container py-6 sm:py-10 px-4 sm:px-6 max-w-7xl mx-auto space-y-6">
       {/* Top Profile & Welcome Banner */}
-      <div className="bg-gradient-to-r from-card to-muted/40 border border-border/80 rounded-2xl p-6 shadow-sm">
+      <div className="glass-panel rounded-2xl p-6 shadow-md transition-all duration-300">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
                 {t('Welcome back', 'மீண்டும் வருக')}, {userProfile?.name || 'User'}
               </h1>
-              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 px-2.5 py-0.5 text-xs font-semibold">
+              <Badge variant="outline" className="glass-pill bg-primary/10 text-primary border-primary/20 px-2.5 py-0.5 text-xs font-semibold">
                 <UserCheck className="w-3 h-3 mr-1 inline" />
                 {getPurposeLabel(registrationPurpose)}
               </Badge>
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="glass-pill text-xs">
                 <ShieldCheck className="w-3 h-3 mr-1 inline text-emerald-500" />
                 {t('Verified User', 'சரிபார்க்கப்பட்ட பயனர்')}
               </Badge>
@@ -106,7 +106,7 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
               variant="outline"
               size="sm"
               onClick={() => onBrowseProperties?.('rent')}
-              className="gap-1.5 rounded-lg"
+              className="glass-pill gap-1.5 rounded-xl hover:-translate-y-0.5 transition-all text-foreground"
             >
               <Home className="h-4 w-4 text-primary" />
               {t('Browse to Rent', 'வாடகைக்கு தேடு')}
@@ -115,7 +115,7 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
               variant="outline"
               size="sm"
               onClick={() => onBrowseProperties?.('buy')}
-              className="gap-1.5 rounded-lg"
+              className="glass-pill gap-1.5 rounded-xl hover:-translate-y-0.5 transition-all text-foreground"
             >
               <Building className="h-4 w-4 text-emerald-600" />
               {t('Browse to Buy', 'வாங்க தேடு')}
@@ -123,7 +123,7 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
             <Button
               size="sm"
               onClick={() => setIsPropertyFormOpen(true)}
-              className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm rounded-lg"
+              className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/20 hover:-translate-y-0.5 rounded-xl transition-all"
             >
               <Plus className="h-4 w-4" />
               {t('List Property', 'சொத்தை பட்டியலிடு')}
@@ -134,7 +134,7 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
 
       {/* Main Unified Navigation Tabs */}
       <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as any)} className="w-full space-y-6">
-        <TabsList className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 w-full h-auto p-1.5 gap-1 rounded-xl bg-muted/60 border">
+        <TabsList className="glass-surface grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 w-full h-auto p-1.5 gap-1 rounded-2xl shadow-sm">
           <TabsTrigger value="overview" className="gap-2 py-2.5 rounded-lg text-xs sm:text-sm font-medium">
             <Sparkles className="h-4 w-4" />
             {t('Overview', 'கண்ணோட்டம்')}

@@ -26,11 +26,11 @@ export default function ServerOfflineScreen() {
 
   return (
     <div
-      className="min-h-screen w-full flex items-center justify-center p-4 bg-gradient-to-br from-background via-muted/30 to-background selection:bg-primary/20"
+      className="min-h-screen w-full flex items-center justify-center p-4 bg-transparent selection:bg-primary/20 relative"
       role="alert"
       aria-live="assertive"
     >
-      <Card className="w-full max-w-lg border-destructive/30 shadow-2xl backdrop-blur-sm bg-card/95">
+      <Card className="glass-dialog w-full max-w-lg border-destructive/30 shadow-2xl backdrop-blur-2xl">
         <CardHeader className="text-center pb-2">
           {/* Animated icon container */}
           <div className="mx-auto mb-4 relative flex items-center justify-center">

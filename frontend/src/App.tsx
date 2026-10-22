@@ -15,6 +15,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import PropertyListings from './components/PropertyListings';
 import FloatingChat from './components/FloatingChat';
+import AuroraBackground from './components/AuroraBackground';
 import { AIProvider } from './contexts/AIContext';
 import { PropertyProvider } from './contexts/PropertyContext';
 import { LanguageProvider } from './contexts/LanguageContext';
@@ -268,18 +269,17 @@ function LoginPage() {
             : t('Enter the OTP and your new password', 'OTP மற்றும் உங்கள் புதிய கடவுச்சொல்லை உள்ளிடவும்');
 
   return (
-    <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center overflow-hidden bg-gradient-to-br from-blue-50 via-background to-teal-50/50 px-4 py-10 dark:from-[#081426] dark:via-background dark:to-[#102d3d]">
-      <div className="pointer-events-none absolute -left-24 top-12 h-72 w-72 rounded-full bg-blue-400/20 blur-3xl transition-opacity duration-500 dark:bg-blue-500/10" />
-      <div className="pointer-events-none absolute -right-20 bottom-0 h-80 w-80 rounded-full bg-teal-300/20 blur-3xl transition-opacity duration-500 dark:bg-teal-500/10" />
-      <div className="absolute inset-x-0 bottom-0 h-1/2 rounded-t-[3rem] bg-white/45 backdrop-blur-3xl dark:bg-[#0c1a2b]/55" />
+    <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center overflow-hidden px-4 py-10">
+      <div className="pointer-events-none absolute -left-24 top-12 h-72 w-72 rounded-full bg-blue-400/15 blur-3xl transition-opacity duration-500 dark:bg-blue-500/10" />
+      <div className="pointer-events-none absolute -right-20 bottom-0 h-80 w-80 rounded-full bg-teal-300/15 blur-3xl transition-opacity duration-500 dark:bg-teal-500/10" />
 
-      <div className="relative grid w-full max-w-5xl gap-6 lg:grid-cols-[1fr_420px] lg:items-stretch">
-        <aside className="group relative hidden overflow-hidden rounded-[2rem] border border-blue-100/80 bg-gradient-to-br from-white via-blue-50 to-teal-50 p-8 text-slate-900 shadow-2xl shadow-blue-950/15 transition-all duration-500 hover:-translate-y-1 hover:shadow-blue-900/25 md:block dark:border-blue-900/60 dark:bg-none dark:bg-slate-950 dark:text-white">
-        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-400/20 blur-3xl transition-transform duration-700 group-hover:scale-125 dark:bg-blue-500/30" />
-        <div className="absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-teal-300/25 blur-3xl transition-transform duration-700 group-hover:scale-125 dark:bg-teal-400/20" />
+      <div className="relative z-10 grid w-full max-w-5xl gap-6 lg:grid-cols-[1fr_420px] lg:items-stretch">
+        <aside className="glass-panel group relative hidden overflow-hidden rounded-[2rem] p-8 text-slate-900 shadow-2xl transition-all duration-500 hover:-translate-y-1 hover:shadow-blue-900/25 md:block dark:text-white">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-400/20 blur-3xl transition-transform duration-700 group-hover:scale-125 dark:bg-blue-500/20" />
+        <div className="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-teal-300/20 blur-3xl transition-transform duration-700 group-hover:scale-125 dark:bg-teal-400/15" />
         <div className="relative flex h-full flex-col justify-between">
           <div>
-            <div className="mb-12 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500 shadow-lg shadow-blue-500/30 transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110">
+            <div className="mb-12 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/30 transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110">
               <Building2 className="h-6 w-6" />
             </div>
             <p className="mb-3 text-sm font-semibold uppercase tracking-[0.25em] text-blue-600 dark:text-blue-300">
@@ -303,7 +303,7 @@ function LoginPage() {
             ].map(({ icon: Icon, text }) => (
               <div
                 key={text}
-                className="flex items-center gap-3 rounded-2xl border border-blue-200/70 bg-white/65 px-4 py-3 text-sm text-slate-700 shadow-sm backdrop-blur transition-all duration-300 hover:translate-x-1 hover:border-blue-300 hover:bg-white/90 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:border-blue-300/40 dark:hover:bg-white/15"
+                className="glass-pill flex items-center gap-3 rounded-2xl px-4 py-3 text-sm text-slate-700 shadow-sm transition-all duration-300 hover:translate-x-1 hover:border-primary/40 dark:text-slate-200"
               >
                 <Icon className="h-5 w-5 text-blue-600 dark:text-blue-300" />
                 <span>{text}</span>
@@ -314,7 +314,7 @@ function LoginPage() {
         </div>
         </aside>
 
-        <div className="group relative w-full rounded-[2rem] border border-blue-100/70 bg-card/95 shadow-2xl shadow-blue-950/10 backdrop-blur transition-all duration-500 hover:border-blue-300/80 hover:shadow-blue-900/20 dark:border-blue-900/60 dark:shadow-black/30 dark:hover:border-blue-700/80">
+        <div className="glass-panel group relative w-full rounded-[2rem] shadow-2xl transition-all duration-500 hover:border-blue-400/50 hover:shadow-blue-900/20">
         <div className="pointer-events-none absolute right-6 top-6 text-blue-500/20 transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110">
           <Sparkles className="h-8 w-8" />
         </div>
@@ -734,7 +734,8 @@ function AppContent() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="relative flex min-h-screen flex-col">
+      <AuroraBackground />
       <Header 
         onLogout={handleLogout}
         onDashboardClick={handleDashboardClick}

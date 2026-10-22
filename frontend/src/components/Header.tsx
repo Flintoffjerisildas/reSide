@@ -53,32 +53,13 @@ export default function Header({
   const { user, logout, isInitializing } = useAuth();
   const { data: userProfile } = useGetCallerUserProfile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeNav, setActiveNav] = useState<'home' | 'about' | 'rent' | 'buy' | 'list'>('home');
   const { language, setLanguage, t } = useLanguage();
 
   const isAuthenticated = !!user;
   const isLoggingIn = isInitializing; // Simplified
 
-  const navClass = (item: typeof activeNav) =>
-    `whitespace-nowrap rounded-full px-3 py-2 transition-all hover:-translate-y-0.5 hover:bg-white/70 hover:text-blue-700 dark:hover:bg-blue-950/70 dark:hover:text-blue-200 lg:px-4 ${
-      activeNav === item
-        ? 'bg-white/85 text-blue-700 shadow-sm ring-1 ring-blue-100 dark:bg-blue-950/80 dark:text-blue-200 dark:ring-blue-800'
-        : ''
-    }`;
-
   const handleHomeNavigation = () => {
-    setActiveNav('home');
     onHomeClick?.();
-  };
-
-  const handleRentNavigation = () => {
-    setActiveNav('rent');
-    onRentClick?.();
-  };
-
-  const handleBuyNavigation = () => {
-    setActiveNav('buy');
-    onBuyClick?.();
   };
 
   const handleLogout = async () => {
@@ -108,38 +89,20 @@ export default function Header({
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-blue-100/80 bg-gradient-to-r from-white/90 via-blue-50/85 to-emerald-50/80 shadow-sm shadow-blue-900/5 backdrop-blur-xl transition-colors dark:border-blue-900/70 dark:bg-none dark:bg-slate-950/85 dark:shadow-black/20">
-      <div className="container flex min-h-[76px] items-center gap-4 py-3 lg:gap-6">
+    <header className="sticky top-0 z-50 w-full glass-nav backdrop-blur-xl transition-colors">
+      <div className="w-full max-w-7xl 2xl:max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 flex min-h-[76px] items-center justify-between gap-4 py-3 lg:gap-6">
         <div 
-          className="flex shrink-0 items-center gap-2.5 text-xl font-bold tracking-tight text-slate-900 transition-all hover:-translate-y-0.5 hover:text-blue-700 dark:text-white dark:hover:text-blue-200"
+          className="flex shrink-0 items-center gap-2.5 text-xl font-bold tracking-tight text-slate-900 transition-all hover:-translate-y-0.5 hover:text-blue-700 dark:text-white dark:hover:text-blue-200 cursor-pointer"
           onClick={handleHomeNavigation}
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-600/20 transition-transform hover:rotate-3 hover:scale-105"><Building2 className="h-5 w-5" /></span>
           <span>Reside</span>
         </div>
 
-        {/* Desktop Navigation */}
-        <div className="hidden min-w-0 flex-1 items-center justify-between gap-4 lg:flex">
-          <nav className="flex min-w-0 flex-1 items-center justify-center gap-1 text-sm font-medium text-muted-foreground">
-            <button type="button" onClick={handleHomeNavigation} className={navClass('home')}>
-              {t('Home', 'முகப்பு')}
-            </button>
-            <button type="button" onClick={() => { setActiveNav('about'); onAboutClick?.(); }} className={navClass('about')}>
-              {t('About us', 'எங்களைப் பற்றி')}
-            </button>
-            <button type="button" onClick={handleRentNavigation} className={navClass('rent')}>
-              {t('Rent', 'வாடகை')}
-            </button>
-            <button type="button" onClick={handleBuyNavigation} className={navClass('buy')}>
-              {t('Buy', 'வாங்க')}
-            </button>
-            <button type="button" onClick={() => setActiveNav('list')} className={navClass('list')}>
-              {t('List Property', 'சொத்தை பட்டியலிடுங்கள்')}
-            </button>
-          </nav>
-          <div className="flex shrink-0 items-center gap-2">
+        {/* Desktop Actions */}
+        <div className="hidden items-center gap-2 lg:flex">
           <Select value={language} onValueChange={(val: any) => setLanguage(val)}>
-            <SelectTrigger className="h-10 w-auto min-w-[108px] rounded-full border-blue-100 bg-white/75 px-3 shadow-sm transition-colors hover:bg-white dark:border-blue-800 dark:bg-slate-900/70 dark:hover:bg-slate-900">
+            <SelectTrigger className="glass-pill h-10 w-auto min-w-[108px] rounded-full px-3 shadow-sm transition-all hover:-translate-y-0.5">
               <Globe2 className="mr-1 h-4 w-4 text-blue-600" />
               <SelectValue placeholder={t('Language', 'மொழி')} />
             </SelectTrigger>
@@ -153,7 +116,7 @@ export default function Header({
             variant="ghost"
             size="icon"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="rounded-full text-slate-600 transition-all hover:-translate-y-0.5 hover:bg-white/80 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-blue-950/70 dark:hover:text-blue-200"
+          className="glass-pill rounded-full text-slate-600 transition-all hover:-translate-y-0.5 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-300"
           >
             <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
             <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
@@ -175,7 +138,7 @@ export default function Header({
           {isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="max-w-[180px] gap-2 rounded-full border-blue-100 bg-white/70 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white dark:border-blue-800 dark:bg-slate-900/70 dark:hover:bg-slate-900">
+                <Button variant="outline" className="glass-surface max-w-[180px] gap-2 rounded-full shadow-sm transition-all hover:-translate-y-0.5">
                   <User className="h-4 w-4" />
                   <span className="max-w-[150px] truncate">
                     {userProfile?.name || user?.name || t('User', 'பயனர்')}
@@ -216,7 +179,6 @@ export default function Header({
               {t('Login', 'உள்நுழைய')}
             </Button>
           )}
-          </div>
         </div>
 
         {/* Mobile Navigation */}
@@ -256,38 +218,6 @@ export default function Header({
                     </SelectContent>
                   </Select>
                 </div>
-
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setActiveNav('about');
-                    onAboutClick?.();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="w-full justify-start"
-                >
-                  {t('About us', 'எங்களைப் பற்றி')}
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    handleRentNavigation();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="w-full justify-start"
-                >
-                  {t('Rent', 'வாடகை')}
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    handleBuyNavigation();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="w-full justify-start"
-                >
-                  {t('Buy', 'வாங்க')}
-                </Button>
 
                 {isAuthenticated ? (
                   <div className="flex flex-col gap-2">

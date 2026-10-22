@@ -110,6 +110,8 @@ export default function OwnerDashboard({
       setActiveTab(initialTab);
     }
   }, [initialTab]);
+
+  const currentTab = hideHeaderActions && initialTab ? initialTab : activeTab;
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
   const [idProofImage, setIdProofImage] = useState<string | null>(null);
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
@@ -1219,73 +1221,79 @@ export default function OwnerDashboard({
         />
       ) : (
         // Show Owner Dashboard
-        <div className="container py-8 sm:py-12 lg:py-16 px-4 sm:px-6">
-          <div className="mx-auto max-w-7xl space-y-8">
+        <div className={hideHeaderActions ? "w-full" : "container py-8 sm:py-12 lg:py-16 px-4 sm:px-6"}>
+          <div className={hideHeaderActions ? "w-full space-y-6" : "mx-auto max-w-7xl space-y-8"}>
 
         {/* Header Section */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {t('Owner Dashboard', 'உரிமையாளர் கட்டுப்பாட்டு அறை')}
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              {t('Welcome back', 'மீண்டும் வருக')}, {userProfile?.name || 'Owner'}
-            </p>
-          </div>
-          <Button onClick={() => setIsPropertyFormOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            {t('Add Property', 'சொத்தைச் சேர்க்கவும்')}
-          </Button>
-        </div>
+        {!hideHeaderActions && (
+          <>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  {t('Owner Dashboard', 'உரிமையாளர் கட்டுப்பாட்டு அறை')}
+                </h1>
+                <p className="text-muted-foreground mt-1">
+                  {t('Welcome back', 'மீண்டும் வருக')}, {userProfile?.name || 'Owner'}
+                </p>
+              </div>
+              <Button onClick={() => setIsPropertyFormOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                {t('Add Property', 'சொத்தைச் சேர்க்கவும்')}
+              </Button>
+            </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Button variant="outline" className="h-11 justify-start rounded-xl" onClick={() => onBrowseProperties?.('rent')}>
-            <Home className="mr-2 h-4 w-4" />
-            {t('Rent', 'வாடகை')}
-          </Button>
-          <Button variant="outline" className="h-11 justify-start rounded-xl" onClick={() => onBrowseProperties?.('buy')}>
-            <Building className="mr-2 h-4 w-4" />
-            {t('Buy', 'வாங்க')}
-          </Button>
-          <Button className="h-11 justify-start rounded-xl" onClick={() => setIsPropertyFormOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t('List Property', 'சொத்தை பட்டியலிடுங்கள்')}
-          </Button>
-        </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Button variant="outline" className="h-11 justify-start rounded-xl" onClick={() => onBrowseProperties?.('rent')}>
+                <Home className="mr-2 h-4 w-4" />
+                {t('Rent', 'வாடகை')}
+              </Button>
+              <Button variant="outline" className="h-11 justify-start rounded-xl" onClick={() => onBrowseProperties?.('buy')}>
+                <Building className="mr-2 h-4 w-4" />
+                {t('Buy', 'வாங்க')}
+              </Button>
+              <Button className="h-11 justify-start rounded-xl" onClick={() => setIsPropertyFormOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                {t('List Property', 'சொத்தை பட்டியலிடுங்கள்')}
+              </Button>
+            </div>
+          </>
+        )}
 
         {/* Navigation Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1">
-            <TabsTrigger value="overview">
-              <Home className="w-4 h-4 mr-2" />
-              {t('Overview', 'கண்ணோட்டம்')}
-            </TabsTrigger>
-            <TabsTrigger value="properties">
-              <Building className="w-4 h-4 mr-2" />
-              {t('My Properties', 'என் சொத்துக்கள்')}
-            </TabsTrigger>
-            <TabsTrigger value="requests">
-              <Inbox className="w-4 h-4 mr-2" />
-              {t('Requests', 'கோரிக்கைகள்')}
-            </TabsTrigger>
-            <TabsTrigger value="announcements">
-              <Megaphone className="w-4 h-4 mr-2" />
-              {t('Announcements', 'அறிவிப்புகள்')}
-              {announcements.length > 0 && (
-                <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs">
-                  {announcements.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="reports">
-              <FileText className="w-4 h-4 mr-2" />
-              {t('Reports', 'அறிக்கைகள்')}
-            </TabsTrigger>
-            <TabsTrigger value="settings">
-              <Settings className="w-4 h-4 mr-2" />
-              {t('Settings', 'அமைப்புகள்')}
-            </TabsTrigger>
-          </TabsList>
+        <Tabs value={currentTab} onValueChange={setActiveTab} className="w-full">
+          {!hideHeaderActions && (
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1">
+              <TabsTrigger value="overview">
+                <Home className="w-4 h-4 mr-2" />
+                {t('Overview', 'கண்ணோட்டம்')}
+              </TabsTrigger>
+              <TabsTrigger value="properties">
+                <Building className="w-4 h-4 mr-2" />
+                {t('My Properties', 'என் சொத்துக்கள்')}
+              </TabsTrigger>
+              <TabsTrigger value="requests">
+                <Inbox className="w-4 h-4 mr-2" />
+                {t('Requests', 'கோரிக்கைகள்')}
+              </TabsTrigger>
+              <TabsTrigger value="announcements">
+                <Megaphone className="w-4 h-4 mr-2" />
+                {t('Announcements', 'அறிவிப்புகள்')}
+                {announcements.length > 0 && (
+                  <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs">
+                    {announcements.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="reports">
+                <FileText className="w-4 h-4 mr-2" />
+                {t('Reports', 'அறிக்கைகள்')}
+              </TabsTrigger>
+              <TabsTrigger value="settings">
+                <Settings className="w-4 h-4 mr-2" />
+                {t('Settings', 'அமைப்புகள்')}
+              </TabsTrigger>
+            </TabsList>
+          )}
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="mt-6 space-y-8">
@@ -1624,7 +1632,7 @@ export default function OwnerDashboard({
 
           {/* My Properties Tab */}
           <TabsContent value="properties" className="mt-6">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:gap-3.5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 items-stretch">
               {myProperties.length > 0 ? (
                 myProperties.map((property) => (
                   <div
@@ -1633,7 +1641,7 @@ export default function OwnerDashboard({
                       setSelectedPropertyInitialTab('tenant');
                       setSelectedProperty(property);
                     }}
-                    className="cursor-pointer"
+                    className="cursor-pointer h-full transition duration-200"
                   >
                     <PropertyCard 
                       property={property} 

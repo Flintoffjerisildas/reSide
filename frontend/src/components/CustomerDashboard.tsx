@@ -87,6 +87,8 @@ export default function CustomerDashboard({
       setActiveTab(initialTab);
     }
   }, [initialTab]);
+
+  const currentTab = hideHeaderActions && initialTab ? initialTab : activeTab;
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
   const [idProofImage, setIdProofImage] = useState<string | null>(null);
   const [agreements, setAgreements] = useState<any[]>([]);
@@ -950,36 +952,38 @@ export default function CustomerDashboard({
   const latestVacateStatus = latestVacate?.status ? String(latestVacate.status) : null;
 
   return (
-    <div className="container py-8 sm:py-12 px-4 sm:px-6">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className={hideHeaderActions ? "w-full" : "container py-8 sm:py-12 px-4 sm:px-6"}>
+      <div className={hideHeaderActions ? "w-full space-y-6" : "mx-auto max-w-7xl space-y-6"}>
 
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-              {t('Customer Dashboard', 'வாடிக்கையாளர் கட்டுப்பாட்டு அறை')}
-            </h1>
-            <p className="text-muted-foreground">
-              {t('Welcome back', 'மீண்டும் வருக')}, {userProfile?.name || 'Customer'}!
-            </p>
+        {!hideHeaderActions && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                {t('Customer Dashboard', 'வாடிக்கையாளர் கட்டுப்பாட்டு அறை')}
+              </h1>
+              <p className="text-muted-foreground">
+                {t('Welcome back', 'மீண்டும் வருக')}, {userProfile?.name || 'Customer'}!
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setRemindersOpen(true)}
+                className="relative inline-flex items-center justify-center h-10 w-10 rounded-full hover:bg-muted transition-colors"
+                aria-label="Reminders"
+                title={t('Reminders', 'நினைவூட்டல்கள்')}
+              >
+                <Bell className={`${pendingRemindersCount > 0 ? 'bell-animate text-amber-600' : ''} h-6 w-6`} />
+                {pendingRemindersCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full text-[10px] h-5 min-w-[20px] flex items-center justify-center px-1">
+                    {pendingRemindersCount}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setRemindersOpen(true)}
-              className="relative inline-flex items-center justify-center h-10 w-10 rounded-full hover:bg-muted transition-colors"
-              aria-label="Reminders"
-              title={t('Reminders', 'நினைவூட்டல்கள்')}
-            >
-              <Bell className={`${pendingRemindersCount > 0 ? 'bell-animate text-amber-600' : ''} h-6 w-6`} />
-              {pendingRemindersCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full text-[10px] h-5 min-w-[20px] flex items-center justify-center px-1">
-                  {pendingRemindersCount}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
+        )}
 
         <style>
           {`
@@ -1067,38 +1071,40 @@ export default function CustomerDashboard({
         </Dialog>
 
         {/* Navigation Tabs (Navbar) */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="flex w-full overflow-x-auto gap-2 sm:gap-3 p-1 sm:justify-center sm:flex-wrap">
-            <TabsTrigger value="overview" className="flex-shrink-0">
-              <Home className="mr-2 h-4 w-4" />
-              {t('Overview', 'கண்ணோட்டம்')}
-            </TabsTrigger>
-            <TabsTrigger value="rentals" className="flex-shrink-0">
-              <Home className="mr-2 h-4 w-4" />
-              {t('My Rentals', 'எனது வாடகைகள்')}
-            </TabsTrigger>
-            <TabsTrigger value="requests" className="flex-shrink-0">
-              <Bell className="mr-2 h-4 w-4" />
-              {t('My Requests', 'எனது கோரிக்கைகள்')}
-            </TabsTrigger>
-            <TabsTrigger value="announcements" className="flex-shrink-0">
-              <Megaphone className="mr-2 h-4 w-4" />
-              {t('Announcements', 'அறிவிப்புகள்')}
-              {announcements.length > 0 && (
-                <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs">
-                  {announcements.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="reports" className="flex-shrink-0">
-              <FileText className="mr-2 h-4 w-4" />
-              {t('Reports', 'அறிக்கைகள்')}
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex-shrink-0">
-              <Settings className="mr-2 h-4 w-4" />
-              {t('Settings', 'அமைப்புகள்')}
-            </TabsTrigger>
-          </TabsList>
+        <Tabs value={currentTab} onValueChange={setActiveTab} className="space-y-4">
+          {!hideHeaderActions && (
+            <TabsList className="flex w-full overflow-x-auto gap-2 sm:gap-3 p-1 sm:justify-center sm:flex-wrap">
+              <TabsTrigger value="overview" className="flex-shrink-0">
+                <Home className="mr-2 h-4 w-4" />
+                {t('Overview', 'கண்ணோட்டம்')}
+              </TabsTrigger>
+              <TabsTrigger value="rentals" className="flex-shrink-0">
+                <Home className="mr-2 h-4 w-4" />
+                {t('My Rentals', 'எனது வாடகைகள்')}
+              </TabsTrigger>
+              <TabsTrigger value="requests" className="flex-shrink-0">
+                <Bell className="mr-2 h-4 w-4" />
+                {t('My Requests', 'எனது கோரிக்கைகள்')}
+              </TabsTrigger>
+              <TabsTrigger value="announcements" className="flex-shrink-0">
+                <Megaphone className="mr-2 h-4 w-4" />
+                {t('Announcements', 'அறிவிப்புகள்')}
+                {announcements.length > 0 && (
+                  <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs">
+                    {announcements.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="reports" className="flex-shrink-0">
+                <FileText className="mr-2 h-4 w-4" />
+                {t('Reports', 'அறிக்கைகள்')}
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex-shrink-0">
+                <Settings className="mr-2 h-4 w-4" />
+                {t('Settings', 'அமைப்புகள்')}
+              </TabsTrigger>
+            </TabsList>
+          )}
 
           {/* Overview Content */}
           <TabsContent value="overview" className="mt-6">

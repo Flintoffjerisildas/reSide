@@ -44,6 +44,11 @@ export default function PropertyListings({ showAbout = false, initialTransaction
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [modalImgFailed, setModalImgFailed] = useState(false);
+
+  useEffect(() => {
+    setModalImgFailed(false);
+  }, [currentImageIndex, selectedPropertyIndex]);
 
   useEffect(() => {
     setTransactionType(initialTransactionType);
@@ -245,8 +250,8 @@ export default function PropertyListings({ showAbout = false, initialTransaction
   };
 
   return (
-    <div className="container py-4 sm:py-6 lg:py-8 px-4 sm:px-6">
-      <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
+    <div className="w-full max-w-screen mx-auto py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
+      <div>
         <HeroSection
           location={location}
           onLocationChange={setLocation}
@@ -258,92 +263,8 @@ export default function PropertyListings({ showAbout = false, initialTransaction
           onMaxPriceChange={(value) => setPriceRange([0, value])}
           onSearch={() => document.getElementById('property-listings')?.scrollIntoView({ behavior: 'smooth' })}
         />
-
-        <section id="about-us" className="scroll-mt-32 overflow-hidden rounded-[2rem] border border-blue-100/80 bg-card shadow-xl shadow-blue-950/10 dark:border-blue-900/70 dark:shadow-black/20">
-            <div className="grid lg:grid-cols-[0.9fr_1.1fr]">
-              <div className="relative min-h-[20rem] overflow-hidden bg-slate-900 lg:min-h-full">
-                <img
-                  src="https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=85"
-                  alt={t('Modern Reside home interior', 'Reside நவீன வீட்டு உட்புறம்')}
-                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-950/65 via-blue-900/25 to-teal-950/55" />
-                <div className="relative flex h-full flex-col justify-between p-7 text-white sm:p-10">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500 shadow-lg shadow-blue-950/30">
-                    <Building2 className="h-6 w-6" />
-                  </div>
-                  <div className="mt-16">
-                    <p className="text-sm font-semibold uppercase tracking-[0.25em] text-blue-200">
-                      {t('About Reside', 'Reside பற்றி')}
-                    </p>
-                    <p className="mt-3 max-w-sm text-3xl font-semibold leading-tight">
-                      {t('Your Space, Your Story, Your Home.', 'உங்கள் இடம், உங்கள் கதை, உங்கள் வீடு.')}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-7 sm:p-10">
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">
-                  {t('Welcome to Reside', 'Reside-க்கு வரவேற்கிறோம்')}
-                </p>
-                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                  {t('Find more than a property.', 'ஒரு சொத்தை விட அதிகமாகக் கண்டறியுங்கள்.')}
-                </h2>
-                <div className="mt-5 space-y-4 text-sm leading-7 text-muted-foreground">
-                  <p>
-                    {t(
-                      'Welcome to Reside, your trusted destination for discovering properties and simplifying your housing journey. Whether you are looking for your dream home, searching for a rental property, or listing a property of your own, Reside makes the process simple, convenient, and accessible.',
-                      'சொத்துகளைக் கண்டறிந்து உங்கள் வீட்டு பயணத்தை எளிதாக்கும் நம்பகமான தளம் Reside. உங்கள் கனவு வீட்டைத் தேடினாலும், வாடகை வீட்டைத் தேடினாலும் அல்லது உங்கள் சொத்தைப் பட்டியலிட்டாலும், Reside செயல்முறையை எளிமையாகவும் வசதியாகவும் அணுகக்கூடியதாகவும் மாற்றுகிறது.'
-                    )}
-                  </p>
-                  <p>
-                    {t(
-                      'Our platform brings property seekers, owners, and brokers together with smart search options, personalized filters, and a user-friendly experience. With support for Tamil and English voice interactions, we aim to make property discovery easier for everyone.',
-                      'ஸ்மார்ட் தேடல், தனிப்பயன் வடிகட்டிகள் மற்றும் எளிய அனுபவத்தின் மூலம் சொத்தைத் தேடுபவர்கள், உரிமையாளர்கள் மற்றும் தரகர்களை எங்கள் தளம் இணைக்கிறது. தமிழ் மற்றும் ஆங்கில குரல் தொடர்பு ஆதரவுடன், அனைவருக்கும் சொத்து தேடலை எளிதாக்குகிறோம்.'
-                    )}
-                  </p>
-                </div>
-                <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                  {[
-                    t('Trusted property discovery', 'நம்பகமான சொத்து தேடல்'),
-                    t('Tamil and English support', 'தமிழ் மற்றும் ஆங்கில ஆதரவு'),
-                  ].map((item) => (
-                    <div key={item} className="flex items-center gap-2 rounded-xl border border-blue-200/70 bg-white/55 px-3 py-2.5 text-sm font-medium text-foreground dark:border-blue-900/70 dark:bg-slate-950/30">
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
-                      <span>{item}</span>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-7 border-l-2 border-primary pl-4 text-sm font-semibold italic text-foreground">
-                  {t(
-                    'At Reside, finding the right place is more than finding a property — it is where life happens, memories grow, and dreams become reality.',
-                    'Reside-ல் சரியான இடத்தைக் கண்டுபிடிப்பது ஒரு சொத்தை கண்டுபிடிப்பதை விட அதிகம் — வாழ்க்கை நிகழும், நினைவுகள் வளரும், கனவுகள் நனவாகும் இடம் அது.'
-                  )}
-                </p>
-                <p className="mt-5 text-base font-semibold text-primary">
-                  {t('Reside — Find Your Place. Feel at Home.', 'Reside — உங்கள் இடத்தைக் கண்டறியுங்கள். வீட்டைப் போல் உணருங்கள்.')}
-                </p>
-              </div>
-            </div>
-        </section>
-
-        <div className="grid gap-4 sm:grid-cols-3">
-          {[
-            { icon: Home, title: t('List your property', 'உங்கள் சொத்தை பட்டியலிடுங்கள்'), text: t('Reach genuine buyers and tenants with our trusted platform.', 'நம்பகமான தளத்தின் மூலம் உண்மையான வாங்குபவர்களை அடையுங்கள்.') },
-            { icon: Search, title: t('Smart property search', 'ஸ்மார்ட் சொத்து தேடல்'), text: t('Find the perfect home with advanced filters and recommendations.', 'மேம்பட்ட வடிகட்டிகளுடன் சரியான வீட்டைக் கண்டறியுங்கள்.') },
-            { icon: Mic2, title: t('Tamil & English voice assistant', 'தமிழ் மற்றும் ஆங்கில குரல் உதவியாளர்'), text: t('Ask, search and explore properties in your preferred language.', 'உங்கள் விருப்ப மொழியில் கேட்டு சொத்துகளை ஆராயுங்கள்.') },
-          ].map(({ icon: Icon, title, text }) => (
-            <div key={title} className="group relative overflow-hidden rounded-2xl border border-border/60 bg-card p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
-              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950"><Icon className="h-5 w-5" /></div>
-              <h3 className="pr-8 text-lg font-semibold">{title}</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p>
-              <span className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-full border border-border transition group-hover:bg-blue-600 group-hover:text-white"><ArrowUpRight className="h-4 w-4" /></span>
-            </div>
-          ))}
-        </div>
-
         {/* Property Listings */}
-        <div className="space-y-4 sm:space-y-6">
+        <div className="space-y-5 sm:space-y-6 mt-8 sm:mt-10">
           {/* Filters Section */}
           <div className="hidden rounded-2xl border border-border/60 bg-card p-4 shadow-sm sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
@@ -436,14 +357,14 @@ export default function PropertyListings({ showAbout = false, initialTransaction
           </div>
 
           {/* Listings */}
-          <div id="property-listings">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div id="property-listings" className="space-y-5 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <h2 className="flex items-center gap-2 text-xl font-bold tracking-tight sm:text-2xl">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950"><Home className="h-4 w-4" /></span>
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/80"><Home className="h-4 w-4" /></span>
                   {t('Homes picked for you', 'உங்களுக்காக தேர்ந்தெடுக்கப்பட்ட வீடுகள்')}
                 </h2>
-                <p className="text-xs sm:text-sm text-muted-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                   {t('Explore handpicked spaces worth seeing', 'பார்க்க வேண்டிய சிறந்த இடங்களை ஆராயுங்கள்')}
                 </p>
               </div>
@@ -459,17 +380,17 @@ export default function PropertyListings({ showAbout = false, initialTransaction
                     key={item.value || 'all'}
                     type="button"
                     onClick={() => handlePropertyTypeChange(item.value)}
-                    className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
+                    className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all hover:-translate-y-0.5 ${
                       propertyType === item.value
-                        ? 'border-blue-600 bg-blue-600 text-white'
-                        : 'border-border bg-card text-muted-foreground hover:border-blue-300 hover:text-blue-600'
+                        ? 'border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+                        : 'glass-pill text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     {item.label}
                   </button>
                 ))}
                 {!isLoading && (
-                  <span className="hidden text-xs text-muted-foreground xl:inline">
+                  <span className="hidden text-xs text-muted-foreground xl:inline ml-1 font-medium">
                     {filteredProperties.length} {t('available', 'கிடைக்கும்')}
                   </span>
                 )}
@@ -477,18 +398,21 @@ export default function PropertyListings({ showAbout = false, initialTransaction
             </div>
 
             {isLoading ? (
-              <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="space-y-3">
-                    <Skeleton className="h-40 sm:h-48 w-full rounded-lg" />
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-4 w-1/2" />
+              <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                  <div key={i} className="glass-card rounded-2xl p-0 overflow-hidden space-y-3">
+                    <Skeleton className="h-40 sm:h-44 w-full" />
+                    <div className="p-3.5 space-y-2.5">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
+                      <Skeleton className="h-5 w-2/3 mt-2" />
+                    </div>
                   </div>
                 ))}
               </div>
             ) : properties.length === 0 ? (
-              <div className="rounded-lg sm:rounded-xl border border-dashed border-border bg-muted/30 p-8 sm:p-12 text-center">
-                <div className="mx-auto mb-3 sm:mb-4 flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-muted">
+              <div className="rounded-xl border border-dashed border-border/80 glass-panel p-8 sm:p-12 text-center">
+                <div className="mx-auto mb-3 sm:mb-4 flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-primary/10">
                   <span className="text-2xl sm:text-3xl">🏘️</span>
                 </div>
                 <h3 className="mb-1 sm:mb-2 text-base sm:text-lg font-semibold">
@@ -499,8 +423,8 @@ export default function PropertyListings({ showAbout = false, initialTransaction
                 </p>
               </div>
             ) : filteredProperties.length === 0 ? (
-              <div className="rounded-lg sm:rounded-xl border border-dashed border-border bg-muted/30 p-8 sm:p-12 text-center">
-                <div className="mx-auto mb-3 sm:mb-4 flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-muted">
+              <div className="rounded-xl border border-dashed border-border/80 glass-panel p-8 sm:p-12 text-center">
+                <div className="mx-auto mb-3 sm:mb-4 flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-primary/10">
                   <span className="text-2xl sm:text-3xl">🔍</span>
                 </div>
                 <h3 className="mb-1 sm:mb-2 text-base sm:text-lg font-semibold">
@@ -511,12 +435,12 @@ export default function PropertyListings({ showAbout = false, initialTransaction
                 </p>
               </div>
             ) : (
-              <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 sm:gap-3.5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 items-stretch">
                 {filteredProperties.map((property, index) => (
                   <div
                     key={String((property as any)?.id ?? (property as any)?._id ?? index)}
                     onClick={() => handleCardClick(index)}
-                    className="cursor-pointer transition-transform hover:scale-105"
+                    className="cursor-pointer h-full transition duration-200"
                   >
                     <PropertyCard property={property} showRequestButton={false} />
                   </div>
@@ -528,10 +452,10 @@ export default function PropertyListings({ showAbout = false, initialTransaction
 
         {/* Property Details Modal */}
         {selectedProperty && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-background rounded-xl max-w-4xl w-full my-8">
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+            <div className="glass-dialog rounded-2xl max-w-4xl w-full my-8 overflow-hidden shadow-2xl border border-white/20">
               {/* Header */}
-              <div className="sticky top-0 flex items-center justify-between p-4 sm:p-6 border-b bg-background">
+              <div className="sticky top-0 z-10 flex items-center justify-between p-4 sm:p-6 border-b border-border/40 glass-nav">
                 <div>
                   <h2 className="text-xl sm:text-2xl font-bold">
                     {language === 'ta' ? (selectedTitleTa || selectedProperty.title) : selectedProperty.title}
@@ -558,11 +482,12 @@ export default function PropertyListings({ showAbout = false, initialTransaction
               {/* Content */}
               <div className="p-4 sm:p-6 space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto">
                 {/* Image Carousel */}
-                {selectedImages.length > 0 ? (
+                {selectedImages.length > 0 && !modalImgFailed ? (
                   <div className="relative rounded-lg overflow-hidden bg-muted aspect-video">
                     <img
                       src={selectedImages[currentImageIndex]}
                       alt={language === 'ta' ? (selectedTitleTa || selectedProperty.title) : selectedProperty.title}
+                      onError={() => setModalImgFailed(true)}
                       className="w-full h-full object-cover"
                     />
                     {selectedImages.length > 1 && (
@@ -592,8 +517,9 @@ export default function PropertyListings({ showAbout = false, initialTransaction
                     )}
                   </div>
                 ) : (
-                  <div className="relative rounded-lg overflow-hidden bg-muted aspect-video flex items-center justify-center">
-                    <span className="text-4xl">🏠</span>
+                  <div className="relative rounded-lg overflow-hidden bg-gradient-to-br from-blue-50/60 via-slate-100/40 to-teal-50/60 dark:from-blue-950/40 dark:via-slate-900/40 dark:to-teal-950/30 aspect-video flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                    <Building2 className="h-12 w-12 text-primary/60" />
+                    <span className="text-xs uppercase tracking-wider font-semibold">{t('Image unavailable', 'படம் இல்லை')}</span>
                   </div>
                 )}
 
@@ -661,22 +587,22 @@ export default function PropertyListings({ showAbout = false, initialTransaction
                     <div className="text-sm font-semibold">{t('Land Dimensions', 'நில அளவுகள்')}</div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                       {selectedProperty.landDimensions.ab !== undefined && selectedProperty.landDimensions.ab !== null && selectedProperty.landDimensions.ab !== '' && (
-                        <div className="p-2 bg-background rounded border">
+                        <div className="p-2 glass-surface rounded-lg">
                           <span className="text-muted-foreground">A → B:</span> <b>{selectedProperty.landDimensions.ab} ft</b>
                         </div>
                       )}
                       {selectedProperty.landDimensions.bc !== undefined && selectedProperty.landDimensions.bc !== null && selectedProperty.landDimensions.bc !== '' && (
-                        <div className="p-2 bg-background rounded border">
+                        <div className="p-2 glass-surface rounded-lg">
                           <span className="text-muted-foreground">B → C:</span> <b>{selectedProperty.landDimensions.bc} ft</b>
                         </div>
                       )}
                       {selectedProperty.landDimensions.cd !== undefined && selectedProperty.landDimensions.cd !== null && selectedProperty.landDimensions.cd !== '' && (
-                        <div className="p-2 bg-background rounded border">
+                        <div className="p-2 glass-surface rounded-lg">
                           <span className="text-muted-foreground">C → D:</span> <b>{selectedProperty.landDimensions.cd} ft</b>
                         </div>
                       )}
                       {selectedProperty.landDimensions.da !== undefined && selectedProperty.landDimensions.da !== null && selectedProperty.landDimensions.da !== '' && (
-                        <div className="p-2 bg-background rounded border">
+                        <div className="p-2 glass-surface rounded-lg">
                           <span className="text-muted-foreground">D → A:</span> <b>{selectedProperty.landDimensions.da} ft</b>
                         </div>
                       )}
@@ -696,7 +622,7 @@ export default function PropertyListings({ showAbout = false, initialTransaction
               </div>
 
               {/* Footer Navigation */}
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 sm:p-6 border-t bg-background sticky bottom-0">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 sm:p-6 border-t border-border/40 glass-nav sticky bottom-0 z-10">
                 <Button
                   onClick={handlePreviousProperty}
                   disabled={selectedPropertyIndex === 0}

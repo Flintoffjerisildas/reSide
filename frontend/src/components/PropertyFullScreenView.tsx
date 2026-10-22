@@ -458,9 +458,9 @@ export default function PropertyFullScreenView({ property, onBack, initialTab }:
 
   return (
     <>
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-transparent">
       {/* Header */}
-      <div className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur-sm">
+      <div className="sticky top-0 z-40 border-b glass-nav">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Button 
             variant="ghost" 

@@ -31,8 +31,8 @@ export default function MessageList() {
             <div
               className={`rounded-2xl px-4 py-2 ${
                 message.role === 'user'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-foreground'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'glass-surface text-foreground shadow-sm'
               }`}
             >
               <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
@@ -42,7 +42,7 @@ export default function MessageList() {
               typeof (message.displayTranslatedText || message.translatedText) === 'string' &&
               String(message.displayTranslatedText || message.translatedText).trim() &&
               String(message.displayTranslatedText || message.translatedText).trim() !== message.content.trim() && (
-                <div className="rounded-2xl border border-border bg-background px-4 py-2">
+                <div className="rounded-2xl glass-surface px-4 py-2 shadow-xs">
                   <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
                     {message.displayTranslatedText || message.translatedText}
                   </p>

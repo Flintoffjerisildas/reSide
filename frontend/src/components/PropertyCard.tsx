@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Building2, MapPin, IndianRupee, Send, Edit, Trash2, Heart, BedDouble, Bath, Ruler, ImageOff, Compass } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Building2, MapPin, Send, Edit, Trash2, Heart, BedDouble, Bath, Ruler, ImageOff, Compass } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { Property } from '../types';
@@ -23,6 +23,14 @@ export default function PropertyCard({ property, compact = false, showRequestBut
   const [translatedTitle, setTranslatedTitle] = useState<string | null>(null);
   const [translatedLocation, setTranslatedLocation] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
+
+  const rawImage = property.images && property.images.length > 0 ? property.images[0] : null;
+  const imageSrc = typeof rawImage === 'string' && rawImage.trim() ? rawImage.trim() : null;
+
+  useEffect(() => {
+    setImgFailed(false);
+  }, [imageSrc]);
 
   const displayTitle = useMemo(() => {
     if (language !== 'ta') return property.title;
@@ -90,9 +98,11 @@ export default function PropertyCard({ property, compact = false, showRequestBut
       }
     );
   };
+
   const getPropertyIcon = (type: string) => {
     switch (type.toLowerCase()) {
       case 'flat':
+      case 'apartment':
         return '🏢';
       case 'house':
         return '🏠';
@@ -134,115 +144,154 @@ export default function PropertyCard({ property, compact = false, showRequestBut
 
   const getTransactionBadge = (type: string) => {
     return type.toLowerCase() === 'rent' ? (
-      <Badge variant="secondary" className="text-xs">{t('Rent', 'வாடகை')}</Badge>
+      <Badge variant="secondary" className="glass-pill text-[10px] px-1.5 py-0.5 font-medium">
+        {t('Rent', 'வாடகை')}
+      </Badge>
     ) : (
-      <Badge variant="default" className="text-xs">{t('Purchase', 'வாங்க')}</Badge>
+      <Badge variant="default" className="text-[10px] px-1.5 py-0.5 font-medium bg-blue-600 text-white">
+        {t('Purchase', 'வாங்க')}
+      </Badge>
     );
   };
 
   const getOccupancyBadge = () => {
     if (property.tenant) {
-      return <Badge className="bg-green-600 hover:bg-green-700 text-xs">{t('Occupied', 'குடியேற்றப்பட்டது')}</Badge>;
+      return <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] px-1.5 py-0.5">{t('Occupied', 'குடியேற்றப்பட்டது')}</Badge>;
     }
-    return <Badge variant="outline" className="text-muted-foreground text-xs">{t('Vacant', 'காலியாக உள்ளது')}</Badge>;
+    return <Badge variant="outline" className="text-muted-foreground text-[9px] px-1.5 py-0.5">{t('Vacant', 'காலியாக உள்ளது')}</Badge>;
   };
 
   if (compact) {
     return (
-      <Card className="overflow-hidden">
-        <CardContent className="p-3 sm:p-4">
-          <div className="flex items-start gap-2 sm:gap-3">
-            <div className="flex h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xl sm:text-2xl">
+      <Card className="glass-card w-full overflow-hidden p-0 gap-0 rounded-xl">
+        <div className="p-2 sm:p-2.5">
+          <div className="flex items-start gap-2 sm:gap-2.5">
+            <div className="flex h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-base sm:text-lg">
               {getPropertyIcon(property.propertyType)}
             </div>
             <div className="min-w-0 flex-1">
-              <h4 className="truncate text-sm sm:text-base font-semibold">{displayTitle}</h4>
-              <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                <MapPin className="h-3 w-3 flex-shrink-0" />
+              <h4 className="truncate text-xs sm:text-sm font-semibold">{displayTitle}</h4>
+              <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                <MapPin className="h-3 w-3 flex-shrink-0 text-primary" />
                 <span className="truncate">{displayLocation}</span>
               </div>
-              <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
-                <span className="text-sm sm:text-base font-semibold text-primary">{formatPrice(property.price)}</span>
+              <div className="mt-1 flex items-center justify-between gap-1.5 flex-wrap">
+                <span className="text-xs sm:text-sm font-semibold text-primary">{formatPrice(property.price)}</span>
                 {getTransactionBadge(property.transactionType)}
               </div>
             </div>
           </div>
-        </CardContent>
+        </div>
       </Card>
     );
   }
 
+  const hasValidImage = Boolean(imageSrc && !imgFailed);
+
   return (
-    <Card className="overflow-hidden rounded-2xl border-border/60 bg-card shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-      {/* Property Image */}
-      <div className="relative h-44 w-full overflow-hidden bg-muted sm:h-48">
-        {property.images && property.images.length > 0 ? (
+    <Card className="glass-card flex flex-col h-full w-full overflow-hidden rounded-xl p-0 gap-0 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg border border-white/20 dark:border-white/10 group">
+      {/* Property Image Container - Compact Height */}
+      <div className="relative h-32 w-full overflow-hidden bg-muted/60 sm:h-36 flex-shrink-0">
+        {hasValidImage ? (
           <img 
-            src={property.images[0]} 
+            src={imageSrc!} 
             alt={displayTitle}
-            className="h-full w-full object-cover transition duration-500 hover:scale-105"
+            onError={() => setImgFailed(true)}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
-          <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-gradient-to-br from-blue-50 via-slate-100 to-teal-50 dark:from-blue-950/60 dark:via-slate-900 dark:to-teal-950/50">
-            <div className="absolute -right-8 -top-12 h-40 w-40 rounded-full bg-blue-200/40 blur-2xl dark:bg-blue-500/10" />
-            <div className="absolute -bottom-16 -left-8 h-40 w-40 rounded-full bg-teal-200/40 blur-2xl dark:bg-teal-500/10" />
-            <div className="relative flex flex-col items-center gap-2 text-blue-600/80 dark:text-blue-300/80">
-              <Building2 className="h-12 w-12" strokeWidth={1.4} />
-              <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider">
-                <ImageOff className="h-3 w-3" /> {t('Image unavailable', 'படம் இல்லை')}
+          <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-gradient-to-br from-blue-50/70 via-slate-100/50 to-teal-50/70 dark:from-blue-950/40 dark:via-slate-900/40 dark:to-teal-950/30">
+            <div className="absolute -right-6 -top-10 h-28 w-28 rounded-full bg-blue-200/30 blur-2xl dark:bg-blue-500/10" />
+            <div className="absolute -bottom-12 -left-6 h-28 w-28 rounded-full bg-teal-200/30 blur-2xl dark:bg-teal-500/10" />
+            <div className="relative flex flex-col items-center gap-1 text-blue-600/80 dark:text-blue-300/80">
+              <Building2 className="h-8 w-8" strokeWidth={1.4} />
+              <span className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider">
+                <ImageOff className="h-2.5 w-2.5" /> {t('Image unavailable', 'படம் இல்லை')}
               </span>
             </div>
           </div>
         )}
-        <div className="absolute left-3 top-3 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">✓ {t('Verified', 'சரிபார்க்கப்பட்டது')}</div>
-        <button type="button" aria-label={t('Save property', 'சொத்தை சேமிக்கவும்')} onClick={(e) => { e.stopPropagation(); setIsFavorite((value) => !value); }} className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow-sm transition duration-200 hover:scale-110 active:scale-95 motion-reduce:transition-none motion-reduce:transform-none ${isFavorite ? 'text-rose-500' : 'text-slate-500'}`}>
-          <Heart className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`} />
+
+        {/* Verified Badge */}
+        <div className="glass-pill absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold text-emerald-600 border-emerald-400/40 dark:text-emerald-400 shadow-sm backdrop-blur-md">
+          ✓ {t('Verified', 'சரிபார்க்கப்பட்டது')}
+        </div>
+
+        {/* Save / Favorite Button */}
+        <button 
+          type="button" 
+          aria-label={t('Save property', 'சொத்தை சேமிக்கவும்')} 
+          onClick={(e) => { 
+            e.stopPropagation(); 
+            setIsFavorite((value) => !value); 
+          }} 
+          className={`glass-pill absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full shadow-sm transition duration-200 hover:scale-110 active:scale-95 motion-reduce:transition-none backdrop-blur-md ${
+            isFavorite ? 'text-rose-500' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+          }`}
+        >
+          <Heart className={`h-3 w-3 ${isFavorite ? 'fill-current' : ''}`} />
         </button>
       </div>
 
-      <CardHeader className="pb-2 sm:pb-3">
-        <div className="flex items-start justify-between gap-2">
+      {/* Header Info */}
+      <div className="p-2.5 sm:p-3 pb-1.5">
+        <div className="flex items-start justify-between gap-1.5">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10 text-lg sm:text-xl flex-shrink-0">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-sm flex-shrink-0">
               {getPropertyIcon(property.propertyType)}
             </div>
             <div className="min-w-0 flex-1">
-              <CardTitle className="text-base sm:text-lg truncate">{displayTitle}</CardTitle>
-              <p className="text-[10px] sm:text-xs text-muted-foreground capitalize">{getPropertyTypeLabel(property.propertyType)}</p>
+              <h3 className="text-xs sm:text-sm font-semibold truncate leading-tight" title={displayTitle}>
+                {displayTitle}
+              </h3>
+              <p className="text-[10px] text-muted-foreground capitalize mt-0.5 truncate">
+                {getPropertyTypeLabel(property.propertyType)}
+              </p>
             </div>
           </div>
-          {/* Show occupancy status if request button is hidden (Owner view) or always if desired */}
           {!showRequestButton && getOccupancyBadge()}
         </div>
-      </CardHeader>
-      <CardContent className="space-y-2 sm:space-y-3">
-        <div className="flex items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-primary" />
-            <span className="truncate">{displayLocation}</span>
+      </div>
+
+      {/* Body Content */}
+      <div className="px-2.5 sm:px-3 py-1 flex-1 flex flex-col justify-between space-y-2">
+        {/* Location & GPS */}
+        <div className="flex items-center justify-between gap-1.5 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-1 min-w-0">
+            <MapPin className="h-3 w-3 flex-shrink-0 text-primary" />
+            <span className="truncate" title={displayLocation}>{displayLocation}</span>
           </div>
           {property.geoLocation?.latitude && property.geoLocation?.longitude && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 shrink-0 font-mono font-medium">
+            <span className="text-[9px] px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20 shrink-0 font-mono font-medium">
               GPS
             </span>
           )}
         </div>
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-1">
-            <IndianRupee className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-            <span className="text-lg sm:text-xl font-bold text-primary">{formatPrice(property.price)}</span>
+
+        {/* Price and Transaction Badge */}
+        <div className="flex items-center justify-between gap-2 pt-0.5">
+          <div className="flex items-baseline gap-0.5">
+            <span className="text-sm sm:text-base font-bold text-primary tracking-tight">
+              {formatPrice(property.price)}
+            </span>
+            {property.transactionType?.toLowerCase() === 'rent' && (
+              <span className="text-[9px] text-muted-foreground font-normal">/mo</span>
+            )}
           </div>
           {getTransactionBadge(property.transactionType)}
         </div>
-        {(property.totalArea || property.bedrooms || property.facing) && (
-          <div className="mt-4 flex items-center gap-3 border-t border-border/60 pt-3 text-[10px] text-muted-foreground sm:text-xs">
+
+        {/* Specs: Area, Bedrooms, Dimensions, Facing */}
+        {(property.totalArea || property.bedrooms || property.facing || (property.propertyType?.toLowerCase() === 'land' && property.landDimensions)) && (
+          <div className="mt-1 flex items-center gap-2 border-t border-border/50 pt-1.5 text-[10px] text-muted-foreground flex-wrap">
             {property.totalArea && (
-              <div className="flex items-center gap-1">
-                <Ruler className="h-3.5 w-3.5" />
-                <span>
+              <div className="flex items-center gap-1" title={`${property.totalArea} sq.ft`}>
+                <Ruler className="h-2.5 w-2.5 text-muted-foreground/80 shrink-0" />
+                <span className="truncate">
                   {property.totalArea} {t('sq.ft', 'சதுர அடி')}
                   {property.propertyType?.toLowerCase() === 'land' && (
-                    <span className="opacity-80 font-normal">
+                    <span className="opacity-80">
                       {' '}({(property.cent !== undefined && property.cent !== null)
                         ? property.cent
                         : parseFloat((property.totalArea / 435.6).toFixed(2))} {t('cent', 'சென்ட்')})
@@ -252,76 +301,88 @@ export default function PropertyCard({ property, compact = false, showRequestBut
               </div>
             )}
             {property.bedrooms && (
-              <div className="flex items-center gap-1">
-                <BedDouble className="h-3.5 w-3.5" /><span>{property.bedrooms} {t('Beds', 'படுக்கைகள்')}</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <BedDouble className="h-2.5 w-2.5 text-muted-foreground/80 shrink-0" />
+                <span>{property.bedrooms} {t('Beds', 'படுக்கைகள்')}</span>
               </div>
             )}
             {property.propertyType?.toLowerCase() === 'land' && property.landDimensions && (
               property.landDimensions.ab != null || property.landDimensions.bc != null
             ) && (
-              <div className="flex items-center gap-1" title={`${property.landDimensions.ab ?? '-'} × ${property.landDimensions.bc ?? '-'} × ${property.landDimensions.cd ?? '-'} × ${property.landDimensions.da ?? '-'} ft`}>
-                <Compass className="h-3.5 w-3.5 text-primary" />
+              <div className="flex items-center gap-1 shrink-0" title={`${property.landDimensions.ab ?? '-'} × ${property.landDimensions.bc ?? '-'} × ${property.landDimensions.cd ?? '-'} × ${property.landDimensions.da ?? '-'} ft`}>
+                <Compass className="h-2.5 w-2.5 text-primary shrink-0" />
                 <span>
                   {[property.landDimensions.ab, property.landDimensions.bc, property.landDimensions.cd, property.landDimensions.da].filter((v): v is number => typeof v === 'number').join(' × ')} ft
                 </span>
               </div>
             )}
             {property.facing && (
-              <div className="flex items-center gap-1">
-                <Bath className="h-3.5 w-3.5" /><span>{t('Baths', 'குளியலறைகள்')}</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <Bath className="h-2.5 w-2.5 text-muted-foreground/80 shrink-0" />
+                <span>{t('Baths', 'குளியலறைகள்')}</span>
               </div>
             )}
           </div>
         )}
-      </CardContent>
-      <CardFooter className="pt-0 flex gap-2">
-        {showRequestButton ? (
-          <Button 
-            className="w-full" 
-            onClick={handleRequest}
-            disabled={createRequest.isPending || !!property.tenant}
-          >
-            {createRequest.isPending ? (
-              t('Sending...', 'அனுப்புகிறது...')
-            ) : property.tenant ? (
-              t('Occupied', 'குடியேற்றப்பட்டது')
-            ) : (
-              <>
-                <Send className="mr-2 h-4 w-4" />
-                {t('Request', 'கோரிக்கை')}
-              </>
-            )}
-          </Button>
-        ) : (
-          <div className="flex w-full justify-end gap-2">
-            {onEdit && (
-              <Button 
-                variant="outline" 
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  console.log('Edit clicked for property:', property);
-                  onEdit(property);
-                }}
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
-            )}
-            {onDelete && (
-              <Button 
-                variant="destructive" 
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(property);
-                }}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        )}
-      </CardFooter>
+      </div>
+
+      {/* Footer Actions */}
+      {(showRequestButton || onEdit || onDelete) && (
+        <div className="px-2.5 sm:px-3 pb-2.5 pt-1 mt-auto">
+          {showRequestButton ? (
+            <Button 
+              size="sm"
+              className="w-full h-7 sm:h-8 text-xs font-medium rounded-lg shadow-sm hover:shadow" 
+              onClick={handleRequest}
+              disabled={createRequest.isPending || !!property.tenant}
+            >
+              {createRequest.isPending ? (
+                t('Sending...', 'அனுப்புகிறது...')
+              ) : property.tenant ? (
+                t('Occupied', 'குடியேற்றப்பட்டது')
+              ) : (
+                <>
+                  <Send className="mr-1 h-3 w-3" />
+                  {t('Request', 'கோரிக்கை')}
+                </>
+              )}
+            </Button>
+          ) : (
+            <div className="flex w-full justify-end gap-1.5">
+              {onEdit && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="h-7 w-7 p-0 rounded-lg"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    console.log('Edit clicked for property:', property);
+                    onEdit(property);
+                  }}
+                >
+                  <Edit className="h-3 w-3" />
+                </Button>
+              )}
+              {onDelete && (
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  className="h-7 w-7 p-0 rounded-lg"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(property);
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {!showRequestButton && !onEdit && !onDelete && (
+        <div className="pb-2" />
+      )}
     </Card>
   );
 }
