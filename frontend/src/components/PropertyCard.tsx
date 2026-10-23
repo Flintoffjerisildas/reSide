@@ -1,5 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Building2, MapPin, Send, Edit, Trash2, Heart, BedDouble, Bath, Ruler, ImageOff, Compass } from 'lucide-react';
+import {
+  Building2,
+  MapPin,
+  Send,
+  Edit,
+  Trash2,
+  Heart,
+  BedDouble,
+  Bath,
+  Ruler,
+  ImageOff,
+  Compass,
+  Globe,
+  EyeOff,
+  Lock,
+  Users,
+  Share2,
+  SlidersHorizontal
+} from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,9 +34,21 @@ interface PropertyCardProps {
   showRequestButton?: boolean;
   onEdit?: (property: Property) => void;
   onDelete?: (property: Property) => void;
+  isOwnerView?: boolean;
+  onManageListing?: (property: Property, defaultAction?: 'sale' | 'rent' | 'edit') => void;
+  onUnlist?: (property: Property) => void;
 }
 
-export default function PropertyCard({ property, compact = false, showRequestButton = true, onEdit, onDelete }: PropertyCardProps) {
+export default function PropertyCard({
+  property,
+  compact = false,
+  showRequestButton = true,
+  onEdit,
+  onDelete,
+  isOwnerView = false,
+  onManageListing,
+  onUnlist
+}: PropertyCardProps) {
   const { t, language } = useLanguage();
   const createRequest = useCreateRequest();
   const [translatedTitle, setTranslatedTitle] = useState<string | null>(null);
@@ -141,6 +171,72 @@ export default function PropertyCard({ property, compact = false, showRequestBut
     );
   };
 
+  const isAcquired = (property as any)?.saleStatus === 'sold' || !!property.buyer || (Array.isArray(property.previousOwners) && property.previousOwners.length > 0);
+  const isCurrentlyListed = property.listingStatus === 'listed' || (property.isListed && property.listingStatus !== 'unlisted');
+  const isOccupied = property.occupancyStatus === 'occupied' || !!property.tenant;
+  const isUnderContract = (property as any)?.saleStatus === 'under_contract';
+
+  const getOwnerListingBadge = () => {
+    if (isUnderContract) {
+      return (
+        <Badge className="bg-amber-600 text-white text-[9px] px-1.5 py-0.5 font-medium flex items-center gap-1 shrink-0">
+          <Lock className="h-2.5 w-2.5" />
+          {t('Under Contract', 'ஒப்பந்தத்தில்')}
+        </Badge>
+      );
+    }
+    if (isCurrentlyListed) {
+      const isRent = property.transactionType?.toLowerCase() === 'rent';
+      return (
+        <Badge className={`text-white text-[9px] px-1.5 py-0.5 font-medium flex items-center gap-1 shrink-0 ${isRent ? 'bg-purple-600' : 'bg-blue-600'}`}>
+          <Globe className="h-2.5 w-2.5" />
+          {isRent ? t('Listed: Rent', 'வாடகைக்கு') : t('Listed: Sale', 'விற்பனைக்கு')}
+        </Badge>
+      );
+    }
+    if (property.listingStatus === 'unavailable') {
+      return (
+        <Badge variant="secondary" className="text-muted-foreground text-[9px] px-1.5 py-0.5 font-medium flex items-center gap-1 shrink-0">
+          <Lock className="h-2.5 w-2.5" />
+          {t('Unavailable', 'கிடைக்கவில்லை')}
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-950/30 text-[9px] px-1.5 py-0.5 font-medium flex items-center gap-1 shrink-0">
+        <EyeOff className="h-2.5 w-2.5" />
+        {t('Private', 'தனிப்பட்டது')}
+      </Badge>
+    );
+  };
+
+  const getOwnerOccupancyBadge = () => {
+    if (isOccupied) {
+      return (
+        <Badge className="bg-purple-600 text-white text-[9px] px-1.5 py-0.5 font-medium flex items-center gap-1 shrink-0">
+          <Users className="h-2.5 w-2.5" />
+          {t('Occupied', 'குடியேற்றப்பட்டது')}
+        </Badge>
+      );
+    }
+    return null;
+  };
+
+  const getOwnerOwnershipBadge = () => {
+    if (isAcquired) {
+      return (
+        <Badge className="bg-emerald-600/90 text-white text-[9px] px-1.5 py-0.5 font-medium shrink-0">
+          ✓ {t('Acquired', 'வாங்கப்பட்டது')}
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="text-muted-foreground text-[9px] px-1.5 py-0.5 shrink-0">
+        {t('Owned', 'உரிமையாளர்')}
+      </Badge>
+    );
+  };
+
   const getOccupancyBadge = () => {
     if ((property as any)?.saleStatus === 'sold') {
       return (
@@ -149,8 +245,13 @@ export default function PropertyCard({ property, compact = false, showRequestBut
         </Badge>
       );
     }
-    if (property.tenant) {
-      return <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] px-1.5 py-0.5">{t('Occupied', 'குடியேற்றப்பட்டது')}</Badge>;
+    if (property.tenant || property.occupancyStatus === 'occupied') {
+      return (
+        <Badge className="bg-purple-600 text-white text-[9px] px-1.5 py-0.5 font-medium flex items-center gap-1">
+          <Users className="h-2.5 w-2.5" />
+          {t('Occupied', 'குடியேற்றப்பட்டது')}
+        </Badge>
+      );
     }
     return <Badge variant="outline" className="text-muted-foreground text-[9px] px-1.5 py-0.5">{t('Vacant', 'காலியாக உள்ளது')}</Badge>;
   };
@@ -243,7 +344,17 @@ export default function PropertyCard({ property, compact = false, showRequestBut
               </p>
             </div>
           </div>
-          {!showRequestButton && getOccupancyBadge()}
+          {isOwnerView ? (
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <div className="flex items-center gap-1 flex-wrap justify-end">
+                {getOwnerOccupancyBadge()}
+                {getOwnerListingBadge()}
+              </div>
+              {getOwnerOwnershipBadge()}
+            </div>
+          ) : (
+            getOccupancyBadge()
+          )}
         </div>
       </div>
 
@@ -338,6 +449,91 @@ export default function PropertyCard({ property, compact = false, showRequestBut
                 </>
               )}
             </Button>
+          ) : isOwnerView ? (
+            <div className="flex w-full items-center justify-between gap-1.5">
+              {/* Listing Controls */}
+              <div className="flex items-center gap-1 flex-1 min-w-0">
+                {isUnderContract ? (
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1 px-1.5 py-0.5 bg-muted/60 rounded">
+                    <Lock className="h-2.5 w-2.5 shrink-0" />
+                    <span className="truncate">{t('Under Contract', 'ஒப்பந்தத்தில்')}</span>
+                  </span>
+                ) : isCurrentlyListed ? (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[10px] px-2 rounded-lg text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onUnlist ? onUnlist(property) : onManageListing?.(property, 'edit');
+                      }}
+                      title={t('Unlist from public search', 'பொதுத் தேடலில் இருந்து நீக்கு')}
+                    >
+                      <EyeOff className="h-2.5 w-2.5 mr-1" />
+                      {t('Unlist', 'நீக்கு')}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[10px] px-2 rounded-lg"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onManageListing ? onManageListing(property, 'edit') : onEdit?.(property);
+                      }}
+                      title={t('Edit public listing details', 'பட்டியல் விவரங்களைத் திருத்து')}
+                    >
+                      <SlidersHorizontal className="h-2.5 w-2.5 mr-1" />
+                      {t('Edit', 'திருத்து')}
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    className="h-7 text-[11px] px-2.5 font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg shadow-xs flex items-center gap-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onManageListing ? onManageListing(property) : onEdit?.(property);
+                    }}
+                  >
+                    <Share2 className="h-3 w-3" />
+                    {t('List Property', 'பட்டியலிடுங்கள்')}
+                  </Button>
+                )}
+              </div>
+
+              {/* Standard Edit & Delete */}
+              <div className="flex items-center gap-1 shrink-0">
+                {onEdit && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 p-0 rounded-lg"
+                    title={t('Edit property details', 'சொத்து விவரங்களைத் திருத்து')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(property);
+                    }}
+                  >
+                    <Edit className="h-3 w-3" />
+                  </Button>
+                )}
+                {onDelete && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="h-7 w-7 p-0 rounded-lg"
+                    title={t('Delete property', 'சொத்தை நீக்கு')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(property);
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            </div>
           ) : (
             <div className="flex w-full justify-end gap-1.5">
               {onEdit && (

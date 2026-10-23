@@ -14,7 +14,8 @@ import {
   useOwnerRentReport,
   useOwnerOccupancyReport,
   useOwnerMaintenanceReport,
-  useAnnouncements
+  useAnnouncements,
+  useUpdateListingStatus
 } from '../hooks/useQueries';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -44,6 +45,7 @@ import {
 import PropertyForm from './PropertyForm';
 import PropertyCard from './PropertyCard';
 import PropertyFullScreenView from './PropertyFullScreenView';
+import ListingControlDialog from './ListingControlDialog';
 import RequestDetailsModal from './RequestDetailsModal';
 import { PropertyStatus, Property } from '../types';
 import { toast } from 'sonner';
@@ -104,6 +106,31 @@ export default function OwnerDashboard({
   const [deletingProperty, setDeletingProperty] = useState<Property | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Listing control dialog state
+  const [listingDialogProperty, setListingDialogProperty] = useState<Property | null>(null);
+  const [listingDefaultAction, setListingDefaultAction] = useState<'sale' | 'rent' | 'edit'>('sale');
+  const [isListingDialogOpen, setIsListingDialogOpen] = useState(false);
+  const updateListingStatus = useUpdateListingStatus();
+
+  const handleOpenListingDialog = (property: Property, defaultAction: 'sale' | 'rent' | 'edit' = 'sale') => {
+    setListingDialogProperty(property);
+    setListingDefaultAction(defaultAction);
+    setIsListingDialogOpen(true);
+  };
+
+  const handleQuickUnlist = async (property: Property) => {
+    try {
+      await updateListingStatus.mutateAsync({
+        id: property.id || (property as any)._id,
+        listingStatus: 'unlisted'
+      });
+      toast.success(t('Property unlisted. Hidden from public listings.', 'சொத்து பட்டியலிலிருந்து நீக்கப்பட்டது. பொதுப் பட்டியலிலிருந்து மறைக்கப்பட்டது.'));
+    } catch (err: any) {
+      const msg = err?.response?.data?.msg || t('Failed to unlist property', 'சொத்தை பட்டியலிலிருந்து நீக்க முடியவில்லை');
+      toast.error(msg);
+    }
+  };
 
   useEffect(() => {
     if (initialTab) {
@@ -1646,6 +1673,9 @@ export default function OwnerDashboard({
                     <PropertyCard 
                       property={property} 
                       showRequestButton={false} 
+                      isOwnerView={true}
+                      onManageListing={handleOpenListingDialog}
+                      onUnlist={handleQuickUnlist}
                       onEdit={handleEditProperty}
                       onDelete={handleDeleteProperty}
                     />
@@ -2728,6 +2758,14 @@ export default function OwnerDashboard({
             if (!open) setEditingProperty(null);
           }}
           initialData={editingProperty}
+        />
+
+        {/* Listing Control Dialog */}
+        <ListingControlDialog
+          property={listingDialogProperty}
+          open={isListingDialogOpen}
+          onOpenChange={setIsListingDialogOpen}
+          defaultAction={listingDefaultAction}
         />
 
         {/* Delete Confirmation Dialog */}

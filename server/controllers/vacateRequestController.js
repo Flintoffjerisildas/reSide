@@ -252,6 +252,9 @@ exports.completeVacateRequest = async (req, res) => {
     property.currentTenantId = null;
     property.currentAgreementId = null;
     property.occupancyStatus = 'vacant';
+    property.listingStatus = 'unlisted';
+    property.isListed = false;
+    property.unlistedAt = new Date();
     await property.save();
 
     request.status = 'completed';

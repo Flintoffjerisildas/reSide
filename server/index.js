@@ -72,6 +72,45 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/resideai'
     } catch (err) {
       console.error('Failed to apply initial admin promotion:', err?.message || err);
     }
+
+    try {
+      const Property = require('./models/Property');
+      const propertiesToMigrate = await Property.find({
+        $or: [
+          { listingStatus: { $exists: false } },
+          { listingStatus: null },
+          { isListed: { $exists: false } },
+          { isListed: null }
+        ]
+      });
+
+      if (propertiesToMigrate.length > 0) {
+        console.log(`Migrating listingStatus for ${propertiesToMigrate.length} legacy properties...`);
+        for (const p of propertiesToMigrate) {
+          if (p.saleStatus === 'sold' || p.buyer != null) {
+            p.listingStatus = 'unlisted';
+            p.isListed = false;
+          } else if (p.occupancyStatus === 'occupied' || p.tenant != null) {
+            p.listingStatus = 'unavailable';
+            p.isListed = false;
+          } else if (p.saleStatus === 'under_contract') {
+            p.listingStatus = 'unavailable';
+            p.isListed = false;
+          } else if (p.status === 'approved' && p.occupancyStatus === 'vacant' && p.saleStatus === 'available') {
+            p.listingStatus = 'listed';
+            p.isListed = true;
+            p.listedAt = p.listedAt || new Date();
+          } else {
+            p.listingStatus = 'unlisted';
+            p.isListed = false;
+          }
+          await p.save();
+        }
+        console.log('Property listingStatus migration completed successfully.');
+      }
+    } catch (err) {
+      console.error('Failed to migrate property listingStatus:', err?.message || err);
+    }
   })
   .catch(err => console.log('MongoDB connection error:', err));
 

@@ -183,6 +183,40 @@ export function useUpdateProperty() {
   });
 }
 
+export function useUpdateListingStatus() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({
+      id,
+      listingStatus,
+      transactionType,
+      price,
+      description
+    }: {
+      id: string;
+      listingStatus: 'listed' | 'unlisted' | 'unavailable';
+      transactionType?: string;
+      price?: number;
+      description?: string;
+    }) => {
+      const res = await api.put(`/properties/${id}/listing-status`, {
+        listingStatus,
+        transactionType,
+        price,
+        description
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allProperties'] });
+      queryClient.invalidateQueries({ queryKey: ['myProperties'] });
+      queryClient.invalidateQueries({ queryKey: ['properties'] });
+      queryClient.invalidateQueries({ queryKey: ['adminProperties'] });
+    }
+  });
+}
+
 export function useDeleteProperty() {
   const queryClient = useQueryClient();
   

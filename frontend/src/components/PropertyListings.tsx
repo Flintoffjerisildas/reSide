@@ -121,9 +121,21 @@ export default function PropertyListings({ showAbout = false, initialTransaction
 
       const propertyPrice = Number((property as any)?.price ?? 0);
       const priceMatch = priceRange[1] === 0 || (propertyPrice >= priceRange[0] && propertyPrice <= priceRange[1]);
-      const availabilityMatch = !property.tenant; // Only show properties without a tenant (available)
+      
+      const isRent = propertyTransactionType === 'rent';
+      const occupancyEligible = isRent
+        ? (property as any)?.occupancyStatus !== 'occupied' && !property.tenant
+        : true; // Sale listings can be occupied (tenant in place)
 
-      return locationMatch && typeMatch && transactionMatch && priceMatch && availabilityMatch;
+      // Strict public visibility check: must be explicitly listed, not unlisted, not unavailable, not sold, and eligible for transaction
+      const isPubliclyAvailable =
+        (property.isListed === true || property.listingStatus === 'listed') &&
+        property.listingStatus !== 'unlisted' &&
+        property.listingStatus !== 'unavailable' &&
+        (property as any)?.saleStatus !== 'sold' &&
+        occupancyEligible;
+
+      return isPubliclyAvailable && locationMatch && typeMatch && transactionMatch && priceMatch;
     });
   }, [properties, location, propertyType, transactionType, priceRange]);
 
@@ -551,6 +563,26 @@ export default function PropertyListings({ showAbout = false, initialTransaction
                     <div className="text-sm text-muted-foreground">{t('Property Facing', 'சொத்து திசை')}</div>
                     <div className="font-semibold">
                       {selectedProperty.facing || t('Not specified', 'குறிப்பிடப்படவில்லை')}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted">
+                    <div className="text-sm text-muted-foreground">{t('Occupancy Status', 'குடியேற்ற நிலை')}</div>
+                    <div className="font-semibold flex items-center gap-1.5 text-xs sm:text-sm">
+                      {(selectedProperty as any).occupancyStatus === 'occupied' || (selectedProperty as any).tenant ? (
+                        <>
+                          <span className="inline-block w-2 h-2 rounded-full bg-purple-500 shrink-0"></span>
+                          <span className="text-purple-700 dark:text-purple-300">
+                            {t('Occupied (Tenant in Place)', 'குடியேற்றப்பட்டுள்ளது')}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                          <span className="text-emerald-700 dark:text-emerald-300">
+                            {t('Vacant Possession', 'காலியாக உள்ளது')}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

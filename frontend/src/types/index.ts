@@ -66,10 +66,22 @@ export interface Property {
   tenantDetails?: TenantDetails; // Detailed tenant information
   buyer?: any;
   previousOwner?: any;
+  occupancyStatus?: 'vacant' | 'occupied' | 'maintenance';
   saleStatus?: 'available' | 'under_contract' | 'sold';
   soldDate?: string;
   finalPrice?: number;
+  listingStatus?: 'listed' | 'unlisted' | 'unavailable';
+  isListed?: boolean;
+  listedAt?: string;
+  unlistedAt?: string;
+  previousOwners?: Array<{
+    owner: any;
+    transferredAt: string;
+    price?: number;
+  }>;
 }
+
+export type ListingStatus = 'listed' | 'unlisted' | 'unavailable';
 
 export type RequestStatus =
   | 'pending'

@@ -537,6 +537,8 @@ const handleAcceptOrApprove = async (req, res) => {
       property.currentTenantId = request.tenant;
       property.currentAgreementId = newAgreement._id;
       property.occupancyStatus = 'occupied';
+      property.listingStatus = 'unavailable';
+      property.isListed = false;
       await property.save();
 
       // Reject competing pending requests for this rental property
@@ -776,6 +778,9 @@ router.put('/:id/verify-payment', auth, async (req, res) => {
       property.tenant = null; // Buyer owns the property, they are not a tenant!
       property.saleStatus = 'sold';
       property.occupancyStatus = 'occupied';
+      property.listingStatus = 'unlisted';
+      property.isListed = false;
+      property.unlistedAt = new Date();
       property.soldDate = new Date();
       property.finalPrice = request.agreedAmount || request.offerAmount || property.price;
       await property.save();
@@ -890,6 +895,9 @@ router.put('/:id/complete', auth, async (req, res) => {
       property.tenant = null;
       property.saleStatus = 'sold';
       property.occupancyStatus = 'occupied';
+      property.listingStatus = 'unlisted';
+      property.isListed = false;
+      property.unlistedAt = new Date();
       property.soldDate = property.soldDate || new Date();
       property.finalPrice = request.agreedAmount || request.offerAmount || property.price;
       await property.save();

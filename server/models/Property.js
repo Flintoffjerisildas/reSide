@@ -56,7 +56,18 @@ const propertySchema = new mongoose.Schema({
     price: { type: Number }
   }],
   currentTenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-  currentAgreementId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agreement', default: null }
+  currentAgreementId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agreement', default: null },
+  listingStatus: {
+    type: String,
+    enum: ['listed', 'unlisted', 'unavailable'],
+    default: 'unlisted'
+  },
+  isListed: {
+    type: Boolean,
+    default: false
+  },
+  listedAt: { type: Date },
+  unlistedAt: { type: Date }
 });
 
 module.exports = mongoose.model('Property', propertySchema);

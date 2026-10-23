@@ -25,6 +25,7 @@ import {
   Heart,
   Briefcase
 } from 'lucide-react';
+import { Eye, EyeOff, Globe, Lock, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { translateText } from '../lib/api';
 import {
@@ -34,6 +35,7 @@ import {
   useCompleteVacateRequest,
 } from '../hooks/useQueries';
 import AgreementDialog from './AgreementDialog';
+import ListingControlDialog from './ListingControlDialog';
 
 interface PropertyFullScreenViewProps {
   property: Property | null;
@@ -122,6 +124,7 @@ export default function PropertyFullScreenView({ property, onBack, initialTab }:
   const [propertyPaymentRequests, setPropertyPaymentRequests] = useState<any[]>([]);
   const [approvingPaymentId, setApprovingPaymentId] = useState<string | null>(null);
   const [rejectingPaymentId, setRejectingPaymentId] = useState<string | null>(null);
+  const [isListingDialogOpen, setIsListingDialogOpen] = useState(false);
   const propertyId = (property as any)?._id || property?.id || null;
   const title = String(property?.title || '').trim();
   const loc = String(property?.location || '').trim();
@@ -532,6 +535,48 @@ export default function PropertyFullScreenView({ property, onBack, initialTab }:
                 <span className="truncate">
                   {language === 'ta' ? (locationTa || property.location) : property.location}
                 </span>
+              </div>
+
+              {/* Ownership & Listing Visibility Status Row */}
+              <div className="flex items-center gap-1.5 pt-1.5 flex-wrap">
+                {((property as any)?.saleStatus === 'sold' || !!property.buyer || ((property as any)?.previousOwners && (property as any).previousOwners.length > 0)) && (
+                  <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 font-medium">
+                    ✓ {t('Acquired / Owned', 'வாங்கப்பட்டது')}
+                  </Badge>
+                )}
+                {(property.occupancyStatus === 'occupied' || property.tenant) && (
+                  <Badge className="bg-purple-600 text-white text-[10px] px-2 py-0.5 font-medium flex items-center gap-1">
+                    <Users className="h-3 w-3" />
+                    {t('Occupied', 'குடியேற்றப்பட்டது')}
+                  </Badge>
+                )}
+                {property.listingStatus === 'listed' || (property.isListed && property.listingStatus !== 'unlisted') ? (
+                  <Badge className={`text-white text-[10px] px-2 py-0.5 font-medium flex items-center gap-1 ${
+                    property.transactionType?.toLowerCase() === 'rent' ? 'bg-purple-600' : 'bg-blue-600'
+                  }`}>
+                    <Globe className="h-3 w-3" />
+                    {property.transactionType?.toLowerCase() === 'rent'
+                      ? t('Listed for Rent', 'வாடகைக்கு வெளியிடப்பட்டது')
+                      : t('Listed for Sale', 'விற்பனைக்கு வெளியிடப்பட்டது')}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-950/30 text-[10px] px-2 py-0.5 font-medium flex items-center gap-1">
+                    <EyeOff className="h-3 w-3" />
+                    {t('Private / Unlisted', 'பட்டியலிடப்படவில்லை')}
+                  </Badge>
+                )}
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 text-[10px] px-2 rounded-lg gap-1 border-primary/30 text-primary hover:bg-primary/10 ml-auto"
+                  onClick={() => setIsListingDialogOpen(true)}
+                >
+                  <Share2 className="h-2.5 w-2.5" />
+                  {property.listingStatus === 'listed' || (property.isListed && property.listingStatus !== 'unlisted')
+                    ? t('Edit Listing', 'பட்டியலைத் திருத்து')
+                    : t('Listing Visibility', 'பட்டியல் தெரிவுநிலை')}
+                </Button>
               </div>
             </div>
 
@@ -1320,6 +1365,12 @@ export default function PropertyFullScreenView({ property, onBack, initialTab }:
         if (!open) setSelectedAgreement(null);
       }}
       onUpdate={() => fetchAgreements()}
+    />
+
+    <ListingControlDialog
+      property={property}
+      open={isListingDialogOpen}
+      onOpenChange={setIsListingDialogOpen}
     />
     </>
   );
