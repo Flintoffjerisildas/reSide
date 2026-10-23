@@ -122,7 +122,7 @@ export default function PropertyListings({ showAbout = false, initialTransaction
       const propertyPrice = Number((property as any)?.price ?? 0);
       const priceMatch = priceRange[1] === 0 || (propertyPrice >= priceRange[0] && propertyPrice <= priceRange[1]);
       const availabilityMatch = !property.tenant; // Only show properties without a tenant (available)
-      
+
       return locationMatch && typeMatch && transactionMatch && priceMatch && availabilityMatch;
     });
   }, [properties, location, propertyType, transactionType, priceRange]);
@@ -193,7 +193,7 @@ export default function PropertyListings({ showAbout = false, initialTransaction
       }
     })();
   }, [language, selectedProperty?.title, selectedProperty?.location]);
-  
+
   const handlePreviousProperty = () => {
     if (selectedPropertyIndex !== null && selectedPropertyIndex > 0) {
       setSelectedPropertyIndex(selectedPropertyIndex - 1);
@@ -337,7 +337,7 @@ export default function PropertyListings({ showAbout = false, initialTransaction
           </div>
 
           {/* Listings */}
-          <div id="property-listings" className="space-y-5 sm:space-y-6">
+          <div id="property-listings" className="relative z-10 space-y-5 sm:space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <h2 className="flex items-center gap-2 text-xl font-bold tracking-tight sm:text-2xl">
@@ -360,11 +360,10 @@ export default function PropertyListings({ showAbout = false, initialTransaction
                     key={item.value || 'all'}
                     type="button"
                     onClick={() => handlePropertyTypeChange(item.value)}
-                    className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all hover:-translate-y-0.5 ${
-                      propertyType === item.value
+                    className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all hover:-translate-y-0.5 ${propertyType === item.value
                         ? 'border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-600/30'
                         : 'glass-pill text-muted-foreground hover:text-foreground'
-                    }`}
+                      }`}
                   >
                     {item.label}
                   </button>
@@ -563,32 +562,32 @@ export default function PropertyListings({ showAbout = false, initialTransaction
                   (selectedProperty.landDimensions.cd !== undefined && selectedProperty.landDimensions.cd !== null && selectedProperty.landDimensions.cd !== '') ||
                   (selectedProperty.landDimensions.da !== undefined && selectedProperty.landDimensions.da !== null && selectedProperty.landDimensions.da !== '')
                 ) && (
-                  <div className="p-3 rounded-lg border bg-muted/40 space-y-2">
-                    <div className="text-sm font-semibold">{t('Land Dimensions', 'நில அளவுகள்')}</div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                      {selectedProperty.landDimensions.ab !== undefined && selectedProperty.landDimensions.ab !== null && selectedProperty.landDimensions.ab !== '' && (
-                        <div className="p-2 glass-surface rounded-lg">
-                          <span className="text-muted-foreground">A → B:</span> <b>{selectedProperty.landDimensions.ab} ft</b>
-                        </div>
-                      )}
-                      {selectedProperty.landDimensions.bc !== undefined && selectedProperty.landDimensions.bc !== null && selectedProperty.landDimensions.bc !== '' && (
-                        <div className="p-2 glass-surface rounded-lg">
-                          <span className="text-muted-foreground">B → C:</span> <b>{selectedProperty.landDimensions.bc} ft</b>
-                        </div>
-                      )}
-                      {selectedProperty.landDimensions.cd !== undefined && selectedProperty.landDimensions.cd !== null && selectedProperty.landDimensions.cd !== '' && (
-                        <div className="p-2 glass-surface rounded-lg">
-                          <span className="text-muted-foreground">C → D:</span> <b>{selectedProperty.landDimensions.cd} ft</b>
-                        </div>
-                      )}
-                      {selectedProperty.landDimensions.da !== undefined && selectedProperty.landDimensions.da !== null && selectedProperty.landDimensions.da !== '' && (
-                        <div className="p-2 glass-surface rounded-lg">
-                          <span className="text-muted-foreground">D → A:</span> <b>{selectedProperty.landDimensions.da} ft</b>
-                        </div>
-                      )}
+                    <div className="p-3 rounded-lg border bg-muted/40 space-y-2">
+                      <div className="text-sm font-semibold">{t('Land Dimensions', 'நில அளவுகள்')}</div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                        {selectedProperty.landDimensions.ab !== undefined && selectedProperty.landDimensions.ab !== null && selectedProperty.landDimensions.ab !== '' && (
+                          <div className="p-2 glass-surface rounded-lg">
+                            <span className="text-muted-foreground">A → B:</span> <b>{selectedProperty.landDimensions.ab} ft</b>
+                          </div>
+                        )}
+                        {selectedProperty.landDimensions.bc !== undefined && selectedProperty.landDimensions.bc !== null && selectedProperty.landDimensions.bc !== '' && (
+                          <div className="p-2 glass-surface rounded-lg">
+                            <span className="text-muted-foreground">B → C:</span> <b>{selectedProperty.landDimensions.bc} ft</b>
+                          </div>
+                        )}
+                        {selectedProperty.landDimensions.cd !== undefined && selectedProperty.landDimensions.cd !== null && selectedProperty.landDimensions.cd !== '' && (
+                          <div className="p-2 glass-surface rounded-lg">
+                            <span className="text-muted-foreground">C → D:</span> <b>{selectedProperty.landDimensions.cd} ft</b>
+                          </div>
+                        )}
+                        {selectedProperty.landDimensions.da !== undefined && selectedProperty.landDimensions.da !== null && selectedProperty.landDimensions.da !== '' && (
+                          <div className="p-2 glass-surface rounded-lg">
+                            <span className="text-muted-foreground">D → A:</span> <b>{selectedProperty.landDimensions.da} ft</b>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* Description */}
                 <div>
@@ -613,7 +612,7 @@ export default function PropertyListings({ showAbout = false, initialTransaction
                   <ChevronLeft className="h-4 w-4" />
                   {t('Previous', 'முந்தைய')}
                 </Button>
-                
+
                 <Button
                   onClick={handleRequestProperty}
                   disabled={createRequest.isPending}
@@ -629,7 +628,7 @@ export default function PropertyListings({ showAbout = false, initialTransaction
                 <div className="text-sm text-muted-foreground text-center hidden sm:block">
                   {selectedPropertyIndex! + 1} / {filteredProperties.length}
                 </div>
-                
+
                 <Button
                   onClick={handleNextProperty}
                   disabled={selectedPropertyIndex === filteredProperties.length - 1}
@@ -649,9 +648,9 @@ export default function PropertyListings({ showAbout = false, initialTransaction
         <AuthDialog open={showAuthDialog} onOpenChange={setShowAuthDialog} />
 
         {/* Request Property Dialog */}
-        <RequestPropertyDialog 
-          property={selectedProperty} 
-          open={showRequestDialog} 
+        <RequestPropertyDialog
+          property={selectedProperty}
+          open={showRequestDialog}
           onOpenChange={setShowRequestDialog}
           onSuccess={() => {
             setShowRequestDialog(false);

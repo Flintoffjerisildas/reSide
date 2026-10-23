@@ -28,7 +28,7 @@ export default function HeroSection({
   const { t } = useLanguage();
 
   return (
-    <section className="relative left-1/2 -mt-12 mb-16 min-h-[560px] w-screen -translate-x-1/2 overflow-visible bg-slate-900 shadow-2xl sm:-mt-16 sm:mb-[4.5rem] sm:min-h-[650px] lg:min-h-[300px]">
+    <section className="relative left-1/2 -mt-12 mb-24 min-h-[540px] w-screen -translate-x-1/2 overflow-visible bg-slate-900 shadow-2xl sm:-mt-16 sm:mb-24 sm:min-h-[560px] lg:mb-16 lg:min-h-[360px]">
       <img src="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1800&q=85" alt="Luxury villa at dusk" className="absolute inset-0 h-full w-full object-cover opacity-80" />
       <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-900/50 to-slate-900/10" />
       <div className="relative min-h-[320px] max-w-2xl px-6 pb-36 pt-12 text-white sm:min-h-[250px] sm:px-10 sm:pt-20 lg:min-h-[200px] lg:px-12">
@@ -41,7 +41,7 @@ export default function HeroSection({
           </h1>
           <p className="mt-5 max-w-md text-base leading-7 text-slate-200 sm:text-lg">{t('Explore verified properties with your bilingual real-estate assistant.', 'உங்கள் இருமொழி ரியல் எஸ்டேட் உதவியாளருடன் சரிபார்க்கப்பட்ட சொத்துகளை ஆராயுங்கள்.')}</p>
         </div>
-      <div className="glass-panel absolute bottom-[-92px] left-1/2 z-10 w-[calc(100%-2rem)] -translate-x-1/2 rounded-2xl p-2 text-foreground shadow-2xl backdrop-blur-2xl sm:bottom-[-78px] sm:w-[calc(100%-4rem)] sm:p-3 lg:bottom-[-58px] lg:w-[calc(100%-6rem)]">
+      <div className="glass-panel absolute bottom-[-72px] left-1/2 z-10 w-[calc(100%-2rem)] -translate-x-1/2 rounded-2xl p-2 text-foreground shadow-2xl backdrop-blur-2xl sm:bottom-[-64px] sm:w-[calc(100%-4rem)] sm:p-3 lg:bottom-[-48px] lg:w-[calc(100%-6rem)]">
         <div className="relative z-10 mb-2 flex flex-wrap gap-1 px-2">
           {[
             { value: '', label: t('All', 'அனைத்தும்') },

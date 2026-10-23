@@ -1390,68 +1390,104 @@ export default function CustomerDashboard({
 
           {/* My Rentals Content */}
           <TabsContent value="rentals" className="mt-6">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:gap-3.5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 items-stretch">
               {agreements.length > 0 ? (
                 agreements.map((agreement) => (
                   <Card
                     key={agreement._id}
-                    className="cursor-pointer hover:shadow-lg transition-shadow group relative overflow-hidden"
+                    className="glass-card flex flex-col h-full w-full overflow-hidden rounded-xl p-0 gap-0 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg border border-white/20 dark:border-white/10 group cursor-pointer"
                     onClick={() => setSelectedRental(agreement)}
                   >
-                    {/* Property Image */}
-                    <div className="relative h-40 sm:h-48 w-full bg-muted overflow-hidden">
+                    {/* Property Image Container - Compact Height matching Home */}
+                    <div className="relative h-32 w-full overflow-hidden bg-muted/60 sm:h-36 flex-shrink-0">
                       {agreement.property?.images && agreement.property.images.length > 0 ? (
                         <img
                           src={agreement.property.images[0]}
                           alt={displayTa(agreement.property?.title || 'Property')}
-                          className="w-full h-full object-cover"
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                      ) : agreement.property?.geoLocatedImage ? (
+                        <img
+                          src={agreement.property.geoLocatedImage}
+                          alt={displayTa(agreement.property?.title || 'Property')}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          loading="lazy"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-muted">
-                          {agreement.property?.geoLocatedImage ? (
-                            <img
-                              src={agreement.property.geoLocatedImage}
-                              alt={displayTa(agreement.property?.title || 'Property')}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <Home className="h-10 w-10 text-muted-foreground" />
-                          )}
+                        <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-gradient-to-br from-blue-50/70 via-slate-100/50 to-teal-50/70 dark:from-blue-950/40 dark:via-slate-900/40 dark:to-teal-950/30">
+                          <Home className="h-8 w-8 text-primary/60" />
                         </div>
                       )}
-                    </div>
-                    <CardHeader className="pb-2">
-                      <div className="flex justify-between items-start">
-                        <Badge variant={agreement.status === 'active' ? 'default' : 'secondary'} className="mb-2">
-                          {agreement.status.toUpperCase()}
-                        </Badge>
+
+                      {/* Status Badge */}
+                      <div className="glass-pill absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold text-emerald-600 border-emerald-400/40 dark:text-emerald-400 shadow-sm backdrop-blur-md">
+                        ✓ {agreement.status?.toUpperCase()}
                       </div>
-                      <CardTitle className="line-clamp-1 text-lg">
-                        {displayTa(agreement.property?.title || 'Unknown Property')}
-                      </CardTitle>
-                      <CardDescription className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        <span className="line-clamp-1">{displayTa(agreement.property?.location)}</span>
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3 text-sm">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <User className="h-4 w-4" />
-                          <span>{t('Owner:', 'உரிமையாளர்:')} {agreement.owner?.name}</span>
+
+                      {/* Lease Badge */}
+                      <div className="glass-pill absolute right-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 border-blue-400/40 shadow-sm backdrop-blur-md">
+                        {t('Lease', 'குத்தகை')}
+                      </div>
+                    </div>
+
+                    {/* Header Info */}
+                    <div className="p-2.5 sm:p-3 pb-1.5">
+                      <div className="flex items-start gap-2">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-sm flex-shrink-0">
+                          <Home className="h-4 w-4 text-primary" />
                         </div>
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Calendar className="h-4 w-4" />
-                          <span>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-xs sm:text-sm font-semibold truncate leading-tight" title={displayTa(agreement.property?.title || 'Property')}>
+                            {displayTa(agreement.property?.title || 'Property')}
+                          </h3>
+                          <p className="text-[10px] text-muted-foreground truncate mt-0.5 flex items-center gap-1">
+                            <MapPin className="h-2.5 w-2.5 text-primary flex-shrink-0" />
+                            <span className="truncate">{displayTa(agreement.property?.location)}</span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Body Content */}
+                    <div className="px-2.5 sm:px-3 py-1 flex-1 flex flex-col justify-between space-y-2">
+                      <div className="space-y-1.5 text-xs">
+                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground truncate">
+                          <User className="h-3 w-3 text-primary flex-shrink-0" />
+                          <span className="truncate"><span className="text-muted-foreground/70">{t('Owner:', 'உரிமையாளர்:')}</span> {agreement.owner?.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground truncate">
+                          <Calendar className="h-3 w-3 flex-shrink-0 text-muted-foreground/80" />
+                          <span className="truncate">
                             {new Date(agreement.startDate).toLocaleDateString()} - {new Date(agreement.endDate).toLocaleDateString()}
                           </span>
                         </div>
-                        <div className="pt-2 border-t flex justify-between items-center">
-                          <span className="text-muted-foreground">{t('Rent:', 'வாடகை:')}</span>
-                          <span className="font-semibold text-primary">₹{agreement.rentAmount?.toLocaleString()}/mo</span>
-                        </div>
                       </div>
-                    </CardContent>
+
+                      {/* Rent row */}
+                      <div className="pt-1.5 border-t border-border/40 flex justify-between items-baseline gap-1">
+                        <div className="flex items-baseline gap-0.5">
+                          <span className="text-sm sm:text-base font-bold text-primary tracking-tight">
+                            ₹{Number(agreement.rentAmount || 0).toLocaleString('en-IN')}
+                          </span>
+                          <span className="text-[9px] text-muted-foreground font-normal">/mo</span>
+                        </div>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                          {agreement.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Footer Action */}
+                    <div className="px-2.5 sm:px-3 pb-2.5 pt-1 mt-auto">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full h-7 sm:h-8 text-xs font-medium rounded-lg shadow-xs hover:bg-primary hover:text-primary-foreground transition-colors"
+                      >
+                        {t('Manage Rental', 'வாடகையை நிர்வகி')}
+                      </Button>
+                    </div>
                   </Card>
                 ))
               ) : (

@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle, AlertCircle, Clock, FileText, Wrench, CreditCard, Mic, Square, Loader2 } from 'lucide-react';
+import { CheckCircle, AlertCircle, Clock, FileText, Wrench, CreditCard, Mic, Square, Loader2, Home, MapPin, User } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { generateReceipt } from '../utils/receiptGenerator';
 import { toast } from 'sonner';
@@ -606,30 +606,59 @@ export default function RentalDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{translatedPropertyTitle || agreement.property?.title || t('Property Details', 'சொத்து விவரங்கள்')}</DialogTitle>
-          <DialogDescription>
-            {translatedPropertyLocation || agreement.property?.location} • {t('Owner:', 'உரிமையாளர்:')} {agreement.owner?.name}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-[760px] max-h-[88vh] overflow-y-auto p-4 sm:p-5 gap-3 !bg-background/98 dark:!bg-slate-950/98 !backdrop-blur-3xl border border-border/80 shadow-2xl">
+        {/* Property Details Containing Box */}
+        <div className="rounded-xl p-3 sm:p-3.5 bg-card/95 dark:bg-card/95 border border-border/80 shadow-xs backdrop-blur-md">
+          <DialogHeader className="space-y-1.5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
+                  <Home className="h-3 w-3" />
+                  <span>{t('Property Details', 'சொத்து விவரங்கள்')}</span>
+                </div>
+                <DialogTitle className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
+                  {translatedPropertyTitle || agreement?.property?.title || t('Property Details', 'சொத்து விவரங்கள்')}
+                </DialogTitle>
+              </div>
+              {agreement?.status && (
+                <Badge variant="outline" className="shrink-0 bg-primary/10 text-primary border-primary/20 text-[11px] px-2 py-0.5 capitalize">
+                  {t(agreement.status, agreement.status)}
+                </Badge>
+              )}
+            </div>
+            <DialogDescription className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-muted-foreground pt-0.5">
+              {(translatedPropertyLocation || agreement?.property?.location) && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3 text-muted-foreground/80 shrink-0" />
+                  <span>{translatedPropertyLocation || agreement?.property?.location}</span>
+                </span>
+              )}
+              {agreement?.owner?.name && (
+                <span className="flex items-center gap-1">
+                  <User className="h-3 w-3 text-muted-foreground/80 shrink-0" />
+                  <span>{t('Owner:', 'உரிமையாளர்:')} {agreement.owner.name}</span>
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+        </div>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="w-full mt-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="payments">
-              <CreditCard className="mr-2 h-4 w-4" />
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="w-full mt-2.5 relative z-10">
+          <TabsList className="grid w-full grid-cols-4 h-9 sm:h-10 p-1 bg-muted/60 dark:bg-muted/40">
+            <TabsTrigger value="payments" className="text-xs sm:text-sm py-1">
+              <CreditCard className="mr-1.5 h-3.5 w-3.5" />
               {t('Payments', 'கட்டணங்கள்')}
             </TabsTrigger>
-            <TabsTrigger value="agreements">
-              <FileText className="mr-2 h-4 w-4" />
+            <TabsTrigger value="agreements" className="text-xs sm:text-sm py-1">
+              <FileText className="mr-1.5 h-3.5 w-3.5" />
               {t('Agreements', 'ஒப்பந்தங்கள்')}
             </TabsTrigger>
-            <TabsTrigger value="maintenance">
-              <Wrench className="mr-2 h-4 w-4" />
+            <TabsTrigger value="maintenance" className="text-xs sm:text-sm py-1">
+              <Wrench className="mr-1.5 h-3.5 w-3.5" />
               {t('Maintenance', 'பராமரிப்பு')}
             </TabsTrigger>
-            <TabsTrigger value="vacate">
-              <AlertCircle className="mr-2 h-4 w-4" />
+            <TabsTrigger value="vacate" className="text-xs sm:text-sm py-1">
+              <AlertCircle className="mr-1.5 h-3.5 w-3.5" />
               {t('Vacate', 'வெளியேறு')}
             </TabsTrigger>
           </TabsList>

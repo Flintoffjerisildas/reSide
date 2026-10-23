@@ -458,30 +458,30 @@ export default function PropertyFullScreenView({ property, onBack, initialTab }:
 
   return (
     <>
-    <div className="min-h-screen bg-transparent">
+    <div className="min-h-screen bg-background/80 dark:bg-background/80 backdrop-blur-xs relative z-10">
       {/* Header */}
       <div className="sticky top-0 z-40 border-b glass-nav">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-4 py-2.5 sm:py-3 max-w-4xl flex items-center justify-between">
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={onBack}
-            className="gap-2"
+            className="gap-1.5 h-8 px-2.5 text-xs sm:text-sm"
           >
             <ArrowLeft className="h-4 w-4" />
             {t('Back', 'பின்னால்')}
           </Button>
-          <h1 className="text-2xl font-bold flex-1 text-center">
+          <h1 className="text-lg sm:text-xl font-bold flex-1 text-center truncate px-2">
             {t('Property Details', 'சொத்து விவரங்கள்')}
           </h1>
-          <div className="w-20" /> {/* Spacer for alignment */}
+          <div className="w-16 sm:w-20" /> {/* Spacer for alignment */}
         </div>
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 py-8 max-w-5xl space-y-6">
+      <div className="container mx-auto px-4 py-4 sm:py-5 max-w-4xl space-y-3.5">
         {/* Image Carousel */}
-        <div className="relative bg-muted rounded-lg overflow-hidden aspect-video">
+        <div className="relative bg-muted/40 rounded-xl overflow-hidden aspect-[16/9] max-h-[260px] sm:max-h-[320px] md:max-h-[340px] w-full border border-border/60 shadow-xs">
           {hasImages ? (
             <>
               <img
@@ -493,17 +493,17 @@ export default function PropertyFullScreenView({ property, onBack, initialTab }:
                 <>
                   <button
                     onClick={prevImage}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70 transition-colors"
                   >
-                    <ChevronLeft className="h-6 w-6" />
+                    <ChevronLeft className="h-4 w-4" />
                   </button>
                   <button
                     onClick={nextImage}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70 transition-colors"
                   >
-                    <ChevronRight className="h-6 w-6" />
+                    <ChevronRight className="h-4 w-4" />
                   </button>
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 px-3 py-1 rounded-full text-white text-sm">
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/50 px-2.5 py-0.5 rounded-full text-white text-xs">
                     {currentImageIndex + 1} / {images.length}
                   </div>
                 </>
@@ -511,48 +511,64 @@ export default function PropertyFullScreenView({ property, onBack, initialTab }:
             </>
           ) : (
             <div className="flex items-center justify-center h-full">
-              <Home className="h-12 w-12 text-muted-foreground/20" />
+              <Home className="h-10 w-10 text-muted-foreground/20" />
             </div>
           )}
         </div>
 
-        {/* Property Basic Info */}
-        <div className="space-y-4">
-          <div>
-            <h1 className="text-3xl font-bold">{language === 'ta' ? (titleTa || property.title) : property.title}</h1>
-            <div className="flex items-center text-muted-foreground mt-2">
-              <MapPin className="h-5 w-5 mr-2" />
-              <span className="text-lg">{language === 'ta' ? (locationTa || property.location) : property.location}</span>
+        {/* Property Details Containing Box */}
+        <div className="rounded-xl p-3.5 sm:p-4 md:p-5 bg-card/95 dark:bg-card/95 border border-border/80 shadow-xs backdrop-blur-md space-y-2.5 relative z-10">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
+                <Home className="h-3 w-3" />
+                <span>{t('Property Details', 'சொத்து விவரங்கள்')}</span>
+              </div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground leading-tight">
+                {language === 'ta' ? (titleTa || property.title) : property.title}
+              </h1>
+              <div className="flex items-center text-muted-foreground text-xs sm:text-sm">
+                <MapPin className="h-3.5 w-3.5 mr-1 shrink-0" />
+                <span className="truncate">
+                  {language === 'ta' ? (locationTa || property.location) : property.location}
+                </span>
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center text-2xl font-bold text-green-600">
-            <IndianRupee className="h-6 w-6 mr-1" />
-            <span>{property.price.toLocaleString()}</span>
-            <span className="text-base font-normal text-muted-foreground ml-2 capitalize">
-              / {property.transactionType}
-            </span>
+            {property.price !== undefined && property.price !== null && (
+              <div className="sm:text-right shrink-0">
+                <div className="flex items-center text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">
+                  <IndianRupee className="h-5 w-5 mr-0.5 shrink-0" />
+                  <span>{typeof property.price === 'number' ? property.price.toLocaleString() : property.price}</span>
+                  {property.transactionType && (
+                    <span className="text-xs sm:text-sm font-normal text-muted-foreground ml-1.5 capitalize">
+                      / {property.transactionType}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {property.description && (
-            <p className="text-muted-foreground text-lg">{property.description}</p>
+            <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed border-t border-border/50 pt-2 mt-1">
+              {property.description}
+            </p>
           )}
         </div>
 
-        <Separator />
-
         {/* Tabs for Tenant, Payments, Maintenance, Agreements and Vacate */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as PropertyTabKey)} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="tenant">{t('Tenant', 'குத்தகைதாரர்')}</TabsTrigger>
-            <TabsTrigger value="payments">{t('Payments', 'கட்டணங்கள்')}</TabsTrigger>
-            <TabsTrigger value="maintenance">{t('Maintenance', 'பராமரிப்பு')}</TabsTrigger>
-            <TabsTrigger value="agreements">{t('Agreements', 'ஒப்பந்தங்கள்')}</TabsTrigger>
-            <TabsTrigger value="vacate">{t('Vacate', 'வெளியேறு')}</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-5 h-9 sm:h-10 p-1 bg-muted/60 dark:bg-muted/40">
+            <TabsTrigger value="tenant" className="text-xs sm:text-sm py-1">{t('Tenant', 'குத்தகைதாரர்')}</TabsTrigger>
+            <TabsTrigger value="payments" className="text-xs sm:text-sm py-1">{t('Payments', 'கட்டணங்கள்')}</TabsTrigger>
+            <TabsTrigger value="maintenance" className="text-xs sm:text-sm py-1">{t('Maintenance', 'பராமரிப்பு')}</TabsTrigger>
+            <TabsTrigger value="agreements" className="text-xs sm:text-sm py-1">{t('Agreements', 'ஒப்பந்தங்கள்')}</TabsTrigger>
+            <TabsTrigger value="vacate" className="text-xs sm:text-sm py-1">{t('Vacate', 'வெளியேறு')}</TabsTrigger>
           </TabsList>
 
           {/* Tenant Tab */}
-          <TabsContent value="tenant" className="space-y-4 mt-6">
+          <TabsContent value="tenant" className="space-y-3 mt-3 sm:mt-3.5">
             {tenantProfile ? (
               <div className="space-y-4">
                 {/* Basic Tenant Information */}
@@ -735,14 +751,14 @@ export default function PropertyFullScreenView({ property, onBack, initialTab }:
                 )}
               </div>
             ) : (
-              <Card>
-                <CardContent className="py-12">
-                  <div className="text-center space-y-4">
-                    <Home className="h-12 w-12 text-muted-foreground/30 mx-auto" />
-                    <p className="text-lg text-muted-foreground">
+              <Card className="border border-border/70 shadow-xs">
+                <CardContent className="py-6 sm:py-7">
+                  <div className="text-center space-y-2">
+                    <Home className="h-7 w-7 text-muted-foreground/35 mx-auto" />
+                    <p className="text-xs sm:text-sm text-muted-foreground font-medium">
                       {t('No tenant assigned to this property.', 'இந்த சொத்திற்கு குத்தகைதாரர் யாரும் நியமிக்கப்படவில்லை.')}
                     </p>
-                    <Badge variant="secondary">{t('Vacant', 'காலியாக')}</Badge>
+                    <Badge variant="secondary" className="text-[11px] px-2 py-0.5">{t('Vacant', 'காலியாக')}</Badge>
                   </div>
                 </CardContent>
               </Card>
@@ -750,7 +766,7 @@ export default function PropertyFullScreenView({ property, onBack, initialTab }:
           </TabsContent>
 
           {/* Payments Tab */}
-          <TabsContent value="payments" className="space-y-4 mt-6">
+          <TabsContent value="payments" className="space-y-3 mt-3 sm:mt-3.5">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -903,7 +919,7 @@ export default function PropertyFullScreenView({ property, onBack, initialTab }:
           </TabsContent>
 
           {/* Maintenance Tab */}
-          <TabsContent value="maintenance" className="space-y-4 mt-6">
+          <TabsContent value="maintenance" className="space-y-3 mt-3 sm:mt-3.5">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1032,7 +1048,7 @@ export default function PropertyFullScreenView({ property, onBack, initialTab }:
           </TabsContent>
 
           {/* Agreements Tab */}
-          <TabsContent value="agreements" className="space-y-4 mt-6">
+          <TabsContent value="agreements" className="space-y-3 mt-3 sm:mt-3.5">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1140,7 +1156,7 @@ export default function PropertyFullScreenView({ property, onBack, initialTab }:
           </TabsContent>
 
           {/* Vacate Tab */}
-          <TabsContent value="vacate" className="space-y-4 mt-6">
+          <TabsContent value="vacate" className="space-y-3 mt-3 sm:mt-3.5">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

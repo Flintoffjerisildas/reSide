@@ -274,7 +274,7 @@ function LoginPage() {
       <div className="pointer-events-none absolute -right-20 bottom-0 h-80 w-80 rounded-full bg-teal-300/15 blur-3xl transition-opacity duration-500 dark:bg-teal-500/10" />
 
       <div className="relative z-10 grid w-full max-w-5xl gap-6 lg:grid-cols-[1fr_420px] lg:items-stretch">
-        <aside className="glass-panel group relative hidden overflow-hidden rounded-[2rem] p-8 text-slate-900 shadow-2xl transition-all duration-500 hover:-translate-y-1 hover:shadow-blue-900/25 md:block dark:text-white">
+        <aside className="glass-panel ambient-glow-login group relative hidden overflow-hidden rounded-[2rem] p-8 text-slate-900 shadow-2xl transition-all duration-500 hover:-translate-y-1 hover:shadow-blue-900/25 md:block dark:text-white">
         <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-400/20 blur-3xl transition-transform duration-700 group-hover:scale-125 dark:bg-blue-500/20" />
         <div className="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-teal-300/20 blur-3xl transition-transform duration-700 group-hover:scale-125 dark:bg-teal-400/15" />
         <div className="relative flex h-full flex-col justify-between">

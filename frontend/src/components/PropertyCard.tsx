@@ -187,8 +187,8 @@ export default function PropertyCard({ property, compact = false, showRequestBut
       {/* Property Image Container - Compact Height */}
       <div className="relative h-32 w-full overflow-hidden bg-muted/60 sm:h-36 flex-shrink-0">
         {hasValidImage ? (
-          <img 
-            src={imageSrc!} 
+          <img
+            src={imageSrc!}
             alt={displayTitle}
             onError={() => setImgFailed(true)}
             loading="lazy"
@@ -213,16 +213,15 @@ export default function PropertyCard({ property, compact = false, showRequestBut
         </div>
 
         {/* Save / Favorite Button */}
-        <button 
-          type="button" 
-          aria-label={t('Save property', 'சொத்தை சேமிக்கவும்')} 
-          onClick={(e) => { 
-            e.stopPropagation(); 
-            setIsFavorite((value) => !value); 
-          }} 
-          className={`glass-pill absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full shadow-sm transition duration-200 hover:scale-110 active:scale-95 motion-reduce:transition-none backdrop-blur-md ${
-            isFavorite ? 'text-rose-500' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
+        <button
+          type="button"
+          aria-label={t('Save property', 'சொத்தை சேமிக்கவும்')}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsFavorite((value) => !value);
+          }}
+          className={`glass-pill absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full shadow-sm transition duration-200 hover:scale-110 active:scale-95 motion-reduce:transition-none backdrop-blur-md ${isFavorite ? 'text-rose-500' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
         >
           <Heart className={`h-3 w-3 ${isFavorite ? 'fill-current' : ''}`} />
         </button>
@@ -324,9 +323,9 @@ export default function PropertyCard({ property, compact = false, showRequestBut
       {(showRequestButton || onEdit || onDelete) && (
         <div className="px-2.5 sm:px-3 pb-2.5 pt-1 mt-auto">
           {showRequestButton ? (
-            <Button 
+            <Button
               size="sm"
-              className="w-full h-7 sm:h-8 text-xs font-medium rounded-lg shadow-sm hover:shadow" 
+              className="w-full h-7 sm:h-8 text-xs font-medium rounded-lg shadow-sm hover:shadow"
               onClick={handleRequest}
               disabled={isUnavailable}
             >
@@ -342,8 +341,8 @@ export default function PropertyCard({ property, compact = false, showRequestBut
           ) : (
             <div className="flex w-full justify-end gap-1.5">
               {onEdit && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   className="h-7 w-7 p-0 rounded-lg"
                   onClick={(e) => {
@@ -356,8 +355,8 @@ export default function PropertyCard({ property, compact = false, showRequestBut
                 </Button>
               )}
               {onDelete && (
-                <Button 
-                  variant="destructive" 
+                <Button
+                  variant="destructive"
                   size="sm"
                   className="h-7 w-7 p-0 rounded-lg"
                   onClick={(e) => {

@@ -592,3 +592,82 @@
     border-color: var(--glass-border-glow) !important;
 }
 
+/* ==========================================================================
+   Animated Ambient Border Light Effect
+   Applied STRICTLY to the Login Page left "Welcome to Reside" Box (.ambient-glow-login)
+   ========================================================================== */
+
+@property --ambient-angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+}
+
+@keyframes ambient-rotate {
+    0% {
+        --ambient-angle: 0deg;
+    }
+    100% {
+        --ambient-angle: 360deg;
+    }
+}
+
+.ambient-glow-login {
+    position: relative;
+}
+
+.ambient-glow-login::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    border-radius: inherit;
+    padding: 2px;
+    background: conic-gradient(
+        from var(--ambient-angle),
+        transparent 0deg,
+        transparent 195deg,
+        rgba(59, 130, 246, 0.85) 240deg,
+        rgba(168, 85, 247, 0.95) 285deg,
+        rgba(20, 184, 166, 0.9) 330deg,
+        transparent 360deg
+    );
+    -webkit-mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+    animation: ambient-rotate 6s linear infinite;
+}
+
+.dark .ambient-glow-login::before {
+    background: conic-gradient(
+        from var(--ambient-angle),
+        transparent 0deg,
+        transparent 180deg,
+        rgba(96, 165, 250, 1) 235deg,
+        rgba(192, 132, 252, 1) 285deg,
+        rgba(45, 212, 191, 1) 330deg,
+        transparent 360deg
+    );
+    opacity: 0.95;
+}
+
+.ambient-glow-login:hover::before {
+    opacity: 1;
+    animation-duration: 3s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ambient-glow-login::before {
+        animation: none !important;
+    }
+}
+
