@@ -283,7 +283,7 @@ export default function PropertyCard({ property, compact = false, showRequestBut
         </div>
 
         {/* Specs: Area, Bedrooms, Dimensions, Facing */}
-        {(property.totalArea || property.bedrooms || property.facing || (property.propertyType?.toLowerCase() === 'land' && property.landDimensions)) && (
+        {/* {(property.totalArea || property.bedrooms || property.facing || (property.propertyType?.toLowerCase() === 'land' && property.landDimensions)) && (
           <div className="mt-1 flex items-center gap-2 border-t border-border/50 pt-1.5 text-[10px] text-muted-foreground flex-wrap">
             {property.totalArea && (
               <div className="flex items-center gap-1" title={`${property.totalArea} sq.ft`}>
@@ -323,7 +323,7 @@ export default function PropertyCard({ property, compact = false, showRequestBut
               </div>
             )}
           </div>
-        )}
+        )} */}
       </div>
 
       {/* Footer Actions */}

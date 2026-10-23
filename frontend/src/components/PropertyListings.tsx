@@ -364,7 +364,7 @@ export default function PropertyListings({ showAbout = false, initialTransaction
                   <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/80"><Home className="h-4 w-4" /></span>
                   {t('Homes picked for you', 'உங்களுக்காக தேர்ந்தெடுக்கப்பட்ட வீடுகள்')}
                 </h2>
-                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                <p className="text-xs ml-11 sm:text-sm text-muted-foreground mt-0.5">
                   {t('Explore handpicked spaces worth seeing', 'பார்க்க வேண்டிய சிறந்த இடங்களை ஆராயுங்கள்')}
                 </p>
               </div>
