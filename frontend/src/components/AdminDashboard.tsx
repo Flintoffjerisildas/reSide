@@ -411,8 +411,8 @@ function AdminDashboardModern() {
   };
 
   return (
-    <div className="min-h-screen bg-transparent">
-      <div className="mx-auto grid w-full max-w-[1600px] grid-cols-1 items-start gap-5 px-4 py-4 xl:grid-cols-[minmax(0,1fr)_380px] sm:px-6">
+    <div className="min-h-screen w-full bg-transparent">
+      <div className="grid w-full grid-cols-1 items-start gap-5 px-4 py-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 xl:grid-cols-[minmax(0,1fr)_400px]">
         <main className="space-y-5">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -1508,7 +1508,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-transparent">
       <header className="sticky top-0 z-10 glass-nav backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+        <div className="flex h-16 w-full items-center justify-between px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12">
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold text-foreground">{sectionTitle}</h1>
           </div>
@@ -1535,7 +1535,7 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-7xl grid-cols-1 items-start gap-6 px-4 py-6 lg:grid-cols-[240px_1fr] sm:px-6">
+      <div className="grid w-full grid-cols-1 items-start gap-6 px-4 py-6 sm:px-6 md:px-8 lg:px-10 xl:px-12 lg:grid-cols-[240px_1fr]">
         <aside className="glass-panel rounded-2xl p-3 shadow-md">
           <nav className="space-y-1">
             <button

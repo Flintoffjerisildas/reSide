@@ -952,8 +952,8 @@ export default function CustomerDashboard({
   const latestVacateStatus = latestVacate?.status ? String(latestVacate.status) : null;
 
   return (
-    <div className={hideHeaderActions ? "w-full" : "container py-8 sm:py-12 px-4 sm:px-6"}>
-      <div className={hideHeaderActions ? "w-full space-y-6" : "mx-auto max-w-7xl space-y-6"}>
+    <div className={hideHeaderActions ? "w-full" : "w-full py-6 sm:py-8 px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12"}>
+      <div className="w-full space-y-6">
 
         {/* Header */}
         {!hideHeaderActions && (

@@ -1221,8 +1221,8 @@ export default function OwnerDashboard({
         />
       ) : (
         // Show Owner Dashboard
-        <div className={hideHeaderActions ? "w-full" : "container py-8 sm:py-12 lg:py-16 px-4 sm:px-6"}>
-          <div className={hideHeaderActions ? "w-full space-y-6" : "mx-auto max-w-7xl space-y-8"}>
+        <div className={hideHeaderActions ? "w-full" : "w-full py-6 sm:py-8 px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12"}>
+          <div className="w-full space-y-8">
 
         {/* Header Section */}
         {!hideHeaderActions && (

@@ -74,7 +74,7 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
   };
 
   return (
-    <div className="container py-6 sm:py-10 px-4 sm:px-6 max-w-7xl mx-auto space-y-6">
+    <div className="w-full py-6 sm:py-8 px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 space-y-6">
       {/* Top Profile & Welcome Banner */}
       <div className="glass-panel rounded-2xl p-6 shadow-md transition-all duration-300">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

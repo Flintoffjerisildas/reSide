@@ -746,7 +746,7 @@ function AppContent() {
         onLoginClick={handleLoginClick}
         isDashboardActive={showDashboard}
       />
-      <main className="flex-1">
+      <main className="flex-1 w-full">
         {showPendingApproval ? (
           <PendingApprovalScreen />
         ) : showDashboard && isAuthenticated ? (

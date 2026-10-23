@@ -51,8 +51,8 @@ export default function BrokerDashboard({ onBrowseProperties }: BrokerDashboardP
   ];
 
   return (
-    <div className="container py-8 sm:py-12 lg:py-16 px-4 sm:px-6">
-      <div className="mx-auto max-w-7xl space-y-8">
+    <div className="w-full py-6 sm:py-8 px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12">
+      <div className="w-full space-y-8">
         
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
