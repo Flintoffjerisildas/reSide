@@ -92,7 +92,7 @@ export default function Header({
 
   return (
     <header className="sticky top-0 z-50 w-full glass-nav backdrop-blur-xl transition-colors">
-      <div className={`w-full ${isDashboardActive ? 'px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12' : 'max-w-7xl 2xl:max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8'} flex min-h-[76px] items-center justify-between gap-4 py-3 lg:gap-6`}>
+      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 flex min-h-[76px] items-center justify-between gap-4 py-3 lg:gap-6">
         <div 
           className="flex shrink-0 items-center gap-2.5 text-xl font-bold tracking-tight text-slate-900 transition-all hover:-translate-y-0.5 hover:text-blue-700 dark:text-white dark:hover:text-blue-200 cursor-pointer"
           onClick={handleHomeNavigation}
