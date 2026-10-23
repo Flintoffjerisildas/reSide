@@ -242,6 +242,7 @@ app.use('/api/reports', require('./routes/reports'));
 app.use('/api/vacate-request', vacateRequestRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/visits', visitRoutes);
+app.use('/api/notifications', require('./routes/notifications'));
 
 app.get('/', (req, res) => {
   res.send('ReSideAI API is running');

@@ -238,12 +238,14 @@ export function useGetMyProperties() {
 export const useCreateRequest = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { propertyId: string; type: 'rent' | 'buy'; message?: string }) => {
+    mutationFn: async (data: { propertyId: string; type: 'rent' | 'buy'; message?: string; offerAmount?: number }) => {
       const response = await api.post('/requests', data);
       return response.data as any;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenant-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['owner-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
 };
@@ -281,7 +283,10 @@ export const useApproveRequest = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['owner-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['my-properties'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['myProperties'] });
+      queryClient.invalidateQueries({ queryKey: ['properties'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
 };
@@ -289,12 +294,205 @@ export const useApproveRequest = () => {
 export const useRejectRequest = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (requestId: string) => {
-      const response = await api.put(`/requests/${requestId}/reject`, {});
+    mutationFn: async (data: string | { requestId: string; reason?: string }) => {
+      const requestId = typeof data === 'string' ? data : data.requestId;
+      const reason = typeof data === 'object' ? data.reason : undefined;
+      const response = await api.put(`/requests/${requestId}/reject`, { reason });
       return response.data as any;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['owner-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['myProperties'] });
+      queryClient.invalidateQueries({ queryKey: ['properties'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};
+
+export const useCounterOfferRequest = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { requestId: string; counterOfferAmount: number; note?: string }) => {
+      const response = await api.put(`/requests/${data.requestId}/counteroffer`, {
+        counterOfferAmount: data.counterOfferAmount,
+        note: data.note,
+      });
+      return response.data as any;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['owner-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};
+
+export const useAcceptCounterOffer = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (requestId: string) => {
+      const response = await api.put(`/requests/${requestId}/accept-counter`, {});
+      return response.data as any;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['owner-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};
+
+export const useConfirmRequestTerms = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { requestId: string; terms?: string }) => {
+      const response = await api.put(`/requests/${data.requestId}/confirm-terms`, {
+        terms: data.terms,
+      });
+      return response.data as any;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['owner-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};
+
+export const useSubmitRequestPayment = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      requestId: string;
+      amount: number;
+      mode: string;
+      transactionId?: string;
+      screenshot?: string;
+    }) => {
+      const response = await api.put(`/requests/${data.requestId}/payment`, {
+        amount: data.amount,
+        mode: data.mode,
+        transactionId: data.transactionId,
+        screenshot: data.screenshot,
+      });
+      return response.data as any;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['owner-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};
+
+export const useVerifyRequestPayment = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (requestId: string) => {
+      const response = await api.put(`/requests/${requestId}/verify-payment`, {});
+      return response.data as any;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['owner-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['myProperties'] });
+      queryClient.invalidateQueries({ queryKey: ['properties'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};
+
+export const useCompleteTransaction = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (requestId: string) => {
+      const response = await api.put(`/requests/${requestId}/complete`, {});
+      return response.data as any;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['owner-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['myProperties'] });
+      queryClient.invalidateQueries({ queryKey: ['properties'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};
+
+export const useRejectRequestPayment = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { requestId: string; reason?: string }) => {
+      const response = await api.put(`/requests/${data.requestId}/reject-payment`, {
+        reason: data.reason,
+      });
+      return response.data as any;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['owner-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};
+
+export const useCancelRequest = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { requestId: string; reason?: string }) => {
+      const response = await api.put(`/requests/${data.requestId}/cancel`, {
+        reason: data.reason,
+      });
+      return response.data as any;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['owner-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['myProperties'] });
+      queryClient.invalidateQueries({ queryKey: ['properties'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};
+
+// Notification Hooks
+
+export const useGetNotifications = () => {
+  const token = localStorage.getItem('token');
+  return useQuery({
+    queryKey: ['notifications'],
+    enabled: !!token,
+    queryFn: async () => {
+      const response = await api.get<{ notifications: any[]; unreadCount: number }>('/notifications');
+      return response.data;
+    },
+    refetchInterval: 15000, // Background poll every 15s for fresh actionable alerts
+  });
+};
+
+export const useMarkNotificationRead = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (notificationId: string) => {
+      const response = await api.put(`/notifications/${notificationId}/read`, {});
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};
+
+export const useMarkAllNotificationsRead = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await api.put('/notifications/read-all', {});
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
 };

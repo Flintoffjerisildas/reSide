@@ -36,11 +36,25 @@ const propertySchema = new mongoose.Schema({
     longitude: { type: Number }
   },
   tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, // Track assigned tenant
+  buyer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, // Track buyer if sold
   occupancyStatus: {
     type: String,
     enum: ['vacant', 'occupied', 'maintenance'],
     default: 'vacant'
   },
+  saleStatus: {
+    type: String,
+    enum: ['available', 'under_contract', 'sold'],
+    default: 'available'
+  },
+  soldDate: { type: Date },
+  finalPrice: { type: Number },
+  previousOwner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  previousOwners: [{
+    owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    transferredAt: { type: Date, default: Date.now },
+    price: { type: Number }
+  }],
   currentTenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   currentAgreementId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agreement', default: null }
 });

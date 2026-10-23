@@ -7,13 +7,15 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Property } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCreateRequest } from '../hooks/useQueries';
 import { toast } from 'sonner';
-import { Loader2, Send } from 'lucide-react';
+import { Loader2, Send, IndianRupee } from 'lucide-react';
 import { translateText } from '../lib/api';
 
 interface RequestPropertyDialogProps {
@@ -32,10 +34,20 @@ export default function RequestPropertyDialog({
   const { t, language } = useLanguage();
   const createRequest = useCreateRequest();
   const [message, setMessage] = useState('');
+  const [offerPrice, setOfferPrice] = useState<string>('');
   const [titleTa, setTitleTa] = useState<string | null>(null);
   const [locationTa, setLocationTa] = useState<string | null>(null);
   const title = String(property?.title || '').trim();
   const loc = String(property?.location || '').trim();
+
+  const isBuy = property?.transactionType?.toLowerCase() === 'buy' || property?.transactionType?.toLowerCase() === 'purchase';
+
+  useEffect(() => {
+    if (property) {
+      setOfferPrice(String(property.price || ''));
+      setMessage('');
+    }
+  }, [property, open]);
 
   useEffect(() => {
     if (!open || language !== 'ta' || !property) {
@@ -74,17 +86,28 @@ export default function RequestPropertyDialog({
   const displayLocation = language === 'ta' ? (locationTa || property.location) : property.location;
 
   const handleSubmit = () => {
-    const requestType = property.transactionType.toLowerCase() === 'rent' ? 'rent' : 'buy';
+    const requestType = isBuy ? 'buy' : 'rent';
+    const numericOffer = Number(offerPrice);
     
+    if (isBuy && (!Number.isFinite(numericOffer) || numericOffer <= 0)) {
+      toast.error(t('Please enter a valid offer amount', 'சரியான சலுகைத் தொகையை உள்ளிடவும்'));
+      return;
+    }
+
     createRequest.mutate(
       { 
-        propertyId: property.id || (property as any)._id, 
+        propertyId: (property as any).id || (property as any)._id, 
         type: requestType,
-        message: message.trim()
+        message: message.trim(),
+        offerAmount: numericOffer > 0 ? numericOffer : Number(property.price)
       },
       {
         onSuccess: () => {
-          toast.success(t('Request sent successfully!', 'கோரிக்கை வெற்றிகரமாக அனுப்பப்பட்டது!'));
+          toast.success(
+            isBuy
+              ? t('Purchase offer submitted successfully!', 'கொள்முதல் சலுகை வெற்றிகரமாக சமர்ப்பிக்கப்பட்டது!')
+              : t('Rental request submitted successfully!', 'வாடகை கோரிக்கை வெற்றிகரமாக அனுப்பப்பட்டது!')
+          );
           setMessage('');
           onOpenChange(false);
           if (onSuccess) onSuccess();
@@ -101,68 +124,109 @@ export default function RequestPropertyDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{t('Request Property', 'சொத்தை கோரவும்')}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <span>{isBuy ? t('Make a Purchase Offer', 'வாங்க சலுகை அளிக்கவும்') : t('Submit Rental Request', 'வாடகை கோரிக்கை சமர்ப்பிக்கவும்')}</span>
+            <Badge variant={isBuy ? 'default' : 'secondary'} className="text-xs">
+              {isBuy ? t('Buy / Sale', 'வாங்க') : t('Rent', 'வாடகை')}
+            </Badge>
+          </DialogTitle>
           <DialogDescription>
-            {t(
-              `Send a request to the owner of "${displayTitle}"`,
-              `"${displayTitle}" இன் உரிமையாளருக்கு கோரிக்கை அனுப்பவும்`
-            )}
+            {isBuy
+              ? t(
+                  `Send a purchase offer or express interest to the owner of "${displayTitle}"`,
+                  `"${displayTitle}" இன் உரிமையாளருக்கு கொள்முதல் சலுகையை அனுப்பவும்`
+                )
+              : t(
+                  `Send a rental application to the owner of "${displayTitle}"`,
+                  `"${displayTitle}" இன் உரிமையாளருக்கு வாடகை விண்ணப்பத்தை அனுப்பவும்`
+                )}
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4 py-4">
-          <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+        <div className="space-y-4 py-3">
+          <div className="flex items-center gap-3.5 p-3.5 bg-muted/50 rounded-xl border">
             {property.images && property.images.length > 0 ? (
               <img 
                 src={property.images[0]} 
                 alt={displayTitle}
-                className="w-16 h-16 object-cover rounded-md" 
+                className="w-16 h-16 object-cover rounded-lg flex-shrink-0" 
               />
             ) : (
-              <div className="w-16 h-16 bg-muted flex items-center justify-center rounded-md text-2xl">
+              <div className="w-16 h-16 bg-muted flex items-center justify-center rounded-lg text-2xl flex-shrink-0">
                 🏠
               </div>
             )}
-            <div>
-              <h4 className="font-semibold line-clamp-1">{displayTitle}</h4>
-              <p className="text-sm text-muted-foreground">{displayLocation}</p>
-              <p className="text-sm font-medium text-primary mt-1">
-                ₹{Number(property.price).toLocaleString()}
+            <div className="min-w-0 flex-1">
+              <h4 className="font-semibold text-sm truncate">{displayTitle}</h4>
+              <p className="text-xs text-muted-foreground truncate">{displayLocation}</p>
+              <p className="text-sm font-semibold text-primary mt-1">
+                {t('Listed Price:', 'பட்டியலிடப்பட்ட விலை:')} ₹{Number(property.price).toLocaleString('en-IN')}
+                <span className="text-[11px] font-normal text-muted-foreground ml-1">
+                  ({property.transactionType})
+                </span>
               </p>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="message">
+          {/* Offer Amount for Buy */}
+          {isBuy && (
+            <div className="space-y-1.5">
+              <Label htmlFor="offer-price" className="text-xs font-semibold flex items-center gap-1">
+                <IndianRupee className="w-3.5 h-3.5 text-primary" />
+                {t('Your Offer Amount (₹)', 'உங்கள் சலுகைத் தொகை (₹)')} <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="offer-price"
+                type="number"
+                placeholder={String(property.price)}
+                value={offerPrice}
+                onChange={(e) => setOfferPrice(e.target.value)}
+                className="font-mono text-sm"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {t('You can offer the asking price or propose a counter-amount.', 'பட்டியல் விலையையோ அல்லது உங்கள் சலுகைத் தொகையையோ குறிப்பிடலாம்.')}
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="message" className="text-xs font-semibold">
               {t('Message to Owner (Optional)', 'உரிமையாளருக்கு செய்தி (விரும்பினால்)')}
             </Label>
             <Textarea
               id="message"
-              placeholder={t(
-                "Hi, I'm interested in this property. When can I visit?",
-                "வணக்கம், நான் இந்த சொத்தில் ஆர்வமாக உள்ளேன். நான் எப்போது பார்வையிடலாம்?"
-              )}
+              placeholder={
+                isBuy
+                  ? t(
+                      "Hi, I'm interested in purchasing this property. I'd like to discuss the closing timeline and terms.",
+                      "வணக்கம், நான் இந்த சொத்தை வாங்க ஆர்வமாக உள்ளேன். நிபந்தனைகளை விவாதிக்க விரும்புகிறேன்."
+                    )
+                  : t(
+                      "Hi, I'm interested in renting this property. When can I schedule a visit?",
+                      "வணக்கம், நான் இந்த சொத்தை வாடகைக்கு எடுக்க ஆர்வமாக உள்ளேன். எப்போது பார்வையிடலாம்?"
+                    )
+              }
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              className="resize-none h-32"
+              className="resize-none h-24 text-sm"
             />
           </div>
         </div>
 
-        <div className="flex justify-end gap-3">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <div className="flex justify-end gap-2.5 pt-1">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             {t('Cancel', 'ரத்து செய்')}
           </Button>
-          <Button onClick={handleSubmit} disabled={createRequest.isPending}>
+          <Button size="sm" onClick={handleSubmit} disabled={createRequest.isPending}>
             {createRequest.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {t('Sending...', 'அனுப்புகிறது...')}
+                {t('Submitting...', 'சமர்ப்பிக்கிறது...')}
               </>
             ) : (
               <>
-                <Send className="mr-2 h-4 w-4" />
-                {t('Send Request', 'கோரிக்கையை அனுப்பு')}
+                <Send className="mr-1.5 h-4 w-4" />
+                {isBuy ? t('Submit Offer', 'சலுகையை சமர்ப்பி') : t('Send Request', 'கோரிக்கையை அனுப்பு')}
               </>
             )}
           </Button>

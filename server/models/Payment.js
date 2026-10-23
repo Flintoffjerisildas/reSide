@@ -1,7 +1,14 @@
 const mongoose = require('mongoose');
 
 const paymentSchema = new mongoose.Schema({
-    rentRecord: { type: mongoose.Schema.Types.ObjectId, ref: 'RentRecord', required: true },
+    rentRecord: { type: mongoose.Schema.Types.ObjectId, ref: 'RentRecord', required: false, default: null },
+    request: { type: mongoose.Schema.Types.ObjectId, ref: 'Request', default: null },
+    property: { type: mongoose.Schema.Types.ObjectId, ref: 'Property', default: null },
+    paymentType: {
+        type: String,
+        enum: ['rent', 'purchase_advance', 'purchase_full'],
+        default: 'rent'
+    },
     tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     amount: { type: Number, required: true },

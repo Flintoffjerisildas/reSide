@@ -1,8 +1,8 @@
-import { Building2, Moon, Sun, LogIn, LogOut, User, Menu, LayoutDashboard, Home, Globe2, Grid2X2 } from 'lucide-react';
+import { Building2, Moon, Sun, LogIn, LogOut, User, Menu, LayoutDashboard, Home, Globe2, Grid2X2, Bell } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../contexts/AuthContext';
-import { useGetCallerUserProfile } from '../hooks/useQueries';
+import { useGetCallerUserProfile, useGetNotifications } from '../hooks/useQueries';
 import { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
@@ -52,6 +52,8 @@ export default function Header({
   const { theme, setTheme } = useTheme();
   const { user, logout, isInitializing } = useAuth();
   const { data: userProfile } = useGetCallerUserProfile();
+  const { data: notificationsData } = useGetNotifications();
+  const unreadCount = notificationsData?.unreadCount || 0;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { language, setLanguage, t } = useLanguage();
 
@@ -122,6 +124,23 @@ export default function Header({
             <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
             <span className="sr-only">Toggle theme</span>
           </Button>
+
+          {isAuthenticated && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onDashboardClick}
+              title={t('Notifications', 'அறிவிப்புகள்')}
+              className="relative glass-pill rounded-full text-slate-600 transition-all hover:-translate-y-0.5 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-300"
+            >
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </Button>
+          )}
 
           {isAuthenticated && (
             <Button
@@ -232,6 +251,19 @@ export default function Header({
                         )}
                       </div>
                     </div>
+                    {unreadCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          onDashboardClick?.();
+                        }}
+                        className="flex items-center justify-between px-3 py-2 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-700 dark:text-blue-300 font-medium text-left"
+                      >
+                        <span className="flex items-center gap-2"><Bell className="h-4 w-4" /> {t('Unread Notifications', 'படிக்காத அறிவிப்புகள்')}</span>
+                        <span className="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full font-bold">{unreadCount}</span>
+                      </button>
+                    )}
                     <Button variant="default" onClick={onDashboardClick} className="w-full justify-start">
                       {isDashboardActive ? <Home className="mr-2 h-4 w-4" /> : <LayoutDashboard className="mr-2 h-4 w-4" />}
                       {isDashboardActive ? t('Back to Home', 'முகப்புக்கு திரும்பவும்') : t('Go to Dashboard', 'டாஷ்போர்டுக்கு செல்லவும்')}

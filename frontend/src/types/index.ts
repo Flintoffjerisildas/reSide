@@ -64,22 +64,84 @@ export interface Property {
     idProofImage?: string;
   }; // ID or populated object
   tenantDetails?: TenantDetails; // Detailed tenant information
+  buyer?: any;
+  previousOwner?: any;
+  saleStatus?: 'available' | 'under_contract' | 'sold';
+  soldDate?: string;
+  finalPrice?: number;
+}
+
+export type RequestStatus =
+  | 'pending'
+  | 'counteroffer'
+  | 'accepted'
+  | 'approved'
+  | 'terms_confirmed'
+  | 'payment_pending'
+  | 'completed'
+  | 'rejected'
+  | 'cancelled';
+
+export interface PaymentDetails {
+  amount?: number;
+  mode?: string;
+  transactionId?: string;
+  screenshot?: string;
+  receiptNumber?: string;
+  submittedAt?: string;
+  verifiedAt?: string;
+  status?: 'unpaid' | 'submitted' | 'verified' | 'rejected';
 }
 
 export interface PropertyRequest {
   _id: string;
   property: Property; // Populated property
-  owner: string;
-  tenant: { // Populated tenant
+  owner: any;
+  agreement?: any;
+  tenant: { // Populated tenant/buyer
+    _id: string;
+    name: string;
+    email: string;
+    phone?: string;
+    address?: string;
+    idType?: string;
+    idNumber?: string;
+  };
+  tenantDetails?: TenantDetails; // Collected tenant details
+  status: RequestStatus;
+  type: 'rent' | 'buy';
+  message?: string;
+  offerAmount?: number;
+  counterOfferAmount?: number;
+  counterOfferNote?: string;
+  agreedAmount?: number;
+  terms?: string;
+  termsConfirmedByBuyer?: boolean;
+  termsConfirmedByOwner?: boolean;
+  paymentDetails?: PaymentDetails;
+  rejectionReason?: string;
+  cancelledReason?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface AppNotification {
+  _id: string;
+  recipient: string;
+  sender: {
     _id: string;
     name: string;
     email: string;
     phone?: string;
   };
-  tenantDetails?: TenantDetails; // Collected tenant details
-  status: 'pending' | 'approved' | 'rejected';
-  type: 'rent' | 'buy';
-  message?: string;
+  type: string;
+  title: string;
+  message: string;
+  property?: Property;
+  request?: PropertyRequest;
+  transactionType: 'rent' | 'buy';
+  actionUrl?: string;
+  read: boolean;
   createdAt: string;
 }
 

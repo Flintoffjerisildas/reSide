@@ -16,13 +16,34 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get MY properties (all statuses)
+// Get MY properties (all currently owned by user)
 router.get('/my', auth, async (req, res) => {
   try {
-    const properties = await Property.find({ owner: req.user.id }).populate(
-      'tenant',
-      'name email phone address aadhar gender age dateOfBirth familyMembers religion occupation companyName monthlyIncome maritalStatus idType idNumber idProofImage'
-    );
+    const properties = await Property.find({ owner: req.user.id })
+      .populate(
+        'tenant',
+        'name email phone address aadhar gender age dateOfBirth familyMembers religion occupation companyName monthlyIncome maritalStatus idType idNumber idProofImage'
+      )
+      .populate('previousOwner', 'name email phone')
+      .populate('buyer', 'name email phone');
+    res.json(properties);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// Get properties previously owned and sold by user
+router.get('/sold-history', auth, async (req, res) => {
+  try {
+    const properties = await Property.find({
+      $or: [
+        { previousOwner: req.user.id },
+        { 'previousOwners.owner': req.user.id }
+      ]
+    })
+      .populate('owner', 'name email phone')
+      .populate('buyer', 'name email phone');
     res.json(properties);
   } catch (err) {
     console.error(err.message);
@@ -299,6 +320,26 @@ router.delete('/admin/:id', auth, auth.requireAdmin, async (req, res) => {
     await Property.findByIdAndDelete(req.params.id);
     res.json({ msg: 'Property removed' });
   } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// Get Property by ID
+router.get('/:id', async (req, res) => {
+  try {
+    const property = await Property.findById(req.params.id)
+      .populate('owner', 'name email phone')
+      .populate('tenant', 'name email phone')
+      .populate('buyer', 'name email phone');
+    if (!property) {
+      return res.status(404).json({ msg: 'Property not found' });
+    }
+    res.json(property);
+  } catch (err) {
+    if (err.kind === 'ObjectId') {
+      return res.status(404).json({ msg: 'Property not found' });
+    }
     console.error(err.message);
     res.status(500).send('Server Error');
   }

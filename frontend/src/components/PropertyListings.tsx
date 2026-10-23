@@ -226,27 +226,7 @@ export default function PropertyListings({ showAbout = false, initialTransaction
 
     if (!selectedProperty) return;
 
-    const tx = String((selectedProperty as any)?.transactionType ?? '').toLowerCase();
-    const requestType = tx === 'rent' ? 'rent' : 'buy';
-    const propertyId = (selectedProperty as any)?.id || (selectedProperty as any)?._id;
-    if (!propertyId) {
-      toast.error(t('Unable to send request', 'கோரிக்கையை அனுப்ப முடியவில்லை'));
-      return;
-    }
-    
-    createRequest.mutate(
-      { propertyId, type: requestType },
-      {
-        onSuccess: () => {
-          toast.success(t('Request sent successfully!', 'கோரிக்கை வெற்றிகரமாக அனுப்பப்பட்டது!'));
-          handleCloseDetail();
-        },
-        onError: (error: any) => {
-          const msg = error.response?.data?.msg || t('Failed to send request', 'கோரிக்கையை அனுப்ப முடியவில்லை');
-          toast.error(msg);
-        }
-      }
-    );
+    setShowRequestDialog(true);
   };
 
   return (
@@ -641,7 +621,9 @@ export default function PropertyListings({ showAbout = false, initialTransaction
                   size="sm"
                 >
                   <Send className="h-4 w-4" />
-                  {createRequest.isPending ? t('Sending...', 'அனுப்பிக்கொண்டிருக்கிறது...') : t('Request Property', 'சொத்தைக் கோரவும்')}
+                  {selectedProperty.transactionType?.toLowerCase() === 'buy' || selectedProperty.transactionType?.toLowerCase() === 'purchase'
+                    ? t('Buy / Express Interest', 'வாங்க / விருப்பம் தெரிவிக்க')
+                    : t('Rent / Apply', 'வாடகைக்கு விண்ணப்பிக்க')}
                 </Button>
 
                 <div className="text-sm text-muted-foreground text-center hidden sm:block">

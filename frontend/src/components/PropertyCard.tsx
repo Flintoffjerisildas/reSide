@@ -8,6 +8,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useCreateRequest } from '../hooks/useQueries';
 import { toast } from 'sonner';
 import { translateText } from '../lib/api';
+import RequestPropertyDialog from './RequestPropertyDialog';
 
 interface PropertyCardProps {
   property: Property;
@@ -24,6 +25,7 @@ export default function PropertyCard({ property, compact = false, showRequestBut
   const [translatedLocation, setTranslatedLocation] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
+  const [showRequestDialog, setShowRequestDialog] = useState(false);
 
   const rawImage = property.images && property.images.length > 0 ? property.images[0] : null;
   const imageSrc = typeof rawImage === 'string' && rawImage.trim() ? rawImage.trim() : null;
@@ -76,27 +78,12 @@ export default function PropertyCard({ property, compact = false, showRequestBut
     })();
   }, [language, property.title, property.location]);
 
-  const handleRequest = () => {
-    const tx = String((property as any)?.transactionType ?? '').toLowerCase();
-    const requestType = tx === 'rent' ? 'rent' : 'buy';
-    const propertyId = (property as any)?.id || (property as any)?._id;
-    if (!propertyId) {
-      toast.error(t('Unable to send request', 'கோரிக்கையை அனுப்ப முடியவில்லை'));
-      return;
-    }
-    
-    createRequest.mutate(
-      { propertyId, type: requestType },
-      {
-        onSuccess: () => {
-          toast.success(t('Request sent successfully!', 'கோரிக்கை வெற்றிகரமாக அனுப்பப்பட்டது!'));
-        },
-        onError: (error: any) => {
-          const msg = error.response?.data?.msg || t('Failed to send request', 'கோரிக்கையை அனுப்ப முடியவில்லை');
-          toast.error(msg);
-        }
-      }
-    );
+  const isBuy = String((property as any)?.transactionType ?? '').toLowerCase() === 'buy' || String((property as any)?.transactionType ?? '').toLowerCase() === 'purchase';
+  const isUnavailable = isBuy ? (property as any)?.saleStatus === 'sold' : !!property.tenant;
+
+  const handleRequest = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowRequestDialog(true);
   };
 
   const getPropertyIcon = (type: string) => {
@@ -155,6 +142,13 @@ export default function PropertyCard({ property, compact = false, showRequestBut
   };
 
   const getOccupancyBadge = () => {
+    if ((property as any)?.saleStatus === 'sold') {
+      return (
+        <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] px-1.5 py-0.5 font-medium">
+          ✓ {t('Acquired / Owned', 'வாங்கப்பட்டது')}
+        </Badge>
+      );
+    }
     if (property.tenant) {
       return <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] px-1.5 py-0.5">{t('Occupied', 'குடியேற்றப்பட்டது')}</Badge>;
     }
@@ -334,16 +328,14 @@ export default function PropertyCard({ property, compact = false, showRequestBut
               size="sm"
               className="w-full h-7 sm:h-8 text-xs font-medium rounded-lg shadow-sm hover:shadow" 
               onClick={handleRequest}
-              disabled={createRequest.isPending || !!property.tenant}
+              disabled={isUnavailable}
             >
-              {createRequest.isPending ? (
-                t('Sending...', 'அனுப்புகிறது...')
-              ) : property.tenant ? (
-                t('Occupied', 'குடியேற்றப்பட்டது')
+              {isUnavailable ? (
+                isBuy ? t('Sold Out', 'விற்கப்பட்டது') : t('Occupied', 'குடியேற்றப்பட்டது')
               ) : (
                 <>
                   <Send className="mr-1 h-3 w-3" />
-                  {t('Request', 'கோரிக்கை')}
+                  {isBuy ? t('Buy / Offer', 'வாங்க / சலுகை') : t('Rent / Apply', 'வாடகை / கோரிக்கை')}
                 </>
               )}
             </Button>
@@ -383,6 +375,12 @@ export default function PropertyCard({ property, compact = false, showRequestBut
       {!showRequestButton && !onEdit && !onDelete && (
         <div className="pb-2" />
       )}
+
+      <RequestPropertyDialog
+        property={property}
+        open={showRequestDialog}
+        onOpenChange={setShowRequestDialog}
+      />
     </Card>
   );
 }
