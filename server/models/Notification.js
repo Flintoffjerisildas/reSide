@@ -17,7 +17,8 @@ const notificationSchema = new mongoose.Schema({
       'payment_verified',
       'payment_rejected',
       'transaction_completed',
-      'request_cancelled'
+      'request_cancelled',
+      'ownership_transferred'
     ],
     required: true
   },

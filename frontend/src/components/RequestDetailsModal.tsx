@@ -327,7 +327,7 @@ export default function RequestDetailsModal({
         return (
           <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-300">
             <Clock className="w-3 h-3 mr-1 inline" />
-            {t('Pending Owner Response', 'உரிமையாளர் பதிலுக்கு காத்திருக்கிறது')}
+            {t('Pending Owner Approval', 'உரிமையாளர் ஒப்புதலுக்கு காத்திருக்கிறது')}
           </Badge>
         );
       case 'counteroffer':
@@ -338,45 +338,33 @@ export default function RequestDetailsModal({
           </Badge>
         );
       case 'accepted':
-        return (
-          <Badge variant="outline" className="bg-sky-500/10 text-sky-600 border-sky-300">
-            <CheckCircle2 className="w-3 h-3 mr-1 inline" />
-            {t('Accepted — Awaiting Terms', 'ஏற்றுக்கொள்ளப்பட்டது — விதிமுறைகள் நிலுவையில் உள்ளன')}
-          </Badge>
-        );
       case 'approved':
-        return (
-          <Badge variant="default" className="bg-emerald-600 text-white">
-            <CheckCircle2 className="w-3 h-3 mr-1 inline" />
-            {t('Approved — Agreement Active', 'அங்கீகரிக்கப்பட்டது — ஒப்பந்தம் செயலில் உள்ளது')}
-          </Badge>
-        );
       case 'terms_confirmed':
         return (
-          <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-300">
-            <ShieldCheck className="w-3 h-3 mr-1 inline" />
-            {t('Terms Confirmed — Ready for Payment', 'விதிமுறைகள் உறுதி — கட்டணத்திற்கு தயார்')}
+          <Badge variant="outline" className="bg-sky-500/10 text-sky-600 border-sky-300">
+            <CreditCard className="w-3 h-3 mr-1 inline" />
+            {t('Accepted — Awaiting Payment', 'ஏற்றுக்கொள்ளப்பட்டது — கட்டணம் நிலுவையில் உள்ளது')}
           </Badge>
         );
       case 'payment_pending':
         return (
           <Badge variant="outline" className="bg-indigo-500/10 text-indigo-600 border-indigo-300">
-            <CreditCard className="w-3 h-3 mr-1 inline" />
-            {t('Payment Pending Verification', 'கட்டணம் சரிபார்ப்பு நிலுவையில் உள்ளது')}
+            <Clock className="w-3 h-3 mr-1 inline" />
+            {t('Payment Verification Pending', 'கட்டண சரிபார்ப்பு நிலுவையில் உள்ளது')}
           </Badge>
         );
       case 'completed':
         return (
           <Badge variant="default" className="bg-emerald-600 text-white">
             <CheckCircle2 className="w-3 h-3 mr-1 inline" />
-            {isBuy ? t('Sold & Closed', 'விற்பனை முடிந்தது') : t('Completed', 'முடிக்கப்பட்டது')}
+            {isBuy ? t('Sold & Completed', 'விற்பனை முடிந்தது') : t('Lease Active & Completed', 'வாடகை முடிந்தது')}
           </Badge>
         );
       case 'rejected':
         return (
           <Badge variant="destructive">
             <XCircle className="w-3 h-3 mr-1 inline" />
-            {t('Rejected', 'நிராகரிக்கப்பட்டது')}
+            {t('Declined', 'நிராகரிக்கப்பட்டது')}
           </Badge>
         );
       case 'cancelled':
@@ -894,7 +882,8 @@ export default function RequestDetailsModal({
                       className="text-destructive hover:bg-destructive/10"
                       onClick={() => setActiveAction('reject')}
                     >
-                      {t('Decline', 'நிராகரி')}
+                      <XCircle className="w-3.5 h-3.5 mr-1.5" />
+                      {t('Reject', 'நிராகரி')}
                     </Button>
                     {isBuy && (
                       <Button
@@ -908,12 +897,13 @@ export default function RequestDetailsModal({
                     )}
                     <Button
                       size="sm"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
                       onClick={handleApprove}
                       disabled={approveMutation.isPending}
                     >
                       {approveMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
-                      {isBuy ? t('Accept Offer', 'சலுகையை ஏற்றுக்கொள்') : t('Approve Lease', 'குத்தகையை அங்கீகரி')}
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                      {isBuy ? t('Accept Offer', 'சலுகையை ஏற்றுக்கொள்') : t('Accept Application', 'விண்ணப்பத்தை ஏற்றுக்கொள்')}
                     </Button>
                   </>
                 )}
@@ -929,10 +919,11 @@ export default function RequestDetailsModal({
                   </Button>
                 )}
 
-                {isOwner && status === 'accepted' && !request.termsConfirmedByOwner && (
-                  <Button size="sm" onClick={() => setActiveAction('terms')}>
-                    {t('Confirm Terms', 'விதிமுறைகளை உறுதிசெய்')}
-                  </Button>
+                {isOwner && (status === 'accepted' || status === 'approved') && (
+                  <div className="flex items-center gap-1.5 text-xs text-sky-600 dark:text-sky-400 font-medium bg-sky-50 dark:bg-sky-950/50 px-3 py-1.5 rounded-lg border border-sky-200 dark:border-sky-800">
+                    <Clock className="w-3.5 h-3.5" />
+                    {t('Accepted — Awaiting Customer Payment', 'ஏற்றுக்கொள்ளப்பட்டது — வாடிக்கையாளர் கட்டணத்திற்கு காத்திருக்கிறது')}
+                  </div>
                 )}
 
                 {isOwner && status === 'payment_pending' && (
@@ -943,45 +934,18 @@ export default function RequestDetailsModal({
                       className="text-destructive hover:bg-destructive/10"
                       onClick={() => setActiveAction('reject-payment')}
                     >
+                      <XCircle className="w-3.5 h-3.5 mr-1.5" />
                       {t('Reject Payment', 'கட்டணத்தை நிராகரி')}
                     </Button>
                     <Button
                       size="sm"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
                       onClick={handleVerifyPayment}
                       disabled={verifyPaymentMutation.isPending}
                     >
                       {verifyPaymentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
-                      {t('Verify & Complete', 'சரிபார்த்து முடி')}
-                    </Button>
-                  </>
-                )}
-
-                {/* OWNER ACTIONS FOR RENTAL APPROVED */}
-                {isOwner && status === 'approved' && !isBuy && (
-                  <>
-                    {onNavigateToRentals && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          onOpenChange(false);
-                          onNavigateToRentals();
-                        }}
-                      >
-                        <KeyRound className="w-3.5 h-3.5 mr-1.5" />
-                        {t('View in My Rentals', 'வாடகைகளில் பார்க்க')}
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                      onClick={handleComplete}
-                      disabled={completeMutation.isPending}
-                    >
-                      {completeMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
                       <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-                      {t('Finalize Move-In & Complete', 'குடியேற்றத்தை உறுதிசெய்து முடி')}
+                      {t('Verify Payment & Complete', 'கட்டணத்தை சரிபார்த்து முடி')}
                     </Button>
                   </>
                 )}
@@ -994,6 +958,7 @@ export default function RequestDetailsModal({
                     className="text-destructive hover:bg-destructive/10"
                     onClick={() => setActiveAction('cancel')}
                   >
+                    <XCircle className="w-3.5 h-3.5 mr-1.5" />
                     {t('Withdraw Request', 'கோரிக்கையை திரும்பப்பெறு')}
                   </Button>
                 )}
@@ -1020,52 +985,20 @@ export default function RequestDetailsModal({
                   </>
                 )}
 
-                {isBuyerOrTenant && status === 'accepted' && !request.termsConfirmedByBuyer && (
-                  <Button size="sm" onClick={() => setActiveAction('terms')}>
-                    {t('Confirm Closing Terms', 'விதிமுறைகளை உறுதிசெய்')}
-                  </Button>
-                )}
-
-                {isBuyerOrTenant && (status === 'terms_confirmed' || (status === 'accepted' && request.termsConfirmedByBuyer)) && (
+                {/* Accepted request proceeds directly to payment! */}
+                {isBuyerOrTenant && ['accepted', 'approved', 'terms_confirmed'].includes(status) && (
                   <Button
                     size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
                     onClick={() => setActiveAction('pay')}
                   >
                     <CreditCard className="w-3.5 h-3.5 mr-1.5" />
-                    {isBuy ? t('Pay Advance / Deposit', 'முன்பணம் செலுத்தவும்') : t('Pay Deposit', 'கட்டணம் செலுத்தவும்')}
+                    {isBuy ? t('Pay Now (Advance / Deposit)', 'இப்போது செலுத்தவும் (முன்பணம்)') : t('Pay Now (First Month Rent)', 'இப்போது செலுத்தவும் (வாடகை)')}
                   </Button>
                 )}
 
-                {/* TENANT ACTIONS FOR APPROVED RENTAL */}
-                {isBuyerOrTenant && status === 'approved' && !isBuy && (
-                  <>
-                    <Button
-                      size="sm"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                      onClick={() => setActiveAction('pay')}
-                    >
-                      <CreditCard className="w-3.5 h-3.5 mr-1.5" />
-                      {t('Pay Deposit / Rent', 'முன்பணம் / வாடகை செலுத்து')}
-                    </Button>
-                    {onNavigateToRentals && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          onOpenChange(false);
-                          onNavigateToRentals();
-                        }}
-                      >
-                        <KeyRound className="w-3.5 h-3.5 mr-1.5" />
-                        {t('Go to My Rentals', 'எனது வாடகைகளுக்கு செல்')}
-                      </Button>
-                    )}
-                  </>
-                )}
-
                 {isBuyerOrTenant && status === 'payment_pending' && (
-                  <div className="flex items-center gap-1.5 text-xs text-indigo-600 font-medium">
+                  <div className="flex items-center gap-1.5 text-xs text-indigo-600 font-medium bg-indigo-50 dark:bg-indigo-950/50 px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800">
                     <Clock className="w-3.5 h-3.5 animate-spin" />
                     {t('Payment submitted — awaiting owner verification', 'கட்டணம் சமர்ப்பிக்கப்பட்டது — சரிபார்ப்புக்கு காத்திருக்கிறது')}
                   </div>

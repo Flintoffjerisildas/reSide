@@ -264,7 +264,8 @@ router.post('/', auth, async (req, res) => {
       message: notifMsg,
       property: property._id,
       request: savedRequest._id,
-      transactionType: requestedType
+      transactionType: requestedType,
+      actionUrl: '/dashboard?tab=incoming-requests'
     });
 
     const populatedRequest = await Request.findById(savedRequest._id)
@@ -457,108 +458,58 @@ const handleAcceptOrApprove = async (req, res) => {
     const property = await Property.findById(request.property);
     if (!property) return res.status(404).json({ msg: 'Associated property not found' });
 
-    if (request.type === 'buy') {
-      // Purchase workflow: Accept inquiry / offer
-      // An accepted inquiry must NOT automatically mark property as sold or confirm payment!
-      request.status = 'accepted';
-      request.agreedAmount = request.counterOfferAmount || request.offerAmount || property.price;
-      request.termsConfirmedByOwner = true;
-      request.updatedAt = new Date();
-      await request.save();
+    // Validate property availability
+    if (request.type === 'buy' && property.saleStatus === 'sold') {
+      return res.status(400).json({ msg: 'This property has already been sold.' });
+    }
+    if (request.type === 'rent' && property.occupancyStatus === 'occupied') {
+      return res.status(400).json({ msg: 'This property is currently occupied.' });
+    }
 
-      // Mark property as under_contract to signal offer accepted, but NOT sold
-      property.saleStatus = 'under_contract';
-      await property.save();
-
-      // Send notification to buyer
-      await sendNotification({
-        recipient: request.tenant,
-        sender: req.user.id,
-        type: 'request_accepted',
-        title: 'Purchase Offer Accepted!',
-        message: `Your purchase offer for "${property.title}" has been accepted! Please review and confirm closing terms.`,
-        property: property._id,
-        request: request._id,
-        transactionType: 'buy'
-      });
-    } else {
-      // Rental workflow: Preserve existing rental agreement and rent record creation
-      let newAgreement = new Agreement({
-        tenant: request.tenant,
-        owner: request.owner,
-        property: request.property,
-        rentAmount: property.price,
-        startDate: new Date(),
-        endDate: new Date(new Date().setMonth(new Date().getMonth() + 11)), // Default 11 months
-        status: 'active'
-      });
-      await newAgreement.save();
-
-      request.status = 'approved';
-      request.agreedAmount = property.price;
-      request.agreement = newAgreement._id;
-      request.termsConfirmedByOwner = true;
-      request.termsConfirmedByBuyer = true;
-      request.terms = 'Standard 11-month rental agreement. Monthly rent due on 5th.';
-      request.updatedAt = new Date();
-      await request.save();
-
-      // Auto-generate initial rent records for agreement
-      const today = new Date();
-      const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      let iteratorDate = new Date(currentMonth);
-      iteratorDate.setDate(1);
-      iteratorDate.setHours(0, 0, 0, 0);
-
-      while (iteratorDate <= currentMonth) {
-        const loopMonth = new Date(iteratorDate);
-        const existing = await RentRecord.findOne({ agreement: newAgreement._id, month: loopMonth });
-        if (!existing) {
-          const dueDate = new Date(loopMonth);
-          dueDate.setDate(newAgreement.duesDay || 5);
-          const newRecord = new RentRecord({
-            tenant: newAgreement.tenant,
-            owner: newAgreement.owner,
-            property: newAgreement.property,
-            agreement: newAgreement._id,
-            month: loopMonth,
-            dueDate: dueDate,
-            rentAmount: newAgreement.rentAmount,
-            balance: newAgreement.rentAmount,
-            status: dueDate < new Date() ? 'overdue' : 'pending'
-          });
-          await newRecord.save();
-        }
-        iteratorDate.setMonth(iteratorDate.getMonth() + 1);
-      }
-
-      // Update Property occupancy
-      property.tenant = request.tenant;
-      property.currentTenantId = request.tenant;
-      property.currentAgreementId = newAgreement._id;
-      property.occupancyStatus = 'occupied';
-      property.listingStatus = 'unavailable';
-      property.isListed = false;
-      await property.save();
-
-      // Reject competing pending requests for this rental property
-      await Request.updateMany(
-        { property: request.property, _id: { $ne: request._id }, status: 'pending' },
-        { status: 'rejected', rejectionReason: 'Property has been leased to another applicant.' }
-      );
-
-      // Send notification to tenant
-      await sendNotification({
-        recipient: request.tenant,
-        sender: req.user.id,
-        type: 'request_accepted',
-        title: 'Rental Request Approved!',
-        message: `Your rental application for "${property.title}" has been approved! Your lease agreement is now active.`,
-        property: property._id,
-        request: request._id,
-        transactionType: 'rent'
+    // Safety check: Prevent concurrent conflicting requests from overselling or double-booking
+    const conflictingRequest = await Request.findOne({
+      property: property._id,
+      _id: { $ne: request._id },
+      status: { $in: ['accepted', 'payment_pending'] }
+    });
+    if (conflictingRequest) {
+      return res.status(400).json({
+        msg: 'Another request for this property has already been accepted and is currently in progress.'
       });
     }
+
+    // Simplified, consistent workflow for both Buy and Rent:
+    // Acceptance transitions directly to 'accepted', unlocking immediate payment for customer.
+    request.status = 'accepted';
+    request.agreedAmount = request.counterOfferAmount || request.offerAmount || property.price;
+    request.termsConfirmedByOwner = true;
+    request.termsConfirmedByBuyer = true;
+    request.terms = request.terms || (request.type === 'buy'
+      ? 'Standard purchase agreement. Payment of agreed purchase amount/token advance required to finalize ownership transfer.'
+      : 'Standard 11-month rental agreement. Monthly rent due on 5th. Payment of initial rent required to activate lease.');
+    request.updatedAt = new Date();
+    await request.save();
+
+    if (request.type === 'buy') {
+      property.saleStatus = 'under_contract';
+      await property.save();
+    }
+
+    // Send notification to customer (buyer/tenant)
+    const isBuy = request.type === 'buy';
+    await sendNotification({
+      recipient: request.tenant,
+      sender: req.user.id,
+      type: 'request_accepted',
+      title: isBuy ? 'Purchase Offer Accepted — Payment Required' : 'Rental Request Accepted — Payment Required',
+      message: isBuy
+        ? `Your purchase offer for "${property.title}" has been accepted! Please submit your payment of ₹${request.agreedAmount.toLocaleString('en-IN')} to proceed.`
+        : `Your rental application for "${property.title}" has been accepted! Please submit your payment of ₹${request.agreedAmount.toLocaleString('en-IN')} to activate your lease.`,
+      property: property._id,
+      request: request._id,
+      transactionType: request.type,
+      actionUrl: '/dashboard?tab=my-requests'
+    });
 
     const populated = await Request.findById(request._id)
       .populate('owner', 'name email phone')
@@ -575,7 +526,7 @@ const handleAcceptOrApprove = async (req, res) => {
 router.put('/:id/approve', auth, handleAcceptOrApprove);
 router.put('/:id/accept', auth, handleAcceptOrApprove);
 
-// Confirm Terms (Buyer or Owner)
+// Confirm Terms (Buyer or Owner) - retained for backward compatibility
 router.put('/:id/confirm-terms', auth, async (req, res) => {
   try {
     const request = await Request.findById(req.params.id);
@@ -599,10 +550,6 @@ router.put('/:id/confirm-terms', auth, async (req, res) => {
     if (isOwner) request.termsConfirmedByOwner = true;
     if (isTenant) request.termsConfirmedByBuyer = true;
 
-    // Both parties confirmed -> progress to terms_confirmed
-    if (request.termsConfirmedByOwner && request.termsConfirmedByBuyer) {
-      request.status = 'terms_confirmed';
-    }
     request.updatedAt = new Date();
     await request.save();
 
@@ -642,8 +589,16 @@ router.put('/:id/payment', auth, async (req, res) => {
       return res.status(403).json({ msg: 'Only the requesting buyer/tenant can submit payment' });
     }
 
-    // Must be in acceptable status (terms_confirmed or accepted)
-    if (!['terms_confirmed', 'accepted', 'approved'].includes(request.status)) {
+    if (request.status === 'completed') {
+      return res.status(400).json({ msg: 'This transaction is already completed.' });
+    }
+
+    if (request.status === 'payment_pending' && request.paymentDetails?.status === 'submitted') {
+      return res.status(400).json({ msg: 'Payment is already submitted and pending owner verification.' });
+    }
+
+    // Must be in acceptable status (accepted, terms_confirmed, approved, or payment_pending if resubmitting after rejection)
+    if (!['accepted', 'approved', 'terms_confirmed', 'payment_pending'].includes(request.status)) {
       return res.status(400).json({ msg: `Transaction is not eligible for payment in status "${request.status}"` });
     }
 
@@ -680,20 +635,31 @@ router.put('/:id/payment', auth, async (req, res) => {
     request.updatedAt = new Date();
     await request.save();
 
-    // Create persistent Payment record
-    const payment = new Payment({
-      rentRecord: null,
-      request: request._id,
-      property: request.property,
-      paymentType: request.type === 'buy' ? 'purchase_advance' : 'rent',
-      tenant: request.tenant,
-      owner: request.owner,
-      amount: numericAmount,
-      mode: formattedMode,
-      transactionId: transactionId || '',
-      screenshot: screenshot || '',
-      status: 'submitted'
-    });
+    // Create or update persistent Payment record in DB
+    let payment = await Payment.findOne({ request: request._id });
+    if (!payment) {
+      payment = new Payment({
+        rentRecord: null,
+        request: request._id,
+        property: request.property,
+        paymentType: request.type === 'buy' ? 'purchase_advance' : 'rent',
+        tenant: request.tenant,
+        owner: request.owner,
+        amount: numericAmount,
+        mode: formattedMode,
+        transactionId: transactionId || '',
+        screenshot: screenshot || '',
+        status: 'submitted'
+      });
+    } else {
+      payment.amount = numericAmount;
+      payment.mode = formattedMode;
+      payment.transactionId = transactionId || '';
+      payment.screenshot = screenshot || '';
+      payment.status = 'submitted';
+      payment.date = new Date();
+      payment.rejectionReason = undefined;
+    }
     await payment.save();
 
     const property = await Property.findById(request.property);
@@ -704,10 +670,11 @@ router.put('/:id/payment', auth, async (req, res) => {
       sender: req.user.id,
       type: 'payment_submitted',
       title: 'Payment Submitted for Verification',
-      message: `Buyer submitted a payment of ₹${numericAmount.toLocaleString('en-IN')} via ${mode} for "${property?.title || 'property'}". Please review and verify.`,
+      message: `${req.user.name || 'Customer'} submitted a payment of ₹${numericAmount.toLocaleString('en-IN')} via ${formattedMode} for "${property?.title || 'property'}". Please review and verify.`,
       property: request.property,
       request: request._id,
-      transactionType: request.type
+      transactionType: request.type,
+      actionUrl: '/dashboard?tab=incoming-requests'
     });
 
     const populated = await Request.findById(request._id)
@@ -732,6 +699,10 @@ router.put('/:id/verify-payment', auth, async (req, res) => {
       return res.status(403).json({ msg: 'Only the property owner can verify payments' });
     }
 
+    if (request.status === 'completed') {
+      return res.status(400).json({ msg: 'Payment has already been verified and transaction is completed.' });
+    }
+
     if (request.status !== 'payment_pending') {
       return res.status(400).json({ msg: `Payment cannot be verified for request with status "${request.status}"` });
     }
@@ -746,10 +717,9 @@ router.put('/:id/verify-payment', auth, async (req, res) => {
     request.paymentDetails.receiptNumber = receiptNumber;
     request.status = 'completed';
     request.updatedAt = new Date();
-    await request.save();
 
     // Update Payment record in DB
-    const payment = await Payment.findOne({ request: request._id, status: 'submitted' });
+    const payment = (await Payment.findOne({ request: request._id, status: 'submitted' })) || (await Payment.findOne({ request: request._id }));
     if (payment) {
       payment.status = 'approved';
       payment.approvedDate = new Date();
@@ -790,59 +760,111 @@ router.put('/:id/verify-payment', auth, async (req, res) => {
         { property: request.property, _id: { $ne: request._id }, status: { $in: ['pending', 'counteroffer', 'accepted'] } },
         { status: 'rejected', rejectionReason: 'Property has been sold to another buyer.' }
       );
-    } else if (request.type === 'rent') {
-      // Find earliest pending rent record for this agreement/property and update it
-      const RentRecord = require('../models/RentRecord');
-      const earliestRentRecord = await RentRecord.findOne({
-        property: request.property,
-        tenant: request.tenant,
-        status: { $in: ['pending', 'overdue'] }
-      }).sort({ dueDate: 1 });
-
-      if (earliestRentRecord) {
-        earliestRentRecord.totalPaid = (earliestRentRecord.totalPaid || 0) + (request.paymentDetails.amount || 0);
-        earliestRentRecord.balance = Math.max(0, earliestRentRecord.rentAmount - earliestRentRecord.totalPaid);
-        if (earliestRentRecord.balance === 0) {
-          earliestRentRecord.status = 'paid';
-        } else {
-          earliestRentRecord.status = 'partially_paid';
-        }
-        await earliestRentRecord.save();
-
-        if (payment) {
-          payment.rentRecord = earliestRentRecord._id;
-          await payment.save();
-        }
+    } else if (request.type === 'rent' && property) {
+      // Rental workflow: Create active Agreement and RentRecord upon verified payment
+      let agreement = request.agreement ? await Agreement.findById(request.agreement) : null;
+      if (!agreement) {
+        agreement = new Agreement({
+          tenant: request.tenant,
+          owner: request.owner,
+          property: request.property,
+          rentAmount: request.agreedAmount || property.price,
+          startDate: new Date(),
+          endDate: new Date(new Date().setMonth(new Date().getMonth() + 11)),
+          status: 'active',
+          terms: request.terms || 'Standard rental agreement terms and conditions apply.'
+        });
+        await agreement.save();
+        request.agreement = agreement._id;
+      } else {
+        agreement.status = 'active';
+        await agreement.save();
       }
+
+      // Auto-generate / update initial rent record for agreement
+      const today = new Date();
+      const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      currentMonth.setHours(0, 0, 0, 0);
+
+      let rentRecord = await RentRecord.findOne({ agreement: agreement._id, month: currentMonth });
+      const paidAmount = request.paymentDetails.amount || agreement.rentAmount;
+      if (!rentRecord) {
+        const dueDate = new Date(currentMonth);
+        dueDate.setDate(agreement.duesDay || 5);
+        const balance = Math.max(0, agreement.rentAmount - paidAmount);
+        rentRecord = new RentRecord({
+          tenant: agreement.tenant,
+          owner: agreement.owner,
+          property: agreement.property,
+          agreement: agreement._id,
+          month: currentMonth,
+          dueDate: dueDate,
+          rentAmount: agreement.rentAmount,
+          totalPaid: paidAmount,
+          balance: balance,
+          status: balance === 0 ? 'paid' : 'partially_paid'
+        });
+        await rentRecord.save();
+      } else {
+        rentRecord.totalPaid = (rentRecord.totalPaid || 0) + paidAmount;
+        rentRecord.balance = Math.max(0, rentRecord.rentAmount - rentRecord.totalPaid);
+        rentRecord.status = rentRecord.balance === 0 ? 'paid' : 'partially_paid';
+        await rentRecord.save();
+      }
+
+      if (payment) {
+        payment.rentRecord = rentRecord._id;
+        await payment.save();
+      }
+
+      // Update property occupancy
+      property.tenant = request.tenant;
+      property.currentTenantId = request.tenant;
+      property.currentAgreementId = agreement._id;
+      property.occupancyStatus = 'occupied';
+      property.listingStatus = 'unavailable';
+      property.isListed = false;
+      await property.save();
+
+      // Reject competing pending requests for this rental property
+      await Request.updateMany(
+        { property: request.property, _id: { $ne: request._id }, status: { $in: ['pending', 'counteroffer', 'accepted'] } },
+        { status: 'rejected', rejectionReason: 'Property has been leased to another applicant.' }
+      );
     }
 
-    // Send notification to buyer
+    await request.save();
+
+    // Send confirmation notification to customer (buyer / tenant)
     await sendNotification({
       recipient: request.tenant,
       sender: req.user.id,
       type: 'payment_verified',
-      title: request.type === 'buy' ? 'Payment Verified — You Own the Property!' : 'Payment Verified — Transaction Completed!',
+      title: request.type === 'buy' ? 'Payment Verified — You Own the Property!' : 'Payment Verified — Rental Lease Active!',
       message: request.type === 'buy'
         ? `Your payment of ₹${request.paymentDetails.amount?.toLocaleString('en-IN')} for "${property?.title || 'property'}" was verified! You are now the official owner. Receipt: ${receiptNumber}.`
-        : `Your payment of ₹${request.paymentDetails.amount?.toLocaleString('en-IN')} for "${property?.title || 'property'}" was verified! Receipt: ${receiptNumber}.`,
+        : `Your payment of ₹${request.paymentDetails.amount?.toLocaleString('en-IN')} for "${property?.title || 'property'}" was verified! Your lease is active. Receipt: ${receiptNumber}.`,
       property: request.property,
       request: request._id,
-      transactionType: request.type
+      transactionType: request.type,
+      actionUrl: '/dashboard?tab=my-requests'
     });
 
-    if (request.type === 'buy') {
-      const buyerUser = await User.findById(request.tenant).select('name email');
-      await sendNotification({
-        recipient: request.owner,
-        sender: req.user.id,
-        type: 'ownership_transferred',
-        title: 'Property Sold & Ownership Transferred',
-        message: `Payment verified. Ownership of "${property?.title || 'property'}" has officially been transferred to ${buyerUser?.name || 'the buyer'}. Receipt: ${receiptNumber}.`,
-        property: request.property,
-        request: request._id,
-        transactionType: 'buy'
-      });
-    }
+    // Send confirmation notification to owner
+    const customerUser = await User.findById(request.tenant).select('name email');
+    await sendNotification({
+      recipient: request.owner,
+      sender: req.user.id,
+      type: request.type === 'buy' ? 'ownership_transferred' : 'transaction_completed',
+      title: request.type === 'buy' ? 'Property Sold & Ownership Transferred' : 'Rental Payment Verified & Tenancy Confirmed',
+      message: request.type === 'buy'
+        ? `Payment verified. Ownership of "${property?.title || 'property'}" has officially been transferred to ${customerUser?.name || 'the buyer'}. Receipt: ${receiptNumber}.`
+        : `Payment verified. Rental tenancy for "${property?.title || 'property'}" has officially commenced with ${customerUser?.name || 'the tenant'}. Receipt: ${receiptNumber}.`,
+      property: request.property,
+      request: request._id,
+      transactionType: request.type,
+      actionUrl: '/dashboard?tab=incoming-requests'
+    });
 
     const populated = await Request.findById(request._id)
       .populate('owner', 'name email phone')
@@ -867,8 +889,8 @@ router.put('/:id/complete', auth, async (req, res) => {
       return res.status(403).json({ msg: 'Only the property owner can complete this transaction' });
     }
 
-    if (!['approved', 'payment_pending', 'terms_confirmed', 'accepted'].includes(request.status)) {
-      return res.status(400).json({ msg: `Cannot complete transaction in status "${request.status}"` });
+    if (request.status !== 'completed' && request.paymentDetails?.status !== 'verified') {
+      return res.status(400).json({ msg: 'Cannot complete transaction before payment is verified' });
     }
 
     request.status = 'completed';
@@ -965,12 +987,12 @@ router.put('/:id/reject-payment', auth, async (req, res) => {
     const reason = req.body.reason ? String(req.body.reason).trim() : 'Invalid transaction details or verification failed.';
 
     request.paymentDetails.status = 'rejected';
-    request.status = 'terms_confirmed'; // Return to awaiting valid payment
+    request.status = 'accepted'; // Return to awaiting valid payment
     request.updatedAt = new Date();
     await request.save();
 
     // Update payment record in DB
-    const payment = await Payment.findOne({ request: request._id, status: 'submitted' });
+    const payment = (await Payment.findOne({ request: request._id, status: 'submitted' })) || (await Payment.findOne({ request: request._id }));
     if (payment) {
       payment.status = 'rejected';
       payment.rejectionReason = reason;
@@ -979,7 +1001,7 @@ router.put('/:id/reject-payment', auth, async (req, res) => {
 
     const property = await Property.findById(request.property);
 
-    // Notify buyer
+    // Notify buyer/tenant
     await sendNotification({
       recipient: request.tenant,
       sender: req.user.id,
@@ -988,7 +1010,8 @@ router.put('/:id/reject-payment', auth, async (req, res) => {
       message: `Payment verification for "${property?.title || 'property'}" was rejected. Reason: ${reason}. Please submit a valid transaction receipt.`,
       property: request.property,
       request: request._id,
-      transactionType: request.type
+      transactionType: request.type,
+      actionUrl: '/dashboard?tab=my-requests'
     });
 
     const populated = await Request.findById(request._id)
@@ -1048,7 +1071,8 @@ router.put('/:id/reject', auth, async (req, res) => {
       message: `Your ${request.type} request for "${property?.title || 'property'}" was declined. Reason: ${request.rejectionReason}`,
       property: request.property,
       request: request._id,
-      transactionType: request.type
+      transactionType: request.type,
+      actionUrl: '/dashboard?tab=my-requests'
     });
 
     const populated = await Request.findById(request._id)
@@ -1106,7 +1130,8 @@ router.put('/:id/cancel', auth, async (req, res) => {
       message: `The ${request.type} request for "${property?.title || 'property'}" was withdrawn by the applicant.`,
       property: request.property,
       request: request._id,
-      transactionType: request.type
+      transactionType: request.type,
+      actionUrl: '/dashboard?tab=incoming-requests'
     });
 
     const populated = await Request.findById(request._id)

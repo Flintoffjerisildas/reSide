@@ -106,6 +106,32 @@ export default function OwnerDashboard({
   const [deletingProperty, setDeletingProperty] = useState<Property | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [requestFilterCategory, setRequestFilterCategory] = useState<'all' | 'pending' | 'awaiting_payment' | 'completed'>('all');
+
+  const ownerRequestCounts = useMemo(() => {
+    const list = requests || [];
+    return {
+      all: list.length,
+      pending: list.filter((r: any) => r.status === 'pending').length,
+      awaitingPayment: list.filter((r: any) => ['accepted', 'approved', 'terms_confirmed', 'payment_pending'].includes(r.status)).length,
+      completed: list.filter((r: any) => r.status === 'completed').length,
+    };
+  }, [requests]);
+
+  const filteredOwnerRequests = useMemo(() => {
+    return (requests || []).filter((req: any) => {
+      if (requestFilterCategory === 'pending') {
+        return req.status === 'pending';
+      }
+      if (requestFilterCategory === 'awaiting_payment') {
+        return ['accepted', 'approved', 'terms_confirmed', 'payment_pending'].includes(req.status);
+      }
+      if (requestFilterCategory === 'completed') {
+        return req.status === 'completed';
+      }
+      return true;
+    });
+  }, [requests, requestFilterCategory]);
 
   // Listing control dialog state
   const [listingDialogProperty, setListingDialogProperty] = useState<Property | null>(null);
@@ -163,9 +189,7 @@ export default function OwnerDashboard({
   >('none');
   const [maintenanceOverview, setMaintenanceOverview] = useState<any[]>([]);
   const [tenantRequestsModalType, setTenantRequestsModalType] = useState<null | 'rent' | 'maintenance' | 'payment'>(null);
-  const [selectedPropertyInitialTab, setSelectedPropertyInitialTab] = useState<
-    'tenant' | 'payments' | 'maintenance' | 'agreements' | 'vacate'
-  >('tenant');
+  const [selectedPropertyInitialTab, setSelectedPropertyInitialTab] = useState<string>('overview');
   const [taTextMap, setTaTextMap] = useState<Record<string, string>>({});
   const now = new Date();
   const toYmd = (d: Date) => {
@@ -1223,32 +1247,80 @@ export default function OwnerDashboard({
           ? vacantPropertiesList
           : [];
 
-  const openPropertyForId = (propertyId: string, tab: 'tenant' | 'payments' | 'maintenance' | 'agreements' | 'vacate') => {
+  const handleSelectProperty = (property: Property, tab: string = 'overview') => {
+    const propId = getId(property);
+    setSelectedProperty(property);
+    setSelectedPropertyInitialTab(tab);
+
+    const url = new URL(window.location.href);
+    url.searchParams.set('propertyId', propId);
+    window.history.pushState({ propertyId: propId }, '', url.toString());
+  };
+
+  const handleBackFromProperty = () => {
+    setSelectedProperty(null);
+    setSelectedPropertyInitialTab('overview');
+    const url = new URL(window.location.href);
+    url.searchParams.delete('propertyId');
+    window.history.pushState({}, '', url.toString());
+  };
+
+  const openPropertyForId = (propertyId: string, tab: string = 'overview') => {
     const match = (myProperties as any[]).find((p: any) => getId(p) === propertyId);
     if (!match) {
       toast.error(t('Property not found for this request', 'இந்த கோரிக்கைக்கான சொத்து கிடைக்கவில்லை'));
       return;
     }
     setTenantRequestsModalType(null);
-    setSelectedPropertyInitialTab(tab);
-    setSelectedProperty(match);
+    setActiveTab('properties');
+    handleSelectProperty(match, tab);
   };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const propId = params.get('propertyId');
+      if (propId && myProperties.length > 0) {
+        const found = (myProperties as any[]).find((p: any) => getId(p) === propId);
+        if (found) {
+          setSelectedProperty(found);
+        } else {
+          setSelectedProperty(null);
+        }
+      } else {
+        setSelectedProperty(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [myProperties]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const propId = params.get('propertyId');
+    if (propId && myProperties.length > 0 && !selectedProperty) {
+      const found = (myProperties as any[]).find((p: any) => getId(p) === propId);
+      if (found) {
+        setSelectedProperty(found);
+      } else {
+        toast.error(t('Property not found or unauthorized', 'சொத்து கிடைக்கவில்லை அல்லது அனுமதியில்லை'));
+        const url = new URL(window.location.href);
+        url.searchParams.delete('propertyId');
+        window.history.replaceState({}, '', url.toString());
+      }
+    }
+  }, [myProperties, selectedProperty]);
+
+  const currentSelectedProperty = useMemo(() => {
+    if (!selectedProperty) return null;
+    const currentId = getId(selectedProperty);
+    return (myProperties as any[]).find((p: any) => getId(p) === currentId) || selectedProperty;
+  }, [myProperties, selectedProperty]);
 
   return (
     <>
-      {selectedProperty ? (
-        // Show full-screen property view
-        <PropertyFullScreenView 
-          property={selectedProperty}
-          initialTab={selectedPropertyInitialTab}
-          onBack={() => {
-            setSelectedProperty(null);
-            setSelectedPropertyInitialTab('tenant');
-          }}
-        />
-      ) : (
-        // Show Owner Dashboard
-        <div className={hideHeaderActions ? "w-full" : "w-full py-6 sm:py-8 px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12"}>
+      <div className={hideHeaderActions ? "w-full" : "w-full py-6 sm:py-8 px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12"}>
           <div className="w-full space-y-8">
 
         {/* Header Section */}
@@ -1658,87 +1730,191 @@ export default function OwnerDashboard({
           </TabsContent>
 
           {/* My Properties Tab */}
-          <TabsContent value="properties" className="mt-6">
-            <div className="grid gap-3 sm:gap-3.5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 items-stretch">
-              {myProperties.length > 0 ? (
-                myProperties.map((property) => (
-                  <div
-                    key={property.id}
-                    onClick={() => {
-                      setSelectedPropertyInitialTab('tenant');
-                      setSelectedProperty(property);
-                    }}
-                    className="cursor-pointer h-full transition duration-200"
-                  >
+          <TabsContent value="properties" className="mt-4 sm:mt-6">
+            {currentSelectedProperty ? (
+              <PropertyFullScreenView 
+                property={currentSelectedProperty}
+                initialTab={selectedPropertyInitialTab}
+                onBack={handleBackFromProperty}
+              />
+            ) : (
+              <div className="grid gap-3 sm:gap-3.5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 items-stretch">
+                {myProperties.length > 0 ? (
+                  myProperties.map((property) => (
                     <PropertyCard 
+                      key={getId(property)}
                       property={property} 
                       showRequestButton={false} 
                       isOwnerView={true}
-                      onManageListing={handleOpenListingDialog}
-                      onUnlist={handleQuickUnlist}
-                      onEdit={handleEditProperty}
-                      onDelete={handleDeleteProperty}
+                      onClick={() => handleSelectProperty(property, 'overview')}
                     />
+                  ))
+                ) : (
+                  <div className="col-span-full text-center py-12 text-muted-foreground">
+                    {t('No properties found. Add your first property!', 'சொத்துக்கள் எதுவும் காணப்படவில்லை. உங்கள் முதல் சொத்தைச் சேர்க்கவும்!')}
                   </div>
-                ))
-              ) : (
-                <div className="col-span-full text-center py-12 text-muted-foreground">
-                  {t('No properties found. Add your first property!', 'சொத்துக்கள் எதுவும் காணப்படவில்லை. உங்கள் முதல் சொத்தைச் சேர்க்கவும்!')}
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </TabsContent>
 
           {/* Requests Tab */}
           <TabsContent value="requests" className="mt-6">
             <Card>
-              <CardHeader>
-                <CardTitle>{t('Property Requests', 'சொத்து கோரிக்கைகள்')}</CardTitle>
-                <CardDescription>
-                  {t('Manage incoming rent and buy requests from potential tenants.', 'சாத்தியமான குத்தகைதாரர்களிடமிருந்து வரும் வாடகை மற்றும் கொள்முதல் கோரிக்கைகளை நிர்வகிக்கவும்.')}
-                </CardDescription>
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
+                <div>
+                  <CardTitle>{t('Property Requests', 'சொத்து கோரிக்கைகள்')}</CardTitle>
+                  <CardDescription>
+                    {t('Manage incoming rent and buy requests from potential tenants and buyers.', 'சாத்தியமான குத்தகைதாரர்கள் மற்றும் வாங்குபவர்களிடமிருந்து வரும் கோரிக்கைகளை நிர்வகிக்கவும்.')}
+                  </CardDescription>
+                </div>
+
+                {/* Requirement 6: Owner Category Filters */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setRequestFilterCategory('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      requestFilterCategory === 'all'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {t('Incoming Requests', 'பெறப்பட்ட கோரிக்கைகள்')} ({ownerRequestCounts.all})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRequestFilterCategory('pending')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      requestFilterCategory === 'pending'
+                        ? 'bg-amber-600 text-white shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {t('Accept / Reject', 'ஏற்க / நிராகரிக்க')} ({ownerRequestCounts.pending})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRequestFilterCategory('awaiting_payment')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      requestFilterCategory === 'awaiting_payment'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {t('Accepted / Awaiting Payment', 'ஏற்றுக்கொள்ளப்பட்டது / கட்டணம் நிலுவையில்')} ({ownerRequestCounts.awaitingPayment})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRequestFilterCategory('completed')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      requestFilterCategory === 'completed'
+                        ? 'bg-slate-700 text-white shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {t('Completed Transactions', 'முடிந்த ஒப்பந்தங்கள்')} ({ownerRequestCounts.completed})
+                  </button>
+                </div>
               </CardHeader>
               <CardContent>
-                {requests.length === 0 ? (
+                {filteredOwnerRequests.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <Inbox className="mx-auto h-12 w-12 text-muted-foreground/20 mb-4" />
-                    {t('No pending requests found.', 'நிலுவையில் உள்ள கோரிக்கைகள் எதுவும் காணப்படவில்லை.')}
+                    {t('No requests found in this category.', 'இந்த பிரிவில் கோரிக்கைகள் எதுவும் காணப்படவில்லை.')}
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {requests.map((request: any) => (
-                      <div key={request._id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg bg-card hover:bg-muted/50 transition-colors">
-                        <div className="space-y-1 mb-4 md:mb-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${request.type === 'rent' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                    {filteredOwnerRequests.map((request: any) => (
+                      <div key={request._id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg bg-card hover:bg-muted/50 transition-colors gap-4">
+                        <div className="space-y-1 mb-2 md:mb-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${request.type === 'rent' ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
                               }`}>
                               {request.type === 'rent' ? t('Rent Request', 'வாடகை கோரிக்கை') : t('Buy Request', 'வாங்க கோரிக்கை')}
                             </span>
-                            <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${request.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                              request.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                            <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
+                              request.status === 'pending'
+                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                                : ['accepted', 'approved', 'terms_confirmed'].includes(request.status)
+                                ? 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300'
+                                : request.status === 'payment_pending'
+                                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
+                                : request.status === 'completed'
+                                ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
+                                : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
                               }`}>
-                              {request.status.toUpperCase()}
+                              {request.status === 'pending'
+                                ? t('Pending Review', 'மதிப்பாய்வு நிலுவையில்')
+                                : ['accepted', 'approved', 'terms_confirmed'].includes(request.status)
+                                ? t('Accepted — Awaiting Payment', 'ஏற்றுக்கொள்ளப்பட்டது - கட்டணம் நிலுவை')
+                                : request.status === 'payment_pending'
+                                ? t('Payment Verification Pending', 'கட்டண சரிபார்ப்பு நிலுவையில்')
+                                : request.status === 'completed'
+                                ? t('Completed', 'முடிக்கப்பட்டது')
+                                : t('Declined', 'நிராகரிக்கப்பட்டது')}
                             </span>
                           </div>
                           <h4 className="font-semibold text-lg">{displayTa(request.property?.title)}</h4>
                           <div className="text-sm text-muted-foreground space-y-1">
                             <div className="flex items-center gap-2">
                               <User className="h-3 w-3" />
-                              <span>{request.tenant?.name}</span>
+                              <span>{request.tenant?.name || 'Applicant'} ({request.tenant?.email})</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <MapPin className="h-3 w-3" />
                               <span>{displayTa(request.property?.location)}</span>
                             </div>
+                            {request.offerAmount && (
+                              <div className="text-xs pt-1">
+                                <span className="text-muted-foreground">{t('Offer Amount: ', 'சலுகை தொகை: ')}</span>
+                                <b className="text-primary">₹{Number(request.offerAmount).toLocaleString('en-IN')}</b>
+                              </div>
+                            )}
                           </div>
                         </div>
 
-                        <Button
-                          className="w-full md:w-auto"
-                          onClick={() => setSelectedRequest(request)}
-                        >
-                          {t('View Details', 'விவரங்களைப் காண்க')}
-                        </Button>
+                        {/* Quick Actions */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {request.status === 'pending' && (
+                            <>
+                              <Button
+                                size="sm"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-medium"
+                                disabled={approveRequest.isPending || rejectRequest.isPending}
+                                onClick={() => handleApproveRequest(request._id)}
+                              >
+                                {request.type === 'buy' ? t('Accept Offer', 'சலுகையை ஏற்றுக்கொள்') : t('Accept Application', 'விண்ணப்பத்தை ஏற்றுக்கொள்')}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30 font-medium"
+                                disabled={approveRequest.isPending || rejectRequest.isPending}
+                                onClick={() => handleRejectRequest(request._id)}
+                              >
+                                {t('Reject', 'நிராகரி')}
+                              </Button>
+                            </>
+                          )}
+                          {request.status === 'payment_pending' && (
+                            <Button
+                              size="sm"
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm font-medium"
+                              onClick={() => setSelectedRequest(request)}
+                            >
+                              <CreditCard className="w-3.5 h-3.5 mr-1" />
+                              {t('Verify Payment', 'கட்டணத்தை சரிபார்')}
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedRequest(request)}
+                          >
+                            {t('View Details', 'விவரங்கள்')}
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -2790,7 +2966,6 @@ export default function OwnerDashboard({
         </AlertDialog>
       </div>
       </div>
-      )}
 
       <Dialog open={tenantRequestsModalType !== null} onOpenChange={(open) => !open && setTenantRequestsModalType(null)}>
         <DialogContent className="max-w-xl">

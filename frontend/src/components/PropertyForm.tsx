@@ -31,9 +31,11 @@ interface PropertyFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialData?: Property | null;
+  inline?: boolean;
+  onSaved?: () => void;
 }
 
-export default function PropertyForm({ open, onOpenChange, initialData }: PropertyFormProps) {
+export default function PropertyForm({ open, onOpenChange, initialData, inline = false, onSaved }: PropertyFormProps) {
   const [title, setTitle] = useState('');
   const [propertyType, setPropertyType] = useState('');
   const [location, setLocation] = useState('');
@@ -216,7 +218,7 @@ export default function PropertyForm({ open, onOpenChange, initialData }: Proper
   };
 
   useEffect(() => {
-    if (open && initialData) {
+    if ((open || inline) && initialData) {
       setTitle(initialData.title || '');
       const pType = initialData.propertyType || '';
       setPropertyType(pType);
@@ -261,7 +263,7 @@ export default function PropertyForm({ open, onOpenChange, initialData }: Proper
         setGeoLocation(null);
       }
       setIsLandDimensionsExpanded(false);
-    } else if (open && !initialData) {
+    } else if ((open || inline) && !initialData) {
       // Reset form for new entry
       setTitle('');
       setPropertyType('');
@@ -280,7 +282,7 @@ export default function PropertyForm({ open, onOpenChange, initialData }: Proper
       setIsLandDimensionsExpanded(false);
       setCurrentTab('details');
     }
-  }, [open, initialData]);
+  }, [open, inline, initialData]);
 
   const blobToBase64 = (blob: Blob): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -456,6 +458,7 @@ export default function PropertyForm({ open, onOpenChange, initialData }: Proper
       setImages([]);
       setLandDimensions({ ab: '', bc: '', cd: '', da: '' });
       setCurrentTab('details');
+      onSaved?.();
       onOpenChange(false);
     } catch (error: any) {
       console.error('Save property error:', error);
@@ -468,29 +471,17 @@ export default function PropertyForm({ open, onOpenChange, initialData }: Proper
     onOpenChange(open);
   };
 
-  return (
-    <Dialog open={open} onOpenChange={handleDialogChange}>
-      <DialogContent className="sm:max-w-[720px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{initialData ? t('Edit Property', 'சொத்தை திருத்தவும்') : t('Add Property', 'சொத்து சேர்க்கவும்')}</DialogTitle>
-          <DialogDescription>
-            {t(
-              'Fill in the details and upload images to list your property',
-              'உங்கள் சொத்தை பட்டியலிட விவரங்களையும் படங்களையும் பதிவேற்றவும்'
-            )}
-          </DialogDescription>
-        </DialogHeader>
-
-        <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="details">
-              {t('Details', 'விவரங்கள்')}
-            </TabsTrigger>
-            <TabsTrigger value="images">
-              <Images className="w-4 h-4 mr-2" />
-              {t('Images', 'படங்கள்')} ({images.length}/20)
-            </TabsTrigger>
-          </TabsList>
+  const formTabs = (
+    <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
+      <TabsList className="grid w-full grid-cols-2">
+        <TabsTrigger value="details">
+          {t('Details', 'விவரங்கள்')}
+        </TabsTrigger>
+        <TabsTrigger value="images">
+          <Images className="w-4 h-4 mr-2" />
+          {t('Images', 'படங்கள்')} ({images.length}/20)
+        </TabsTrigger>
+      </TabsList>
 
           <TabsContent value="details" className="mt-4">
             <div className="grid grid-cols-12 gap-x-4 gap-y-4">
@@ -843,17 +834,57 @@ export default function PropertyForm({ open, onOpenChange, initialData }: Proper
             </div>
           </TabsContent>
         </Tabs>
+  );
 
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button type="button" variant="outline" onClick={() => handleDialogChange(false)}>
-            {t('Cancel', 'ரத்து செய்')}
-          </Button>
-          <Button type="button" onClick={handleSubmit} disabled={addPropertyMutation.isPending || updatePropertyMutation.isPending}>
-            {addPropertyMutation.isPending || updatePropertyMutation.isPending
-              ? (initialData ? t('Updating...', 'புதுப்பிக்கிறது...') : t('Adding...', 'சேர்க்கிறது...'))
-              : (initialData ? t('Save Changes', 'மாற்றங்களைச் சேமிக்கவும்') : t('Add Property', 'சேர்க்கவும்'))}
-          </Button>
+  const actionButtons = (
+    <div className="flex justify-end gap-2 pt-4 border-t">
+      {!inline && (
+        <Button type="button" variant="outline" onClick={() => handleDialogChange(false)}>
+          {t('Cancel', 'ரத்து செய்')}
+        </Button>
+      )}
+      <Button type="button" onClick={handleSubmit} disabled={addPropertyMutation.isPending || updatePropertyMutation.isPending}>
+        {addPropertyMutation.isPending || updatePropertyMutation.isPending
+          ? (initialData ? t('Updating...', 'புதுப்பிக்கிறது...') : t('Adding...', 'சேர்க்கிறது...'))
+          : (initialData ? t('Save Changes', 'மாற்றங்களைச் சேமிக்கவும்') : t('Add Property', 'சேர்க்கவும்'))}
+      </Button>
+    </div>
+  );
+
+  if (inline) {
+    return (
+      <div className="w-full rounded-xl border bg-card/95 p-4 sm:p-6 shadow-xs space-y-4">
+        <div className="space-y-1">
+          <h3 className="text-base sm:text-lg font-semibold tracking-tight">
+            {initialData ? t('Edit Property Details', 'சொத்து விவரங்களைத் திருத்தவும்') : t('Add Property', 'சொத்து சேர்க்கவும்')}
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            {t(
+              'Update your property specifications, dimensions, amenities, and uploaded photos below.',
+              'உங்கள் சொத்து விவரங்கள், பரிமாணங்கள், வசதிகள் மற்றும் புகைப்படங்களை கீழே புதுப்பிக்கவும்.'
+            )}
+          </p>
         </div>
+        {formTabs}
+        {actionButtons}
+      </div>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleDialogChange}>
+      <DialogContent className="sm:max-w-[720px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{initialData ? t('Edit Property', 'சொத்தை திருத்தவும்') : t('Add Property', 'சொத்து சேர்க்கவும்')}</DialogTitle>
+          <DialogDescription>
+            {t(
+              'Fill in the details and upload images to list your property',
+              'உங்கள் சொத்தை பட்டியலிட விவரங்களையும் படங்களையும் பதிவேற்றவும்'
+            )}
+          </DialogDescription>
+        </DialogHeader>
+        {formTabs}
+        {actionButtons}
       </DialogContent>
     </Dialog>
   );

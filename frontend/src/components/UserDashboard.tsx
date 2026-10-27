@@ -12,8 +12,11 @@ import {
   useAnnouncements,
   useGetNotifications,
   useMarkNotificationRead,
-  useMarkAllNotificationsRead
+  useMarkAllNotificationsRead,
+  useApproveRequest,
+  useRejectRequest
 } from '../hooks/useQueries';
+import { toast } from 'sonner';
 import {
   Home,
   Building,
@@ -58,6 +61,8 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
   const { data: notificationData } = useGetNotifications();
   const markReadMutation = useMarkNotificationRead();
   const markAllReadMutation = useMarkAllNotificationsRead();
+  const approveRequestMutation = useApproveRequest();
+  const rejectRequestMutation = useRejectRequest();
 
   const notifications = notificationData?.notifications || [];
   const unreadCount = notificationData?.unreadCount || 0;
@@ -79,11 +84,11 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
   const [isPropertyFormOpen, setIsPropertyFormOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<PropertyRequest | null>(null);
 
-  // Filters for My Requests
+  // Filters for My Requests (Customer categories: My Requests, Pending Owner Approval, Awaiting Payment, Completed / Rejected)
   const [sentFilterType, setSentFilterType] = useState<'all' | 'buy' | 'rent'>('all');
   const [sentFilterStatus, setSentFilterStatus] = useState<string>('all');
 
-  // Filters for Incoming Requests
+  // Filters for Incoming Requests (Owner categories: Incoming Requests, Accept / Reject, Accepted / Awaiting Payment, Completed Transactions)
   const [incomingFilterType, setIncomingFilterType] = useState<'all' | 'buy' | 'rent'>('all');
   const [incomingFilterStatus, setIncomingFilterStatus] = useState<string>('all');
 
@@ -96,6 +101,28 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
     () => (Array.isArray(tenantRequests) ? tenantRequests.filter((r: any) => r.status === 'pending' || r.status === 'counteroffer').length : 0),
     [tenantRequests]
   );
+
+  // Customer category counts (Requirement 6)
+  const customerCounts = useMemo(() => {
+    const list = tenantRequests || [];
+    return {
+      all: list.length,
+      pending: list.filter((r: any) => ['pending', 'counteroffer'].includes(r.status)).length,
+      awaitingPayment: list.filter((r: any) => ['accepted', 'approved', 'terms_confirmed'].includes(r.status)).length,
+      completedRejected: list.filter((r: any) => ['completed', 'rejected', 'cancelled'].includes(r.status)).length,
+    };
+  }, [tenantRequests]);
+
+  // Owner category counts (Requirement 6)
+  const ownerCounts = useMemo(() => {
+    const list = ownerRequests || [];
+    return {
+      all: list.length,
+      pending: list.filter((r: any) => r.status === 'pending').length,
+      awaitingPayment: list.filter((r: any) => ['accepted', 'approved', 'terms_confirmed', 'payment_pending'].includes(r.status)).length,
+      completed: list.filter((r: any) => r.status === 'completed').length,
+    };
+  }, [ownerRequests]);
 
   // Transactions list (accepted, terms_confirmed, payment_pending, completed)
   const activeTransactions = useMemo(() => {
@@ -120,7 +147,14 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
   const filteredSentRequests = useMemo(() => {
     return (tenantRequests || []).filter((r: any) => {
       const typeMatch = sentFilterType === 'all' || r.type === sentFilterType;
-      const statusMatch = sentFilterStatus === 'all' || r.status === sentFilterStatus;
+      let statusMatch = true;
+      if (sentFilterStatus === 'pending') {
+        statusMatch = ['pending', 'counteroffer'].includes(r.status);
+      } else if (sentFilterStatus === 'awaiting_payment') {
+        statusMatch = ['accepted', 'approved', 'terms_confirmed'].includes(r.status);
+      } else if (sentFilterStatus === 'completed_rejected') {
+        statusMatch = ['completed', 'rejected', 'cancelled'].includes(r.status);
+      }
       return typeMatch && statusMatch;
     });
   }, [tenantRequests, sentFilterType, sentFilterStatus]);
@@ -129,7 +163,14 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
   const filteredIncomingRequests = useMemo(() => {
     return (ownerRequests || []).filter((r: any) => {
       const typeMatch = incomingFilterType === 'all' || r.type === incomingFilterType;
-      const statusMatch = incomingFilterStatus === 'all' || r.status === incomingFilterStatus;
+      let statusMatch = true;
+      if (incomingFilterStatus === 'pending') {
+        statusMatch = r.status === 'pending';
+      } else if (incomingFilterStatus === 'awaiting_payment') {
+        statusMatch = ['accepted', 'approved', 'terms_confirmed', 'payment_pending'].includes(r.status);
+      } else if (incomingFilterStatus === 'completed') {
+        statusMatch = r.status === 'completed';
+      }
       return typeMatch && statusMatch;
     });
   }, [ownerRequests, incomingFilterType, incomingFilterStatus]);
@@ -167,36 +208,30 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
           </Badge>
         );
       case 'accepted':
-        return (
-          <Badge variant="outline" className="bg-sky-500/10 text-sky-600 border-sky-300 text-[11px] px-2 py-0.5">
-            <CheckCircle2 className="w-3 h-3 mr-1 inline" />
-            {t('Offer Accepted', 'ஏற்றுக்கொள்ளப்பட்டது')}
-          </Badge>
-        );
       case 'approved':
         return (
-          <Badge variant="default" className="bg-emerald-600 text-white text-[11px] px-2 py-0.5">
+          <Badge variant="outline" className="bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-300 text-[11px] px-2 py-0.5 font-medium">
             <CheckCircle2 className="w-3 h-3 mr-1 inline" />
-            {t('Approved', 'அங்கீகரிக்கப்பட்டது')}
+            {t('Accepted — Awaiting Payment', 'ஏற்றுக்கொள்ளப்பட்டது - கட்டணம் செலுத்தலாம்')}
           </Badge>
         );
       case 'terms_confirmed':
         return (
-          <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-300 text-[11px] px-2 py-0.5">
+          <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-300 text-[11px] px-2 py-0.5 font-medium">
             <ShieldCheck className="w-3 h-3 mr-1 inline" />
-            {t('Terms Confirmed', 'விதிமுறைகள் உறுதி')}
+            {t('Awaiting Payment', 'கட்டணம் நிலுவையில்')}
           </Badge>
         );
       case 'payment_pending':
         return (
-          <Badge variant="outline" className="bg-indigo-500/10 text-indigo-600 border-indigo-300 text-[11px] px-2 py-0.5">
+          <Badge variant="outline" className="bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-300 text-[11px] px-2 py-0.5 font-medium">
             <CreditCard className="w-3 h-3 mr-1 inline" />
-            {t('Payment Pending', 'கட்டண சரிபார்ப்பு')}
+            {t('Payment Verification Pending', 'கட்டண சரிபார்ப்பு நிலுவையில்')}
           </Badge>
         );
       case 'completed':
         return (
-          <Badge variant="default" className="bg-emerald-600 text-white text-[11px] px-2 py-0.5">
+          <Badge variant="default" className="bg-emerald-600 text-white text-[11px] px-2 py-0.5 font-medium">
             <CheckCircle2 className="w-3 h-3 mr-1 inline" />
             {t('Completed', 'முடிக்கப்பட்டது')}
           </Badge>
@@ -591,8 +626,55 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
                 </CardDescription>
               </div>
 
-              {/* Filters */}
-              <div className="flex items-center gap-2 flex-wrap">
+              {/* Customer Filters (Requirement 6) */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setSentFilterStatus('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      sentFilterStatus === 'all'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {t('My Requests', 'என் கோரிக்கைகள்')} ({customerCounts.all})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSentFilterStatus('pending')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      sentFilterStatus === 'pending'
+                        ? 'bg-amber-600 text-white shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {t('Pending Owner Approval', 'உரிமையாளர் ஒப்புதல் நிலுவையில்')} ({customerCounts.pending})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSentFilterStatus('awaiting_payment')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      sentFilterStatus === 'awaiting_payment'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {t('Awaiting Payment', 'கட்டணம் நிலுவையில்')} ({customerCounts.awaitingPayment})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSentFilterStatus('completed_rejected')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      sentFilterStatus === 'completed_rejected'
+                        ? 'bg-slate-700 text-white shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {t('Completed / Rejected', 'முடிந்தவை / நிராகரிக்கப்பட்டவை')} ({customerCounts.completedRejected})
+                  </button>
+                </div>
+
                 <div className="flex items-center rounded-lg border bg-muted/40 p-1 text-xs">
                   <button
                     type="button"
@@ -689,7 +771,7 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
                       </div>
 
                       {/* Action Button */}
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
                         {req.status === 'counteroffer' && (
                           <Button
                             size="sm"
@@ -699,15 +781,21 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
                             {t('Review Counteroffer', 'எதிர் சலுகையை காண்க')}
                           </Button>
                         )}
-                        {req.status === 'terms_confirmed' && (
+                        {['accepted', 'approved', 'terms_confirmed'].includes(req.status) && (
                           <Button
                             size="sm"
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1.5 shadow-sm"
                             onClick={() => setSelectedRequest(req)}
                           >
-                            <CreditCard className="w-3.5 h-3.5 mr-1" />
-                            {t('Pay Advance / Deposit', 'கட்டணம் செலுத்து')}
+                            <CreditCard className="w-3.5 h-3.5" />
+                            {t('Pay Now', 'கட்டணம் செலுத்து')}
                           </Button>
+                        )}
+                        {req.status === 'payment_pending' && (
+                          <Badge variant="outline" className="bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-300 text-xs px-2.5 py-1">
+                            <Clock className="w-3 h-3 mr-1 inline" />
+                            {t('Verification Pending', 'சரிபார்ப்பு நிலுவையில்')}
+                          </Badge>
                         )}
                         <Button
                           variant="outline"
@@ -741,8 +829,55 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
                 </CardDescription>
               </div>
 
-              {/* Filters */}
-              <div className="flex items-center gap-2 flex-wrap">
+              {/* Owner Filters (Requirement 6) */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setIncomingFilterStatus('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      incomingFilterStatus === 'all'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {t('Incoming Requests', 'பெறப்பட்ட கோரிக்கைகள்')} ({ownerCounts.all})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIncomingFilterStatus('pending')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      incomingFilterStatus === 'pending'
+                        ? 'bg-amber-600 text-white shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {t('Accept / Reject', 'ஏற்க / நிராகரிக்க')} ({ownerCounts.pending})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIncomingFilterStatus('awaiting_payment')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      incomingFilterStatus === 'awaiting_payment'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {t('Accepted / Awaiting Payment', 'ஏற்றுக்கொள்ளப்பட்டது / கட்டணம் நிலுவையில்')} ({ownerCounts.awaitingPayment})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIncomingFilterStatus('completed')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      incomingFilterStatus === 'completed'
+                        ? 'bg-slate-700 text-white shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {t('Completed Transactions', 'முடிந்த ஒப்பந்தங்கள்')} ({ownerCounts.completed})
+                  </button>
+                </div>
+
                 <div className="flex items-center rounded-lg border bg-muted/40 p-1 text-xs">
                   <button
                     type="button"
@@ -833,17 +968,52 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                        {req.status === 'pending' && (
+                          <>
+                            <Button
+                              size="sm"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium gap-1 shadow-sm"
+                              disabled={approveRequestMutation.isPending || rejectRequestMutation.isPending}
+                              onClick={() => {
+                                approveRequestMutation.mutate(req._id, {
+                                  onSuccess: () => toast.success(t('Offer/Request accepted! Customer notified to proceed with payment.', 'கோரிக்கை ஏற்கப்பட்டது! கட்டணம் செலுத்த வாடிக்கையாளருக்கு அறிவிக்கப்பட்டது.')),
+                                  onError: (err: any) => toast.error(err?.response?.data?.msg || t('Failed to accept request', 'கோரிக்கையை ஏற்க முடியவில்லை'))
+                                });
+                              }}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              {req.type === 'buy' ? t('Accept Offer', 'சலுகையை ஏற்றுக்கொள்') : t('Accept Application', 'விண்ணப்பத்தை ஏற்றுக்கொள்')}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30 font-medium gap-1"
+                              disabled={approveRequestMutation.isPending || rejectRequestMutation.isPending}
+                              onClick={() => {
+                                rejectRequestMutation.mutate(req._id, {
+                                  onSuccess: () => toast.success(t('Request rejected', 'கோரிக்கை நிராகரிக்கப்பட்டது')),
+                                  onError: () => toast.error(t('Failed to reject request', 'கோரிக்கையை நிராகரிக்க முடியவில்லை'))
+                                });
+                              }}
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                              {t('Reject', 'நிராகரி')}
+                            </Button>
+                          </>
+                        )}
                         {req.status === 'payment_pending' && (
                           <Button
                             size="sm"
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium gap-1 shadow-sm"
                             onClick={() => setSelectedRequest(req)}
                           >
+                            <CreditCard className="w-3.5 h-3.5" />
                             {t('Verify Payment', 'கட்டணத்தை சரிபார்')}
                           </Button>
                         )}
                         <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => setSelectedRequest(req)}
                           className="gap-1.5"

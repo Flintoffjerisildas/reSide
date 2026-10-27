@@ -14,9 +14,7 @@ import {
   Globe,
   EyeOff,
   Lock,
-  Users,
-  Share2,
-  SlidersHorizontal
+  Users
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,6 +35,7 @@ interface PropertyCardProps {
   isOwnerView?: boolean;
   onManageListing?: (property: Property, defaultAction?: 'sale' | 'rent' | 'edit') => void;
   onUnlist?: (property: Property) => void;
+  onClick?: () => void;
 }
 
 export default function PropertyCard({
@@ -47,7 +46,8 @@ export default function PropertyCard({
   onDelete,
   isOwnerView = false,
   onManageListing,
-  onUnlist
+  onUnlist,
+  onClick
 }: PropertyCardProps) {
   const { t, language } = useLanguage();
   const createRequest = useCreateRequest();
@@ -159,14 +159,15 @@ export default function PropertyCard({
     }
   };
 
-  const getTransactionBadge = (type: string) => {
+  const getTransactionBadge = (type?: string) => {
+    if (!type) return null;
     return type.toLowerCase() === 'rent' ? (
-      <Badge variant="secondary" className="glass-pill text-[10px] px-1.5 py-0.5 font-medium">
+      <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-medium border-purple-300 dark:border-purple-800 text-purple-700 dark:text-purple-300">
         {t('Rent', 'வாடகை')}
       </Badge>
     ) : (
-      <Badge variant="default" className="text-[10px] px-1.5 py-0.5 font-medium bg-blue-600 text-white">
-        {t('Purchase', 'வாங்க')}
+      <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-medium border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300">
+        {t('Sale', 'விற்பனை')}
       </Badge>
     );
   };
@@ -176,7 +177,7 @@ export default function PropertyCard({
   const isOccupied = property.occupancyStatus === 'occupied' || !!property.tenant;
   const isUnderContract = (property as any)?.saleStatus === 'under_contract';
 
-  const getOwnerListingBadge = () => {
+  const getOwnerStatusBadge = () => {
     if (isUnderContract) {
       return (
         <Badge className="bg-amber-600 text-white text-[9px] px-1.5 py-0.5 font-medium flex items-center gap-1 shrink-0">
@@ -194,6 +195,14 @@ export default function PropertyCard({
         </Badge>
       );
     }
+    if (isOccupied) {
+      return (
+        <Badge className="bg-purple-600 text-white text-[9px] px-1.5 py-0.5 font-medium flex items-center gap-1 shrink-0">
+          <Users className="h-2.5 w-2.5" />
+          {t('Occupied', 'குடியேற்றப்பட்டது')}
+        </Badge>
+      );
+    }
     if (property.listingStatus === 'unavailable') {
       return (
         <Badge variant="secondary" className="text-muted-foreground text-[9px] px-1.5 py-0.5 font-medium flex items-center gap-1 shrink-0">
@@ -206,33 +215,6 @@ export default function PropertyCard({
       <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-950/30 text-[9px] px-1.5 py-0.5 font-medium flex items-center gap-1 shrink-0">
         <EyeOff className="h-2.5 w-2.5" />
         {t('Private', 'தனிப்பட்டது')}
-      </Badge>
-    );
-  };
-
-  const getOwnerOccupancyBadge = () => {
-    if (isOccupied) {
-      return (
-        <Badge className="bg-purple-600 text-white text-[9px] px-1.5 py-0.5 font-medium flex items-center gap-1 shrink-0">
-          <Users className="h-2.5 w-2.5" />
-          {t('Occupied', 'குடியேற்றப்பட்டது')}
-        </Badge>
-      );
-    }
-    return null;
-  };
-
-  const getOwnerOwnershipBadge = () => {
-    if (isAcquired) {
-      return (
-        <Badge className="bg-emerald-600/90 text-white text-[9px] px-1.5 py-0.5 font-medium shrink-0">
-          ✓ {t('Acquired', 'வாங்கப்பட்டது')}
-        </Badge>
-      );
-    }
-    return (
-      <Badge variant="outline" className="text-muted-foreground text-[9px] px-1.5 py-0.5 shrink-0">
-        {t('Owned', 'உரிமையாளர்')}
       </Badge>
     );
   };
@@ -284,7 +266,22 @@ export default function PropertyCard({
   const hasValidImage = Boolean(imageSrc && !imgFailed);
 
   return (
-    <Card className="glass-card flex flex-col h-full w-full overflow-hidden rounded-xl p-0 gap-0 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg border border-white/20 dark:border-white/10 group">
+    <Card
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (onClick && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className={`glass-card flex flex-col h-full w-full overflow-hidden rounded-xl p-0 gap-0 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg border border-white/20 dark:border-white/10 group ${
+        onClick
+          ? 'cursor-pointer hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60'
+          : ''
+      }`}
+    >
       {/* Property Image Container - Compact Height */}
       <div className="relative h-32 w-full overflow-hidden bg-muted/60 sm:h-36 flex-shrink-0">
         {hasValidImage ? (
@@ -313,19 +310,21 @@ export default function PropertyCard({
           ✓ {t('Verified', 'சரிபார்க்கப்பட்டது')}
         </div>
 
-        {/* Save / Favorite Button */}
-        <button
-          type="button"
-          aria-label={t('Save property', 'சொத்தை சேமிக்கவும்')}
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsFavorite((value) => !value);
-          }}
-          className={`glass-pill absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full shadow-sm transition duration-200 hover:scale-110 active:scale-95 motion-reduce:transition-none backdrop-blur-md ${isFavorite ? 'text-rose-500' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-        >
-          <Heart className={`h-3 w-3 ${isFavorite ? 'fill-current' : ''}`} />
-        </button>
+        {/* Save / Favorite Button - customer view only */}
+        {!isOwnerView && (
+          <button
+            type="button"
+            aria-label={t('Save property', 'சொத்தை சேமிக்கவும்')}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsFavorite((value) => !value);
+            }}
+            className={`glass-pill absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full shadow-sm transition duration-200 hover:scale-110 active:scale-95 motion-reduce:transition-none backdrop-blur-md ${isFavorite ? 'text-rose-500' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+          >
+            <Heart className={`h-3 w-3 ${isFavorite ? 'fill-current' : ''}`} />
+          </button>
+        )}
       </div>
 
       {/* Header Info */}
@@ -345,13 +344,7 @@ export default function PropertyCard({
             </div>
           </div>
           {isOwnerView ? (
-            <div className="flex flex-col items-end gap-1 shrink-0">
-              <div className="flex items-center gap-1 flex-wrap justify-end">
-                {getOwnerOccupancyBadge()}
-                {getOwnerListingBadge()}
-              </div>
-              {getOwnerOwnershipBadge()}
-            </div>
+            getOwnerStatusBadge()
           ) : (
             getOccupancyBadge()
           )}
@@ -360,17 +353,10 @@ export default function PropertyCard({
 
       {/* Body Content */}
       <div className="px-2.5 sm:px-3 py-1 flex-1 flex flex-col justify-between space-y-2">
-        {/* Location & GPS */}
-        <div className="flex items-center justify-between gap-1.5 text-[11px] text-muted-foreground">
-          <div className="flex items-center gap-1 min-w-0">
-            <MapPin className="h-3 w-3 flex-shrink-0 text-primary" />
-            <span className="truncate" title={displayLocation}>{displayLocation}</span>
-          </div>
-          {property.geoLocation?.latitude && property.geoLocation?.longitude && (
-            <span className="text-[9px] px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20 shrink-0 font-mono font-medium">
-              GPS
-            </span>
-          )}
+        {/* Location */}
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          <MapPin className="h-3 w-3 flex-shrink-0 text-primary" />
+          <span className="truncate" title={displayLocation}>{displayLocation}</span>
         </div>
 
         {/* Price and Transaction Badge */}
@@ -383,7 +369,7 @@ export default function PropertyCard({
               <span className="text-[9px] text-muted-foreground font-normal">/mo</span>
             )}
           </div>
-          {getTransactionBadge(property.transactionType)}
+          {!isOwnerView && !showRequestButton && getTransactionBadge(property.transactionType)}
         </div>
 
         {/* Specs: Area, Bedrooms, Dimensions, Facing */}
@@ -449,91 +435,6 @@ export default function PropertyCard({
                 </>
               )}
             </Button>
-          ) : isOwnerView ? (
-            <div className="flex w-full items-center justify-between gap-1.5">
-              {/* Listing Controls */}
-              <div className="flex items-center gap-1 flex-1 min-w-0">
-                {isUnderContract ? (
-                  <span className="text-[10px] text-muted-foreground flex items-center gap-1 px-1.5 py-0.5 bg-muted/60 rounded">
-                    <Lock className="h-2.5 w-2.5 shrink-0" />
-                    <span className="truncate">{t('Under Contract', 'ஒப்பந்தத்தில்')}</span>
-                  </span>
-                ) : isCurrentlyListed ? (
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-[10px] px-2 rounded-lg text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/40"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onUnlist ? onUnlist(property) : onManageListing?.(property, 'edit');
-                      }}
-                      title={t('Unlist from public search', 'பொதுத் தேடலில் இருந்து நீக்கு')}
-                    >
-                      <EyeOff className="h-2.5 w-2.5 mr-1" />
-                      {t('Unlist', 'நீக்கு')}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-[10px] px-2 rounded-lg"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onManageListing ? onManageListing(property, 'edit') : onEdit?.(property);
-                      }}
-                      title={t('Edit public listing details', 'பட்டியல் விவரங்களைத் திருத்து')}
-                    >
-                      <SlidersHorizontal className="h-2.5 w-2.5 mr-1" />
-                      {t('Edit', 'திருத்து')}
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    size="sm"
-                    className="h-7 text-[11px] px-2.5 font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg shadow-xs flex items-center gap-1"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onManageListing ? onManageListing(property) : onEdit?.(property);
-                    }}
-                  >
-                    <Share2 className="h-3 w-3" />
-                    {t('List Property', 'பட்டியலிடுங்கள்')}
-                  </Button>
-                )}
-              </div>
-
-              {/* Standard Edit & Delete */}
-              <div className="flex items-center gap-1 shrink-0">
-                {onEdit && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 w-7 p-0 rounded-lg"
-                    title={t('Edit property details', 'சொத்து விவரங்களைத் திருத்து')}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit(property);
-                    }}
-                  >
-                    <Edit className="h-3 w-3" />
-                  </Button>
-                )}
-                {onDelete && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="h-7 w-7 p-0 rounded-lg"
-                    title={t('Delete property', 'சொத்தை நீக்கு')}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(property);
-                    }}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                )}
-              </div>
-            </div>
           ) : (
             <div className="flex w-full justify-end gap-1.5">
               {onEdit && (
@@ -568,7 +469,7 @@ export default function PropertyCard({
         </div>
       )}
       {!showRequestButton && !onEdit && !onDelete && (
-        <div className="pb-2" />
+        <div className="pb-2.5" />
       )}
 
       <RequestPropertyDialog
