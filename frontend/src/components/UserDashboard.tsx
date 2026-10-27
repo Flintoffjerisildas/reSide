@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +14,8 @@ import {
   useMarkNotificationRead,
   useMarkAllNotificationsRead,
   useApproveRequest,
-  useRejectRequest
+  useRejectRequest,
+  useGetTenantAgreements
 } from '../hooks/useQueries';
 import { toast } from 'sonner';
 import {
@@ -39,22 +40,45 @@ import {
   IndianRupee,
   Eye,
   CheckCheck,
-  MapPin
+  MapPin,
+  ShoppingBag
 } from 'lucide-react';
 import OwnerDashboard from './OwnerDashboard';
 import CustomerDashboard from './CustomerDashboard';
+import PropertyFullScreenView from './PropertyFullScreenView';
 import PropertyForm from './PropertyForm';
 import RequestDetailsModal from './RequestDetailsModal';
 import { PropertyRequest } from '../types';
 
 interface UserDashboardProps {
   onBrowseProperties?: (transactionType: 'rent' | 'buy') => void;
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
+  selectedPropertyId?: string | null;
+  onSelectProperty?: (propertyId: string | null) => void;
+  initialPropertySection?: 'owned' | 'rents';
 }
 
-export default function UserDashboard({ onBrowseProperties }: UserDashboardProps) {
+export type UserDashboardTab =
+  | 'overview'
+  | 'properties'
+  | 'notifications'
+  | 'reports'
+  | 'announcements'
+  | 'settings';
+
+export default function UserDashboard({
+  onBrowseProperties,
+  activeTab,
+  onTabChange,
+  selectedPropertyId,
+  onSelectProperty,
+  initialPropertySection = 'owned'
+}: UserDashboardProps) {
   const { t } = useLanguage();
   const { data: userProfile } = useGetCallerUserProfile();
   const { data: myProperties = [] } = useGetMyProperties();
+  const { data: tenantAgreements = [] } = useGetTenantAgreements();
   const { data: ownerRequests = [] } = useGetOwnerRequests();
   const { data: tenantRequests = [] } = useGetTenantRequests();
   const { data: announcements = [] } = useAnnouncements();
@@ -67,18 +91,252 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
   const notifications = notificationData?.notifications || [];
   const unreadCount = notificationData?.unreadCount || 0;
 
-  const [mainTab, setMainTab] = useState<
-    | 'overview'
-    | 'properties'
-    | 'my-requests'
-    | 'incoming-requests'
-    | 'transactions'
-    | 'notifications'
-    | 'rentals'
-    | 'reports'
-    | 'announcements'
-    | 'settings'
-  >('overview');
+  const getInitialSection = (): 'owned' | 'rents' => {
+    if (initialPropertySection) return initialPropertySection;
+    if (activeTab === 'rentals' || activeTab === 'my-requests' || activeTab === 'requests') return 'rents';
+    if (activeTab === 'incoming-requests') return 'owned';
+    if (activeTab === 'transactions') return 'rents';
+    if (typeof window !== 'undefined') {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const sec = urlParams.get('section');
+        if (sec === 'rents' || sec === 'owned') return sec as any;
+      } catch {}
+    }
+    return 'owned';
+  };
+
+  const [propertySection, setPropertySection] = useState<'owned' | 'rents'>(getInitialSection);
+
+  useEffect(() => {
+    if (initialPropertySection) {
+      setPropertySection(initialPropertySection);
+    }
+  }, [initialPropertySection]);
+
+  useEffect(() => {
+    if (activeTab === 'rentals' || activeTab === 'my-requests' || activeTab === 'requests') {
+      setPropertySection('rents');
+    } else if (activeTab === 'incoming-requests') {
+      setPropertySection('owned');
+    } else if (activeTab === 'transactions') {
+      setPropertySection('rents');
+    }
+  }, [activeTab]);
+
+  const getId = (item: any) => item?._id || item?.id;
+
+  const [selectedOwnedId, setSelectedOwnedId] = useState<string | null>(null);
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
+  const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
+
+  // Derived tenant properties from tenantAgreements + tenantRequests for rent
+  const tenantProperties = useMemo(() => {
+    const list: any[] = [];
+    const seenPropertyIds = new Set<string>();
+
+    // 1. Established active agreements
+    (tenantAgreements || []).forEach((ag: any) => {
+      if (!ag) return;
+      const propObj = ag.property && typeof ag.property === 'object' ? ag.property : {};
+      const rawPropId = (typeof ag.property === 'string' ? ag.property : null) || propObj._id || propObj.id || ag._id;
+      if (rawPropId) seenPropertyIds.add(String(rawPropId));
+
+      const propTitle = propObj.title || ag.propertyTitle || ag.title || t('Rental Property', 'வாடகை சொத்து');
+      const propLoc = propObj.location || propObj.address || ag.propertyLocation || ag.location || t('Rental Location', 'வாடகை இடம்');
+      const propPrice = ag.rentAmount || propObj.price || 0;
+
+      list.push({
+        ...propObj,
+        _id: rawPropId,
+        id: rawPropId,
+        title: propTitle,
+        location: propLoc,
+        price: propPrice,
+        transactionType: 'rent',
+        status: ag.status === 'active' ? 'occupied' : (ag.status || 'occupied'),
+        _agreement: ag,
+        isPendingRental: false,
+      });
+    });
+
+    // 2. Pending or active rental requests not yet finalized into active agreements
+    (tenantRequests || []).forEach((req: any) => {
+      if (!req || req.type !== 'rent') return;
+      const propObj = req.property && typeof req.property === 'object' ? req.property : {};
+      const rawPropId = (typeof req.property === 'string' ? req.property : null) || propObj._id || propObj.id || req._id;
+      if (!rawPropId || seenPropertyIds.has(String(rawPropId))) return;
+
+      seenPropertyIds.add(String(rawPropId));
+      const propTitle = propObj.title || t('Rental Application', 'வாடகை விண்ணப்பம்');
+      const propLoc = propObj.location || propObj.address || '';
+      const propPrice = req.agreedAmount || req.offerAmount || propObj.price || 0;
+
+      list.push({
+        ...propObj,
+        _id: rawPropId,
+        id: rawPropId,
+        title: propTitle,
+        location: propLoc,
+        price: propPrice,
+        transactionType: 'rent',
+        status: req.status,
+        _request: req,
+        isPendingRental: true,
+      });
+    });
+
+    return list;
+  }, [tenantAgreements, tenantRequests, t]);
+
+  // Synchronize selection with props or auto-detect section
+  useEffect(() => {
+    if (selectedPropertyId) {
+      if (propertySection === 'owned') {
+        const found = myProperties.find((p: any) => getId(p) === selectedPropertyId);
+        if (found) {
+          setSelectedOwnedId(selectedPropertyId);
+          return;
+        }
+        const foundInTenant = tenantProperties.find((p: any) => getId(p) === selectedPropertyId);
+        if (foundInTenant) {
+          setPropertySection('rents');
+          setSelectedTenantId(selectedPropertyId);
+          return;
+        }
+      } else {
+        const found = tenantProperties.find((p: any) => getId(p) === selectedPropertyId);
+        if (found) {
+          setSelectedTenantId(selectedPropertyId);
+          return;
+        }
+        const foundInOwned = myProperties.find((p: any) => getId(p) === selectedPropertyId);
+        if (foundInOwned) {
+          setPropertySection('owned');
+          setSelectedOwnedId(selectedPropertyId);
+          return;
+        }
+      }
+    }
+  }, [selectedPropertyId, propertySection, myProperties, tenantProperties]);
+
+  // Auto-select first owned property when entering owned section if nothing selected
+  useEffect(() => {
+    if (myProperties.length > 0) {
+      if (!selectedOwnedId || !myProperties.some((p: any) => getId(p) === selectedOwnedId)) {
+        const firstId = getId(myProperties[0]);
+        setSelectedOwnedId(firstId);
+      }
+    } else {
+      setSelectedOwnedId(null);
+    }
+  }, [myProperties, selectedOwnedId]);
+
+  // Auto-select first tenant property when entering rents section if nothing selected
+  useEffect(() => {
+    if (tenantProperties.length > 0) {
+      if (!selectedTenantId || !tenantProperties.some((p: any) => getId(p) === selectedTenantId)) {
+        const firstId = getId(tenantProperties[0]);
+        setSelectedTenantId(firstId);
+      }
+    } else {
+      setSelectedTenantId(null);
+    }
+  }, [tenantProperties, selectedTenantId]);
+
+  const activeOwnedProperty = useMemo(() => {
+    if (!myProperties.length) return null;
+    return myProperties.find((p: any) => getId(p) === selectedOwnedId) || myProperties[0];
+  }, [myProperties, selectedOwnedId]);
+
+  const activeTenantProperty = useMemo(() => {
+    if (!tenantProperties.length) return null;
+    return tenantProperties.find((p: any) => getId(p) === selectedTenantId) || tenantProperties[0];
+  }, [tenantProperties, selectedTenantId]);
+
+  const handleSelectOwnedProperty = (property: any) => {
+    const id = getId(property);
+    setSelectedOwnedId(id);
+    if (typeof window !== 'undefined') {
+      try {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('section', 'owned');
+        window.history.replaceState({}, '', currentUrl.toString());
+      } catch {}
+    }
+  };
+
+  const handleSelectTenantProperty = (property: any) => {
+    const id = getId(property);
+    setSelectedTenantId(id);
+    if (typeof window !== 'undefined') {
+      try {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('section', 'rents');
+        window.history.replaceState({}, '', currentUrl.toString());
+      } catch {}
+    }
+  };
+
+  const handleSwitchSection = (section: 'owned' | 'rents') => {
+    setPropertySection(section);
+    if (typeof window !== 'undefined') {
+      try {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('section', section);
+        window.history.replaceState({}, '', currentUrl.toString());
+      } catch {}
+    }
+    if (section === 'owned') {
+      const targetId = selectedOwnedId || (myProperties[0] ? getId(myProperties[0]) : null);
+      if (targetId) setSelectedOwnedId(targetId);
+    } else {
+      const targetId = selectedTenantId || (tenantProperties[0] ? getId(tenantProperties[0]) : null);
+      if (targetId) setSelectedTenantId(targetId);
+    }
+  };
+
+  const normalizeTab = (tab?: string): UserDashboardTab => {
+    if (!tab) return 'overview';
+    if (tab === 'requests' || tab === 'my-requests') return 'properties';
+    if (tab === 'incoming-requests') return 'properties';
+    if (tab === 'transactions') return 'properties';
+    if (tab === 'rentals') return 'properties';
+    if (
+      tab === 'properties' ||
+      tab === 'notifications' ||
+      tab === 'reports' ||
+      tab === 'announcements' ||
+      tab === 'settings' ||
+      tab === 'overview'
+    ) {
+      return tab as UserDashboardTab;
+    }
+    return 'overview';
+  };
+
+  const [mainTab, setMainTabState] = useState<UserDashboardTab>(() => normalizeTab(activeTab));
+
+  useEffect(() => {
+    if (activeTab) {
+      setMainTabState(normalizeTab(activeTab));
+      if (activeTab === 'my-requests' || activeTab === 'requests') {
+        setPropertySection('rents');
+      } else if (activeTab === 'incoming-requests') {
+        setPropertySection('owned');
+      } else if (activeTab === 'transactions') {
+        setPropertySection('rents');
+      }
+    }
+  }, [activeTab]);
+
+  const setMainTab = (v: UserDashboardTab) => {
+    setMainTabState(v);
+    if (onTabChange) {
+      const urlTab = v === 'overview' ? '' : v;
+      onTabChange(urlTab);
+    }
+  };
 
   const [reportsSubTab, setReportsSubTab] = useState<'owner' | 'tenant'>('owner');
   const [isPropertyFormOpen, setIsPropertyFormOpen] = useState(false);
@@ -260,10 +518,19 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
     }
     if (notif.request) {
       const fullRequest = (ownerRequests as any[]).concat(tenantRequests as any[]).find((r: any) => r._id === (notif.request._id || notif.request));
-      if (fullRequest) {
-        setSelectedRequest(fullRequest);
-      } else if (typeof notif.request === 'object') {
-        setSelectedRequest(notif.request);
+      const targetReq = fullRequest || (typeof notif.request === 'object' ? notif.request : null);
+      if (targetReq) {
+        const propId = getId(targetReq.property);
+        setMainTab('properties');
+        const isOwner = targetReq.owner === (userProfile as any)?._id || targetReq.owner?._id === (userProfile as any)?._id;
+        if (isOwner) {
+          setPropertySection('owned');
+          if (propId) setSelectedOwnedId(propId);
+        } else {
+          setPropertySection('rents');
+          if (propId) setSelectedTenantId(propId);
+        }
+        setSelectedRequest(targetReq);
       }
     }
   };
@@ -329,7 +596,7 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
 
       {/* Main Unified Navigation Tabs */}
       <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as any)} className="w-full space-y-6">
-        <TabsList className="glass-surface grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-9 w-full h-auto p-1.5 gap-1 rounded-2xl shadow-sm">
+        <TabsList className="glass-surface grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 w-full h-auto p-1.5 gap-1 rounded-2xl shadow-sm">
           <TabsTrigger value="overview" className="gap-1.5 py-2 rounded-lg text-xs font-medium">
             <Sparkles className="h-3.5 w-3.5" />
             {t('Overview', 'கண்ணோட்டம்')}
@@ -338,39 +605,14 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
           <TabsTrigger value="properties" className="gap-1.5 py-2 rounded-lg text-xs font-medium">
             <Building className="h-3.5 w-3.5" />
             {t('My Properties', 'என் சொத்துக்கள்')}
-            {myProperties.length > 0 && (
+            {(myProperties.length > 0 || tenantProperties.length > 0) && (
               <Badge variant="secondary" className="ml-0.5 px-1.5 py-0 h-4 text-[10px]">
-                {myProperties.length}
+                {myProperties.length + tenantProperties.length}
               </Badge>
             )}
-          </TabsTrigger>
-
-          <TabsTrigger value="my-requests" className="gap-1.5 py-2 rounded-lg text-xs font-medium">
-            <Send className="h-3.5 w-3.5 text-blue-500" />
-            {t('My Requests', 'என் கோரிக்கைகள்')}
-            {pendingTenantRequests > 0 && (
-              <Badge variant="secondary" className="ml-0.5 px-1.5 py-0 h-4 text-[10px]">
-                {pendingTenantRequests}
-              </Badge>
-            )}
-          </TabsTrigger>
-
-          <TabsTrigger value="incoming-requests" className="gap-1.5 py-2 rounded-lg text-xs font-medium">
-            <Inbox className="h-3.5 w-3.5 text-amber-500" />
-            {t('Incoming', 'வந்த கோரிக்கைகள்')}
             {pendingOwnerRequests > 0 && (
-              <Badge variant="destructive" className="ml-0.5 px-1.5 py-0 h-4 text-[10px]">
+              <Badge variant="destructive" className="ml-1 px-1.5 py-0 h-4 text-[10px] font-bold">
                 {pendingOwnerRequests}
-              </Badge>
-            )}
-          </TabsTrigger>
-
-          <TabsTrigger value="transactions" className="gap-1.5 py-2 rounded-lg text-xs font-medium">
-            <CreditCard className="h-3.5 w-3.5 text-emerald-600" />
-            {t('Transactions', 'பரிவர்த்தனைகள்')}
-            {activeTransactions.length > 0 && (
-              <Badge variant="secondary" className="ml-0.5 px-1.5 py-0 h-4 text-[10px]">
-                {activeTransactions.length}
               </Badge>
             )}
           </TabsTrigger>
@@ -383,11 +625,6 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
                 {unreadCount}
               </Badge>
             )}
-          </TabsTrigger>
-
-          <TabsTrigger value="rentals" className="gap-1.5 py-2 rounded-lg text-xs font-medium">
-            <KeyRound className="h-3.5 w-3.5" />
-            {t('My Rentals', 'எனது வாடகைகள்')}
           </TabsTrigger>
 
           <TabsTrigger value="reports" className="gap-1.5 py-2 rounded-lg text-xs font-medium">
@@ -406,7 +643,10 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card
               className="cursor-pointer hover:border-primary/50 transition-all shadow-sm"
-              onClick={() => setMainTab('my-requests')}
+              onClick={() => {
+                setMainTab('properties');
+                setPropertySection('rents');
+              }}
             >
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                 <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
@@ -426,7 +666,10 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
 
             <Card
               className="cursor-pointer hover:border-primary/50 transition-all shadow-sm"
-              onClick={() => setMainTab('incoming-requests')}
+              onClick={() => {
+                setMainTab('properties');
+                setPropertySection('owned');
+              }}
             >
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                 <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
@@ -446,7 +689,12 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
 
             <Card
               className="cursor-pointer hover:border-primary/50 transition-all shadow-sm"
-              onClick={() => setMainTab('transactions')}
+              onClick={() => {
+                setMainTab('properties');
+                const hasTenantTx = tenantProperties.some(p => p._request);
+                if (hasTenantTx) setPropertySection('rents');
+                else setPropertySection('owned');
+              }}
             >
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                 <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
@@ -536,7 +784,10 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
                   <Button
                     size="sm"
                     variant="default"
-                    onClick={() => setMainTab('my-requests')}
+                    onClick={() => {
+                      setMainTab('properties');
+                      setPropertySection('rents');
+                    }}
                     className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     <Send className="h-3.5 w-3.5" />
@@ -583,7 +834,10 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setMainTab('incoming-requests')}
+                    onClick={() => {
+                      setMainTab('properties');
+                      setPropertySection('owned');
+                    }}
                     className="gap-1.5"
                   >
                     <Inbox className="h-3.5 w-3.5 text-amber-500" />
@@ -604,12 +858,131 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
         </TabsContent>
 
         {/* Tab 2: My Properties */}
-        <TabsContent value="properties" className="mt-0">
-          <OwnerDashboard
-            initialTab="properties"
-            hideHeaderActions={true}
-            onBrowseProperties={onBrowseProperties}
-          />
+        <TabsContent value="properties" className="mt-0 space-y-4">
+          {/* Section Switcher: Property Owned vs My Rents vs Purchase Offers */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-2.5 sm:p-3 rounded-2xl glass-panel bg-card/60 border border-border/60 shadow-xs">
+            <div className="inline-flex p-1 bg-muted/70 dark:bg-muted/40 rounded-xl border border-border/50 gap-1 self-start sm:self-auto flex-wrap">
+              <button
+                type="button"
+                id="tab-property-owned"
+                onClick={() => handleSwitchSection('owned')}
+                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                  propertySection === 'owned'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Building className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                <span>{t('Property Owned', 'சொத்து உரிமையாளர்')}</span>
+                {myProperties.length > 0 && (
+                  <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-bold">
+                    {myProperties.length}
+                  </Badge>
+                )}
+                {pendingOwnerRequests > 0 && (
+                  <Badge variant="destructive" className="px-1.5 py-0 h-4 text-[10px] font-bold">
+                    {pendingOwnerRequests}
+                  </Badge>
+                )}
+              </button>
+
+              <button
+                type="button"
+                id="tab-my-rents"
+                onClick={() => handleSwitchSection('rents')}
+                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                  propertySection === 'rents'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <KeyRound className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>{t('My Rents', 'எனது வாடகைகள்')}</span>
+                {tenantProperties.length > 0 && (
+                  <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                    {tenantProperties.length}
+                  </Badge>
+                )}
+              </button>
+
+            </div>
+
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              {propertySection === 'owned' ? (
+                <Button
+                  size="sm"
+                  onClick={() => setIsPropertyFormOpen(true)}
+                  className="gap-1.5 text-xs rounded-xl shadow-xs"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {t('List New Property', 'புதிய சொத்து சேர்க்க')}
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onBrowseProperties?.('rent')}
+                  className="gap-1.5 text-xs rounded-xl"
+                >
+                  <Home className="h-3.5 w-3.5 text-emerald-600" />
+                  {t('Browse Rentals', 'வாடகைக்கு தேட')}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Inline Management Workspace */}
+          {propertySection === 'owned' ? (
+            activeOwnedProperty ? (
+              <PropertyFullScreenView
+                property={activeOwnedProperty}
+                properties={myProperties}
+                selectedPropertyId={getId(activeOwnedProperty)}
+                onSelectProperty={handleSelectOwnedProperty}
+                isTenantView={false}
+              />
+            ) : (
+              <div className="rounded-2xl glass-panel bg-card/60 border border-border/60 p-8 sm:p-12 text-center space-y-3">
+                <Building className="h-10 w-10 text-muted-foreground/40 mx-auto" />
+                <h3 className="text-base font-semibold text-foreground">
+                  {t('No owned properties found', 'சொத்துக்கள் எதுவும் இல்லை')}
+                </h3>
+                <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                  {t('You have not added any properties to your portfolio yet. Add your first property to start managing listings, tenant agreements, and rent collection.', 'உங்கள் முதல் சொத்தைச் சேர்த்து பட்டியல்கள் மற்றும் குத்தகைதாரர்களை நிர்வகிக்கத் தொடங்குங்கள்.')}
+                </p>
+                <Button onClick={() => setIsPropertyFormOpen(true)} className="gap-1.5 text-xs">
+                  <Plus className="h-3.5 w-3.5" />
+                  {t('List New Property', 'புதிய சொத்து சேர்க்க')}
+                </Button>
+              </div>
+            )
+          ) : (
+            activeTenantProperty ? (
+              <PropertyFullScreenView
+                property={activeTenantProperty}
+                properties={tenantProperties}
+                selectedPropertyId={getId(activeTenantProperty)}
+                onSelectProperty={handleSelectTenantProperty}
+                isTenantView={true}
+                tenantAgreement={activeTenantProperty?._agreement}
+                activeRequest={activeTenantProperty?._request}
+              />
+            ) : (
+              <div className="rounded-2xl glass-panel bg-card/60 border border-border/60 p-8 sm:p-12 text-center space-y-3">
+                <KeyRound className="h-10 w-10 text-muted-foreground/40 mx-auto" />
+                <h3 className="text-base font-semibold text-foreground">
+                  {t("You don't currently rent any properties", 'நீங்கள் தற்போது எந்த சொத்தையும் வாடகைக்கு எடுக்கவில்லை')}
+                </h3>
+                <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                  {t('You do not currently have any active rental agreements or pending rental applications. Browse available rentals to find your next home.', 'தற்போது தங்களிடம் வாடகை ஒப்பந்தங்கள் அல்லது நிலுவை விண்ணப்பங்கள் எதுவும் இல்லை. புதிய வீட்டைத் தேட வாடகை பட்டியல்களைப் பார்க்கவும்.')}
+                </p>
+                <Button variant="outline" onClick={() => onBrowseProperties?.('rent')} className="gap-1.5 text-xs">
+                  <Home className="h-3.5 w-3.5 text-emerald-600" />
+                  {t('Browse Rentals', 'வாடகைக்கு தேட')}
+                </Button>
+              </div>
+            )
+          )}
         </TabsContent>
 
         {/* Tab 3: My Requests (Sent requests by current user) */}
@@ -1080,11 +1453,14 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
                               <Button
                                 size="sm"
                                 variant="secondary"
-                                onClick={() => setMainTab('rentals')}
+                                onClick={() => {
+                                  setMainTab('properties');
+                                  setPropertySection('rents');
+                                }}
                                 className="gap-1.5 text-xs text-emerald-700 dark:text-emerald-300"
                               >
                                 <KeyRound className="w-3.5 h-3.5" />
-                                {t('View in My Rentals', 'எனது வாடகைகளில் பார்க்க')}
+                                {t('View in My Rents', 'எனது வாடகைகளில் பார்க்க')}
                               </Button>
                             )}
                             <Button
@@ -1313,16 +1689,7 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
           </Card>
         </TabsContent>
 
-        {/* Tab 7: My Rentals (Leases & maintenance) */}
-        <TabsContent value="rentals" className="mt-0">
-          <CustomerDashboard
-            initialTab="rentals"
-            hideHeaderActions={true}
-            onBrowseProperties={onBrowseProperties}
-          />
-        </TabsContent>
-
-        {/* Tab 8: Reports */}
+        {/* Tab 7: Reports */}
         <TabsContent value="reports" className="space-y-4 mt-0">
           <div className="flex items-center justify-between border-b pb-3">
             <div className="flex items-center gap-2">
@@ -1385,7 +1752,11 @@ export default function UserDashboard({ onBrowseProperties }: UserDashboardProps
         onOpenChange={(isOpen) => {
           if (!isOpen) setSelectedRequest(null);
         }}
-        onNavigateToRentals={() => setMainTab('rentals')}
+        onNavigateToRentals={() => {
+          setSelectedRequest(null);
+          setMainTab('properties');
+          setPropertySection('rents');
+        }}
       />
     </div>
   );

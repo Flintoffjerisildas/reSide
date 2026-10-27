@@ -1166,7 +1166,8 @@ router.post('/maintenance/classify', auth, async (req, res) => {
 // Create Maintenance Request (Tenant -> Owner)
 router.post('/maintenance', auth, async (req, res) => {
   try {
-    const { propertyId, issue, description } = req.body;
+    const propertyId = req.body.propertyId || req.body.property;
+    const { issue, description } = req.body;
 
     const property = await Property.findById(propertyId);
     if (!property) return res.status(404).json({ msg: 'Property not found' });

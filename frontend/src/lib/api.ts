@@ -25,7 +25,24 @@ api.interceptors.response.use(
   (res) => res,
   (error) => {
     const status = error?.response?.status;
-    if (status === 401 || status === 403) {
+    const url = error?.config?.url || '';
+    const msg = error?.response?.data?.msg || error?.response?.data?.message || '';
+
+    // Only clear credentials and trigger forced logout on genuine authentication failure:
+    // 1) The authentication verification endpoint (/auth/me) returns 401 or 403
+    // 2) Status is 401 AND the response explicitly indicates token invalidity/expiry
+    // Never logout on resource authorization errors (403 or non-token 401s like ownership checks)
+    const isAuthEndpoint = typeof url === 'string' && (url.includes('/auth/me') || url.includes('/auth/verify'));
+    const isTokenError =
+      status === 401 && (
+        isAuthEndpoint ||
+        msg === 'Token is not valid' ||
+        msg === 'No token, authorization denied' ||
+        msg === 'jwt expired' ||
+        (typeof msg === 'string' && msg.toLowerCase().includes('token'))
+      );
+
+    if (isTokenError) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.dispatchEvent(new Event('reside:logout'));

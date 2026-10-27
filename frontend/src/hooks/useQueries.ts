@@ -536,7 +536,7 @@ export const useMarkAllNotificationsRead = () => {
 export const useCreateVacateRequest = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { propertyId: string; reason: string; requestedVacateDate: string }) => {
+    mutationFn: async (data: { propertyId: string; reason?: string; requestedVacateDate: string }) => {
       const response = await api.post('/vacate-request', data);
       return response.data as any;
     },
@@ -626,6 +626,19 @@ export const useCompleteVacateRequest = () => {
     },
   });
 };
+
+export function useGetTenantAgreements() {
+  const token = localStorage.getItem('token');
+  return useQuery({
+    queryKey: ['agreements-tenant'],
+    enabled: !!token,
+    queryFn: async () => {
+      const res = await api.get('/agreements/tenant');
+      return Array.isArray(res.data) ? res.data : [];
+    },
+    staleTime: 1000 * 60 * 2,
+  });
+}
 
 // Rent History Queries
 export function useGetOwnerRentHistory() {

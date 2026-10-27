@@ -77,12 +77,16 @@ interface OwnerDashboardProps {
   onBrowseProperties?: (transactionType: 'rent' | 'buy') => void;
   initialTab?: string;
   hideHeaderActions?: boolean;
+  selectedPropertyId?: string | null;
+  onSelectProperty?: (propertyId: string | null) => void;
 }
 
 export default function OwnerDashboard({
   onBrowseProperties,
   initialTab = 'overview',
-  hideHeaderActions = false
+  hideHeaderActions = false,
+  selectedPropertyId = null,
+  onSelectProperty
 }: OwnerDashboardProps = {}) {
   const { t, language } = useLanguage();
   const { data: userProfile, refetch: refetchUserProfile } = useGetCallerUserProfile();
@@ -1252,17 +1256,25 @@ export default function OwnerDashboard({
     setSelectedProperty(property);
     setSelectedPropertyInitialTab(tab);
 
-    const url = new URL(window.location.href);
-    url.searchParams.set('propertyId', propId);
-    window.history.pushState({ propertyId: propId }, '', url.toString());
+    if (onSelectProperty) {
+      onSelectProperty(propId);
+    } else {
+      const url = new URL(window.location.href);
+      url.searchParams.set('propertyId', propId);
+      window.history.pushState({ propertyId: propId }, '', url.toString());
+    }
   };
 
   const handleBackFromProperty = () => {
     setSelectedProperty(null);
     setSelectedPropertyInitialTab('overview');
-    const url = new URL(window.location.href);
-    url.searchParams.delete('propertyId');
-    window.history.pushState({}, '', url.toString());
+    if (onSelectProperty) {
+      onSelectProperty(null);
+    } else {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('propertyId');
+      window.history.pushState({}, '', url.toString());
+    }
   };
 
   const openPropertyForId = (propertyId: string, tab: string = 'overview') => {
@@ -1277,6 +1289,18 @@ export default function OwnerDashboard({
   };
 
   useEffect(() => {
+    if (selectedPropertyId && myProperties.length > 0) {
+      const found = (myProperties as any[]).find((p: any) => getId(p) === selectedPropertyId);
+      if (found) {
+        setSelectedProperty(found);
+      }
+    } else if (selectedPropertyId === null && onSelectProperty) {
+      setSelectedProperty(null);
+    }
+  }, [selectedPropertyId, myProperties, onSelectProperty]);
+
+  useEffect(() => {
+    if (onSelectProperty) return; // Router handles history when onSelectProperty is provided
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       const propId = params.get('propertyId');
@@ -1294,9 +1318,10 @@ export default function OwnerDashboard({
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [myProperties]);
+  }, [myProperties, onSelectProperty]);
 
   useEffect(() => {
+    if (onSelectProperty) return; // Router handles history when onSelectProperty is provided
     const params = new URLSearchParams(window.location.search);
     const propId = params.get('propertyId');
     if (propId && myProperties.length > 0 && !selectedProperty) {
@@ -1310,13 +1335,19 @@ export default function OwnerDashboard({
         window.history.replaceState({}, '', url.toString());
       }
     }
-  }, [myProperties, selectedProperty]);
+  }, [myProperties, selectedProperty, onSelectProperty]);
 
   const currentSelectedProperty = useMemo(() => {
     if (!selectedProperty) return null;
     const currentId = getId(selectedProperty);
     return (myProperties as any[]).find((p: any) => getId(p) === currentId) || selectedProperty;
   }, [myProperties, selectedProperty]);
+
+  const activeOwnerProperty = useMemo(() => {
+    if (currentSelectedProperty) return currentSelectedProperty;
+    if (myProperties && myProperties.length > 0) return myProperties[0];
+    return null;
+  }, [currentSelectedProperty, myProperties]);
 
   return (
     <>
@@ -1731,29 +1762,21 @@ export default function OwnerDashboard({
 
           {/* My Properties Tab */}
           <TabsContent value="properties" className="mt-4 sm:mt-6">
-            {currentSelectedProperty ? (
+            {activeOwnerProperty ? (
               <PropertyFullScreenView 
-                property={currentSelectedProperty}
+                property={activeOwnerProperty}
+                properties={myProperties}
+                selectedPropertyId={getId(activeOwnerProperty)}
+                onSelectProperty={(prop) => {
+                  setSelectedProperty(prop);
+                  onSelectProperty?.(getId(prop));
+                }}
                 initialTab={selectedPropertyInitialTab}
                 onBack={handleBackFromProperty}
               />
             ) : (
-              <div className="grid gap-3 sm:gap-3.5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 items-stretch">
-                {myProperties.length > 0 ? (
-                  myProperties.map((property) => (
-                    <PropertyCard 
-                      key={getId(property)}
-                      property={property} 
-                      showRequestButton={false} 
-                      isOwnerView={true}
-                      onClick={() => handleSelectProperty(property, 'overview')}
-                    />
-                  ))
-                ) : (
-                  <div className="col-span-full text-center py-12 text-muted-foreground">
-                    {t('No properties found. Add your first property!', 'சொத்துக்கள் எதுவும் காணப்படவில்லை. உங்கள் முதல் சொத்தைச் சேர்க்கவும்!')}
-                  </div>
-                )}
+              <div className="text-center py-12 text-muted-foreground">
+                {t('No properties found. Add your first property!', 'சொத்துக்கள் எதுவும் காணப்படவில்லை. உங்கள் முதல் சொத்தைச் சேர்க்கவும்!')}
               </div>
             )}
           </TabsContent>

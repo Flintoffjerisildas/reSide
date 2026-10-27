@@ -17,9 +17,18 @@ import HeroSection from './HeroSection';
 interface PropertyListingsProps {
   showAbout?: boolean;
   initialTransactionType?: 'rent' | 'buy' | '';
+  selectedPropertyId?: string | null;
+  onSelectProperty?: (propertyId: string | null) => void;
+  onTransactionTypeChange?: (type: 'rent' | 'buy' | '') => void;
 }
 
-export default function PropertyListings({ showAbout = false, initialTransactionType = '' }: PropertyListingsProps) {
+export default function PropertyListings({
+  showAbout = false,
+  initialTransactionType = '',
+  selectedPropertyId = null,
+  onSelectProperty,
+  onTransactionTypeChange
+}: PropertyListingsProps) {
   const { data: properties = [], isLoading } = useGetAllProperties();
   const { t, language } = useLanguage();
   const { isAuthenticated } = useAuth();
@@ -139,6 +148,20 @@ export default function PropertyListings({ showAbout = false, initialTransaction
     });
   }, [properties, location, propertyType, transactionType, priceRange]);
 
+  // Sync selectedPropertyId prop with index
+  useEffect(() => {
+    if (selectedPropertyId && properties.length > 0) {
+      const idx = filteredProperties.findIndex(
+        (p: any) => (p.id || p._id) === selectedPropertyId
+      );
+      if (idx !== -1) {
+        setSelectedPropertyIndex(idx);
+      }
+    } else if (!selectedPropertyId) {
+      setSelectedPropertyIndex(null);
+    }
+  }, [selectedPropertyId, filteredProperties, properties]);
+
   // Check if any filters are active
   const hasActiveFilters = location || propertyType || transactionType || priceRange[0] !== 0 || priceRange[1] !== 0;
 
@@ -147,6 +170,7 @@ export default function PropertyListings({ showAbout = false, initialTransaction
     setPropertyType('');
     setTransactionType('');
     setPriceRange([0, 0]);
+    onTransactionTypeChange?.('');
   };
 
   const handlePropertyTypeChange = (value: string) => {
@@ -156,8 +180,21 @@ export default function PropertyListings({ showAbout = false, initialTransaction
     });
   };
 
+  const handleTransactionTypeChange = (value: string) => {
+    setTransactionType(value);
+    if (onTransactionTypeChange) {
+      const normalized = value === 'purchase' || value === 'buy' ? 'buy' : value === 'rent' ? 'rent' : '';
+      onTransactionTypeChange(normalized);
+    }
+  };
+
+  const directProperty = useMemo(() => {
+    if (!selectedPropertyId) return null;
+    return properties.find((p: any) => (p.id || (p as any)._id) === selectedPropertyId) || null;
+  }, [selectedPropertyId, properties]);
+
   // Navigation for property details view
-  const selectedProperty = selectedPropertyIndex !== null ? filteredProperties[selectedPropertyIndex] : null;
+  const selectedProperty = selectedPropertyIndex !== null ? filteredProperties[selectedPropertyIndex] : directProperty;
   const [selectedTitleTa, setSelectedTitleTa] = useState<string | null>(null);
   const [selectedLocationTa, setSelectedLocationTa] = useState<string | null>(null);
   const selectedImages = useMemo(() => {
@@ -208,26 +245,43 @@ export default function PropertyListings({ showAbout = false, initialTransaction
 
   const handlePreviousProperty = () => {
     if (selectedPropertyIndex !== null && selectedPropertyIndex > 0) {
-      setSelectedPropertyIndex(selectedPropertyIndex - 1);
+      const newIdx = selectedPropertyIndex - 1;
+      setSelectedPropertyIndex(newIdx);
       setCurrentImageIndex(0);
+      const prop = filteredProperties[newIdx];
+      if (prop && onSelectProperty) {
+        onSelectProperty(prop.id || (prop as any)._id);
+      }
     }
   };
 
   const handleNextProperty = () => {
     if (selectedPropertyIndex !== null && selectedPropertyIndex < filteredProperties.length - 1) {
-      setSelectedPropertyIndex(selectedPropertyIndex + 1);
+      const newIdx = selectedPropertyIndex + 1;
+      setSelectedPropertyIndex(newIdx);
       setCurrentImageIndex(0);
+      const prop = filteredProperties[newIdx];
+      if (prop && onSelectProperty) {
+        onSelectProperty(prop.id || (prop as any)._id);
+      }
     }
   };
 
   const handleCardClick = (index: number) => {
     setSelectedPropertyIndex(index);
     setCurrentImageIndex(0);
+    const prop = filteredProperties[index];
+    if (prop && onSelectProperty) {
+      onSelectProperty(prop.id || (prop as any)._id);
+    }
   };
 
   const handleCloseDetail = () => {
     setSelectedPropertyIndex(null);
     setCurrentImageIndex(0);
+    if (onSelectProperty) {
+      onSelectProperty(null);
+    }
   };
 
   const handleRequestProperty = () => {
@@ -250,7 +304,7 @@ export default function PropertyListings({ showAbout = false, initialTransaction
           propertyType={propertyType}
           onPropertyTypeChange={handlePropertyTypeChange}
           transactionType={transactionType}
-          onTransactionTypeChange={setTransactionType}
+          onTransactionTypeChange={handleTransactionTypeChange}
           maxPrice={priceRange[1]}
           onMaxPriceChange={(value) => setPriceRange([0, value])}
           onSearch={() => document.getElementById('property-listings')?.scrollIntoView({ behavior: 'smooth' })}

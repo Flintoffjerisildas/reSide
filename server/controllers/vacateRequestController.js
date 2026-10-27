@@ -91,7 +91,7 @@ exports.cancelVacateRequest = async (req, res) => {
     }
 
     if (request.tenant.toString() !== req.user.id) {
-      return res.status(401).json({ msg: 'Not authorized' });
+      return res.status(403).json({ msg: 'Not authorized: Tenant access required' });
     }
 
     if (request.status !== 'pending') {
@@ -117,7 +117,7 @@ exports.getVacateRequestsForProperty = async (req, res) => {
     }
 
     if (property.owner.toString() !== req.user.id) {
-      return res.status(401).json({ msg: 'Not authorized' });
+      return res.status(403).json({ msg: 'Not authorized: Owner access required' });
     }
 
     const requests = await VacateRequest.find({ property: propertyId })
@@ -140,7 +140,7 @@ exports.approveVacateRequest = async (req, res) => {
     }
 
     if (request.owner.toString() !== req.user.id) {
-      return res.status(401).json({ msg: 'Not authorized' });
+      return res.status(403).json({ msg: 'Not authorized: Owner access required' });
     }
 
     if (request.status !== 'pending') {
@@ -184,7 +184,7 @@ exports.rejectVacateRequest = async (req, res) => {
     }
 
     if (request.owner.toString() !== req.user.id) {
-      return res.status(401).json({ msg: 'Not authorized' });
+      return res.status(403).json({ msg: 'Not authorized: Owner access required' });
     }
 
     if (request.status !== 'pending') {
@@ -210,7 +210,7 @@ exports.completeVacateRequest = async (req, res) => {
     }
 
     if (request.owner.toString() !== req.user.id) {
-      return res.status(401).json({ msg: 'Not authorized' });
+      return res.status(403).json({ msg: 'Not authorized: Owner access required' });
     }
 
     if (request.status !== 'approved') {

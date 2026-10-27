@@ -37,6 +37,7 @@ interface HeaderProps {
   onBuyClick?: () => void;
   isDashboardActive?: boolean;
   onLoginClick?: () => void;
+  onNotificationsClick?: () => void;
 }
 
 export default function Header({ 
@@ -47,7 +48,8 @@ export default function Header({
   onRentClick,
   onBuyClick,
   isDashboardActive = false,
-  onLoginClick
+  onLoginClick,
+  onNotificationsClick
 }: HeaderProps) {
   const { theme, setTheme } = useTheme();
   const { user, logout, isInitializing } = useAuth();
@@ -129,7 +131,7 @@ export default function Header({
             <Button
               variant="ghost"
               size="icon"
-              onClick={onDashboardClick}
+              onClick={onNotificationsClick || onDashboardClick}
               title={t('Notifications', 'அறிவிப்புகள்')}
               className="relative glass-pill rounded-full text-slate-600 transition-all hover:-translate-y-0.5 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-300"
             >
