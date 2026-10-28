@@ -1,0 +1,70 @@
+{
+  "kind": "coverage_report",
+  "version": "1.0",
+  "generatedAt": "2026-02-05T13:27:36.764Z",
+  "sources": {
+    "buildRequest": true,
+    "implementationPlan": true
+  },
+  "requirements": {
+    "total": 3,
+    "implemented": 3,
+    "items": [
+      {
+        "id": "REQ-4",
+        "summary": "Add a local development guide (in English) that explains exactly how to run the app locally and how to keep all dependency artifacts stored within the project folder (frontend dependencies and local replica/canister artifacts), including copy-paste commands.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/LOCAL_DEV.md"
+        ],
+        "matchedFiles": [
+          "frontend/LOCAL_DEV.md"
+        ]
+      },
+      {
+        "id": "REQ-5",
+        "summary": "Ensure frontend package management can be configured to store its package cache/store within the project directory (not in a global user-level location) and provide repo-checked-in configuration to enable it.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/.npmrc",
+          "frontend/.gitignore",
+          "frontend/LOCAL_DEV.md"
+        ],
+        "matchedFiles": [
+          "frontend/.npmrc",
+          "frontend/.gitignore",
+          "frontend/LOCAL_DEV.md"
+        ]
+      },
+      {
+        "id": "REQ-6",
+        "summary": "Add a single command/script in the repository that verifies a machine has all required local dependencies and that project-local dependency directories are present (or prints clear instructions to generate them).",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/scripts/check-local-dev.mjs",
+          "frontend/LOCAL_DEV.md"
+        ],
+        "matchedFiles": [
+          "frontend/scripts/check-local-dev.mjs",
+          "frontend/LOCAL_DEV.md"
+        ]
+      }
+    ]
+  },
+  "changedFiles": [
+    "backend/main.mo",
+    "build-request.json",
+    "caffeine.lock.json",
+    "feature_evidence.json",
+    "frontend-file-summaries.txt",
+    "frontend-implementation-plan.json",
+    "frontend/.gitignore",
+    "frontend/.npmrc",
+    "frontend/LOCAL_DEV.md",
+    "frontend/scripts/check-local-dev.mjs",
+    "project_state.json",
+    "scratch/component-selection.json",
+    "spec.md",
+    "spec_vs_diff_report.json"
+  ]
+}
