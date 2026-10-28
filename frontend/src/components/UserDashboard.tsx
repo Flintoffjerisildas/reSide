@@ -15,7 +15,8 @@ import {
   useMarkAllNotificationsRead,
   useApproveRequest,
   useRejectRequest,
-  useGetTenantAgreements
+  useGetTenantAgreements,
+  useGetSelfManagedRentals
 } from '../hooks/useQueries';
 import { toast } from 'sonner';
 import {
@@ -28,6 +29,9 @@ import {
   Settings,
   Plus,
   ArrowUpRight,
+  ArrowRight,
+  LayoutGrid,
+  User,
   Send,
   Sparkles,
   ShieldCheck,
@@ -41,13 +45,16 @@ import {
   Eye,
   CheckCheck,
   MapPin,
-  ShoppingBag
+  ShoppingBag,
+  SlidersHorizontal,
+  Link2
 } from 'lucide-react';
 import OwnerDashboard from './OwnerDashboard';
 import CustomerDashboard from './CustomerDashboard';
 import PropertyFullScreenView from './PropertyFullScreenView';
 import PropertyForm from './PropertyForm';
 import RequestDetailsModal from './RequestDetailsModal';
+import AddExistingRentalDialog from './AddExistingRentalDialog';
 import { PropertyRequest } from '../types';
 
 interface UserDashboardProps {
@@ -81,6 +88,7 @@ export default function UserDashboard({
   const { data: tenantAgreements = [] } = useGetTenantAgreements();
   const { data: ownerRequests = [] } = useGetOwnerRequests();
   const { data: tenantRequests = [] } = useGetTenantRequests();
+  const { data: selfManagedRentals = [] } = useGetSelfManagedRentals();
   const { data: announcements = [] } = useAnnouncements();
   const { data: notificationData } = useGetNotifications();
   const markReadMutation = useMarkNotificationRead();
@@ -129,6 +137,8 @@ export default function UserDashboard({
   const [selectedOwnedId, setSelectedOwnedId] = useState<string | null>(null);
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
+  const [isAddRentalOpen, setIsAddRentalOpen] = useState(false);
+  const [rentalCategoryFilter, setRentalCategoryFilter] = useState<'all' | 'connected' | 'self_managed'>('all');
 
   // Derived tenant properties from tenantAgreements + tenantRequests for rent
   const tenantProperties = useMemo(() => {
@@ -183,11 +193,42 @@ export default function UserDashboard({
         status: req.status,
         _request: req,
         isPendingRental: true,
+        rentalMode: 'connected',
+        isSelfManaged: false,
+      });
+    });
+
+    // 3. Self-managed rentals created directly by current tenant
+    (selfManagedRentals || []).forEach((smr: any) => {
+      if (!smr) return;
+      const smrId = smr._id || smr.id;
+      if (!smrId || seenPropertyIds.has(String(smrId))) return;
+      seenPropertyIds.add(String(smrId));
+
+      const propTitle = smr.propertyTitle || t('Self-Managed Rental', 'சுய-நிர்வகிக்கப்பட்ட வாடகை');
+      const propLoc = `${smr.address || ''}${smr.city ? ', ' + smr.city : ''}${smr.postalCode ? ' - ' + smr.postalCode : ''}`.trim() || t('Self-Managed Rental Location', 'வாடகை இடம்');
+      const propPrice = smr.monthlyRent || 0;
+
+      list.push({
+        _id: smrId,
+        id: smrId,
+        title: propTitle,
+        location: propLoc,
+        price: propPrice,
+        transactionType: 'rent',
+        propertyType: smr.propertyType,
+        images: smr.image ? [smr.image] : [],
+        status: smr.status || 'occupied',
+        occupancyStatus: 'occupied',
+        rentalMode: 'self_managed',
+        isSelfManaged: true,
+        _selfManaged: smr,
+        isPendingRental: false,
       });
     });
 
     return list;
-  }, [tenantAgreements, tenantRequests, t]);
+  }, [tenantAgreements, tenantRequests, selfManagedRentals, t]);
 
   // Synchronize selection with props or auto-detect section
   useEffect(() => {
@@ -232,17 +273,35 @@ export default function UserDashboard({
     }
   }, [myProperties, selectedOwnedId]);
 
+  const connectedRentalsCount = useMemo(() => {
+    return tenantProperties.filter((p: any) => !p.isSelfManaged).length;
+  }, [tenantProperties]);
+
+  const selfManagedRentalsCount = useMemo(() => {
+    return tenantProperties.filter((p: any) => !!p.isSelfManaged).length;
+  }, [tenantProperties]);
+
+  const filteredTenantProperties = useMemo(() => {
+    if (rentalCategoryFilter === 'connected') {
+      return tenantProperties.filter((p: any) => !p.isSelfManaged);
+    }
+    if (rentalCategoryFilter === 'self_managed') {
+      return tenantProperties.filter((p: any) => !!p.isSelfManaged);
+    }
+    return tenantProperties;
+  }, [tenantProperties, rentalCategoryFilter]);
+
   // Auto-select first tenant property when entering rents section if nothing selected
   useEffect(() => {
-    if (tenantProperties.length > 0) {
-      if (!selectedTenantId || !tenantProperties.some((p: any) => getId(p) === selectedTenantId)) {
-        const firstId = getId(tenantProperties[0]);
+    if (filteredTenantProperties.length > 0) {
+      if (!selectedTenantId || !filteredTenantProperties.some((p: any) => getId(p) === selectedTenantId)) {
+        const firstId = getId(filteredTenantProperties[0]);
         setSelectedTenantId(firstId);
       }
     } else {
       setSelectedTenantId(null);
     }
-  }, [tenantProperties, selectedTenantId]);
+  }, [filteredTenantProperties, selectedTenantId]);
 
   const activeOwnedProperty = useMemo(() => {
     if (!myProperties.length) return null;
@@ -250,9 +309,9 @@ export default function UserDashboard({
   }, [myProperties, selectedOwnedId]);
 
   const activeTenantProperty = useMemo(() => {
-    if (!tenantProperties.length) return null;
-    return tenantProperties.find((p: any) => getId(p) === selectedTenantId) || tenantProperties[0];
-  }, [tenantProperties, selectedTenantId]);
+    if (!filteredTenantProperties.length) return null;
+    return filteredTenantProperties.find((p: any) => getId(p) === selectedTenantId) || filteredTenantProperties[0];
+  }, [filteredTenantProperties, selectedTenantId]);
 
   const handleSelectOwnedProperty = (property: any) => {
     const id = getId(property);
@@ -536,25 +595,45 @@ export default function UserDashboard({
   };
 
   return (
-    <div className="w-full py-6 sm:py-8 px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 space-y-6">
-      {/* Top Profile & Welcome Banner */}
-      <div className="glass-panel rounded-2xl p-6 shadow-md transition-all duration-300">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
+    <div className="w-full min-h-[calc(100vh-58px)] bg-gradient-to-b from-[#f0f6ff]/60 via-slate-50/50 to-white dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 py-3 sm:py-5 px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 space-y-0">
+      {/* Main Unified Navigation Tabs */}
+      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as any)} className="w-full space-y-0">
+        {/* Compact Container Architecture: Container 1 (Banner) + Container 2 (Primary Tabs) */}
+
+        {/* Container 1: Welcome Banner (Desktop height approx 140-160px, rounded 16px, soft blue gradient, building image on right) */}
+        <div className="relative overflow-hidden rounded-2xl border border-blue-200/70 dark:border-blue-900/40 bg-gradient-to-r from-[#d9ebff]/90 via-[#e4f0ff]/80 to-[#eff6ff]/50 dark:from-slate-900 dark:via-blue-950/40 dark:to-slate-900 p-5 sm:p-6 shadow-xs min-h-[145px] flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Residential Building Background restricted to right portion */}
+          <div className="absolute right-0 top-0 bottom-0 w-full md:w-[46%] pointer-events-none overflow-hidden select-none">
+            <img
+              src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1000&q=80"
+              alt="Modern residential building"
+              className="w-full h-full object-cover object-center opacity-85 [mask-image:linear-gradient(to_left,black_60%,transparent_100%)]"
+            />
+            <div className="absolute inset-0 bg-blue-500/10 mix-blend-multiply" />
+          </div>
+
+          {/* Left section: Welcome Back, Customer, Badges, Description */}
+          <div className="relative z-10 space-y-1.5 max-w-xl">
+            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <span>{t('WELCOME BACK', 'மீண்டும் வருக')}</span>
+              <span className="w-6 h-0.5 bg-slate-400/60 inline-block rounded-full" />
+            </div>
+
             <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-                {t('Welcome back', 'மீண்டும் வருக')}, {userProfile?.name || 'User'}
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#0B1736] dark:text-white tracking-tight leading-none">
+                {userProfile?.name || 'Customer'}
               </h1>
-              <Badge variant="outline" className="glass-pill bg-primary/10 text-primary border-primary/20 px-2.5 py-0.5 text-xs font-semibold">
-                <UserCheck className="w-3 h-3 mr-1 inline" />
+              <Badge className="bg-blue-500/15 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-full px-2.5 py-0.5 text-xs font-semibold flex items-center gap-1.5 shadow-2xs">
+                <User className="w-3.5 h-3.5 text-blue-600" />
                 {getPurposeLabel(registrationPurpose)}
               </Badge>
-              <Badge variant="secondary" className="glass-pill text-xs">
-                <ShieldCheck className="w-3 h-3 mr-1 inline text-emerald-500" />
+              <Badge className="bg-emerald-500/15 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-full px-2.5 py-0.5 text-xs font-semibold flex items-center gap-1.5 shadow-2xs">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 {t('Unified Account', 'ஒருங்கிணைந்த கணக்கு')}
               </Badge>
             </div>
-            <p className="text-sm text-muted-foreground">
+
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-normal leading-relaxed pt-0.5">
               {t(
                 'Buy, rent, sell, or lease from one unified hub with complete transaction security and verified payment workflow.',
                 'ஒரே மையத்திலிருந்து வாங்கலாம், வாடகைக்கு எடுக்கலாம், விற்கலாம் மற்றும் கட்டணங்களை சரிபார்க்கலாம்.'
@@ -562,79 +641,101 @@ export default function UserDashboard({
             </p>
           </div>
 
-          {/* Quick Action Buttons */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          {/* Right section: 3 action buttons */}
+          <div className="relative z-10 flex items-center gap-2.5 flex-wrap shrink-0">
             <Button
               variant="outline"
               size="sm"
               onClick={() => onBrowseProperties?.('rent')}
-              className="glass-pill gap-1.5 rounded-xl hover:-translate-y-0.5 transition-all text-foreground"
+              className="h-10 bg-white/95 hover:bg-white text-[#0B1736] dark:bg-slate-900/90 dark:text-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-xl px-3.5 text-xs font-semibold shadow-xs flex items-center gap-2 transition-all hover:-translate-y-0.5"
             >
-              <Home className="h-4 w-4 text-primary" />
-              {t('Browse to Rent', 'வாடகைக்கு தேடு')}
+              <span className="p-1 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400">
+                <Home className="h-4 w-4" />
+              </span>
+              <span>{t('Browse to Rent', 'வாடகைக்கு தேட')}</span>
+              <ArrowRight className="h-3.5 w-3.5 text-slate-400" />
             </Button>
+
             <Button
               variant="outline"
               size="sm"
               onClick={() => onBrowseProperties?.('buy')}
-              className="glass-pill gap-1.5 rounded-xl hover:-translate-y-0.5 transition-all text-foreground"
+              className="h-10 bg-white/95 hover:bg-white text-[#0B1736] dark:bg-slate-900/90 dark:text-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-xl px-3.5 text-xs font-semibold shadow-xs flex items-center gap-2 transition-all hover:-translate-y-0.5"
             >
-              <Building className="h-4 w-4 text-emerald-600" />
-              {t('Browse to Buy', 'வாங்க தேடு')}
+              <span className="p-1 rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400">
+                <Building className="h-4 w-4" />
+              </span>
+              <span>{t('Browse to Buy', 'வாங்க தேட')}</span>
+              <ArrowRight className="h-3.5 w-3.5 text-slate-400" />
             </Button>
+
             <Button
               size="sm"
               onClick={() => setIsPropertyFormOpen(true)}
-              className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/20 hover:-translate-y-0.5 rounded-xl transition-all"
+              className="h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 text-xs font-semibold shadow-sm flex items-center gap-2 transition-all hover:-translate-y-0.5"
             >
               <Plus className="h-4 w-4" />
-              {t('List Property', 'சொத்தை பட்டியலிடு')}
+              <span>{t('List Property', 'சொத்தை பட்டியலிடு')}</span>
+              <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
-      </div>
 
-      {/* Main Unified Navigation Tabs */}
-      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as any)} className="w-full space-y-6">
-        <TabsList className="glass-surface grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 w-full h-auto p-1.5 gap-1 rounded-2xl shadow-sm">
-          <TabsTrigger value="overview" className="gap-1.5 py-2 rounded-lg text-xs font-medium">
-            <Sparkles className="h-3.5 w-3.5" />
-            {t('Overview', 'கண்ணோட்டம்')}
+        {/* Container 2: Primary Navigation Tabs (Unified white container, equal-width tabs, pale cyan active highlight) */}
+        <TabsList className="w-full border border-slate-200/80 dark:border-border/80 rounded-2xl shadow-xs p-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 h-auto gap-1">
+          <TabsTrigger
+            value="overview"
+            className="h-11 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-all duration-200 data-[state=active]:bg-[#e0f2fe]/75 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-950/60 dark:data-[state=active]:text-blue-300 data-[state=active]:font-bold data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+          >
+            <LayoutGrid className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <span>{t('Overview', 'கண்ணோட்டம்')}</span>
           </TabsTrigger>
 
-          <TabsTrigger value="properties" className="gap-1.5 py-2 rounded-lg text-xs font-medium">
-            <Building className="h-3.5 w-3.5" />
-            {t('My Properties', 'என் சொத்துக்கள்')}
+          <TabsTrigger
+            value="properties"
+            className="h-11 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-all duration-200 data-[state=active]:bg-[#e0f2fe]/75 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-950/60 dark:data-[state=active]:text-blue-300 data-[state=active]:font-bold data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+          >
+            <Building className="h-4 w-4 text-slate-700 dark:text-slate-300" />
+            <span>{t('My Properties', 'என் சொத்துக்கள்')}</span>
             {(myProperties.length > 0 || tenantProperties.length > 0) && (
-              <Badge variant="secondary" className="ml-0.5 px-1.5 py-0 h-4 text-[10px]">
+              <Badge variant="secondary" className="ml-0.5 px-1.5 py-0 h-4 text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200 rounded-full">
                 {myProperties.length + tenantProperties.length}
               </Badge>
             )}
             {pendingOwnerRequests > 0 && (
-              <Badge variant="destructive" className="ml-1 px-1.5 py-0 h-4 text-[10px] font-bold">
+              <Badge variant="destructive" className="ml-1 px-1.5 py-0 h-4 text-[10px] font-bold rounded-full">
                 {pendingOwnerRequests}
               </Badge>
             )}
           </TabsTrigger>
 
-          <TabsTrigger value="notifications" className="gap-1.5 py-2 rounded-lg text-xs font-medium">
-            <Bell className="h-3.5 w-3.5 text-indigo-500" />
-            {t('Notifications', 'அறிவிப்புகள்')}
+          <TabsTrigger
+            value="notifications"
+            className="h-11 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-all duration-200 data-[state=active]:bg-[#e0f2fe]/75 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-950/60 dark:data-[state=active]:text-blue-300 data-[state=active]:font-bold data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+          >
+            <Bell className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+            <span>{t('Notifications', 'அறிவிப்புகள்')}</span>
             {unreadCount > 0 && (
-              <Badge variant="destructive" className="ml-0.5 px-1.5 py-0 h-4 text-[10px]">
+              <Badge variant="destructive" className="ml-0.5 px-1.5 py-0 h-4 text-[10px] rounded-full font-bold">
                 {unreadCount}
               </Badge>
             )}
           </TabsTrigger>
 
-          <TabsTrigger value="reports" className="gap-1.5 py-2 rounded-lg text-xs font-medium">
-            <FileText className="h-3.5 w-3.5" />
-            {t('Reports', 'அறிக்கைகள்')}
+          <TabsTrigger
+            value="reports"
+            className="h-11 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-all duration-200 data-[state=active]:bg-[#e0f2fe]/75 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-950/60 dark:data-[state=active]:text-blue-300 data-[state=active]:font-bold data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+          >
+            <FileText className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+            <span>{t('Reports', 'அறிக்கைகள்')}</span>
           </TabsTrigger>
 
-          <TabsTrigger value="settings" className="gap-1.5 py-2 rounded-lg text-xs font-medium">
-            <Settings className="h-3.5 w-3.5" />
-            {t('Settings', 'அமைப்புகள்')}
+          <TabsTrigger
+            value="settings"
+            className="h-11 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-all duration-200 data-[state=active]:bg-[#e0f2fe]/75 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-950/60 dark:data-[state=active]:text-blue-300 data-[state=active]:font-bold data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+          >
+            <Settings className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+            <span>{t('Settings', 'அமைப்புகள்')}</span>
           </TabsTrigger>
         </TabsList>
 
@@ -858,24 +959,24 @@ export default function UserDashboard({
         </TabsContent>
 
         {/* Tab 2: My Properties */}
-        <TabsContent value="properties" className="mt-0 space-y-4">
-          {/* Section Switcher: Property Owned vs My Rents vs Purchase Offers */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-2.5 sm:p-3 rounded-2xl glass-panel bg-card/60 border border-border/60 shadow-xs">
-            <div className="inline-flex p-1 bg-muted/70 dark:bg-muted/40 rounded-xl border border-border/50 gap-1 self-start sm:self-auto flex-wrap">
+        <TabsContent value="properties" className="mt-0 space-y-3.5">
+          {/* Container 3: Property Category Toolbar */}
+          <div className="w-full min-h-[52px] sm:h-14 bg-white/95 dark:bg-card/90 backdrop-blur-md border border-slate-200/80 dark:border-border/80 rounded-2xl px-3 sm:px-4 py-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shadow-xs">
+            <div className="inline-flex p-1 bg-slate-100/80 dark:bg-muted/50 rounded-xl gap-1 self-start sm:self-auto flex-wrap">
               <button
                 type="button"
                 id="tab-property-owned"
                 onClick={() => handleSwitchSection('owned')}
-                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   propertySection === 'owned'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-white text-blue-700 dark:bg-card dark:text-blue-300 shadow-xs border border-slate-200/80 font-bold'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
                 }`}
               >
-                <Building className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                <Home className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
                 <span>{t('Property Owned', 'சொத்து உரிமையாளர்')}</span>
                 {myProperties.length > 0 && (
-                  <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-bold">
+                  <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
                     {myProperties.length}
                   </Badge>
                 )}
@@ -890,10 +991,10 @@ export default function UserDashboard({
                 type="button"
                 id="tab-my-rents"
                 onClick={() => handleSwitchSection('rents')}
-                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   propertySection === 'rents'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-white text-emerald-700 dark:bg-card dark:text-emerald-300 shadow-xs border border-slate-200/80 font-bold'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
                 }`}
               >
                 <KeyRound className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -904,32 +1005,146 @@ export default function UserDashboard({
                   </Badge>
                 )}
               </button>
-
             </div>
 
-            <div className="flex items-center gap-2 self-start sm:self-auto">
+            <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
               {propertySection === 'owned' ? (
                 <Button
                   size="sm"
                   onClick={() => setIsPropertyFormOpen(true)}
-                  className="gap-1.5 text-xs rounded-xl shadow-xs"
+                  className="gap-1.5 text-xs rounded-xl shadow-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold h-9 px-4"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   {t('List New Property', 'புதிய சொத்து சேர்க்க')}
                 </Button>
               ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onBrowseProperties?.('rent')}
-                  className="gap-1.5 text-xs rounded-xl"
-                >
-                  <Home className="h-3.5 w-3.5 text-emerald-600" />
-                  {t('Browse Rentals', 'வாடகைக்கு தேட')}
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    onClick={() => setIsAddRentalOpen(true)}
+                    className="gap-1.5 text-xs rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs font-semibold h-9 px-3.5"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    {t('Add Existing Rental', 'ஏற்கனவே உள்ள வாடகையை சேர்க்க')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onBrowseProperties?.('rent')}
+                    className="gap-1.5 text-xs rounded-xl border-slate-200 h-9 px-3.5 font-semibold"
+                  >
+                    <Home className="h-3.5 w-3.5 text-emerald-600" />
+                    {t('Browse Rentals', 'வாடகைக்கு தேட')}
+                  </Button>
+                </>
               )}
             </div>
           </div>
+
+          {/* Sub-Filter for My Rents: All vs Connected vs Self-Managed */}
+          {propertySection === 'rents' && (
+            <div
+              id="rental-category-filter"
+              data-testid="rental-category-filter"
+              className="w-full rounded-2xl glass-panel bg-card/90 dark:bg-card/85 backdrop-blur-md border border-border/80 shadow-xs p-2.5 sm:p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition-all"
+            >
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-foreground shrink-0">
+                  <div className="w-6 h-6 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                  </div>
+                  <span>{t('Filter Category:', 'வகைப்படுத்து:')}</span>
+                </div>
+
+                <div className="inline-flex p-1 bg-muted/80 dark:bg-muted/50 rounded-xl border border-border/60 gap-1 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setRentalCategoryFilter('all')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                      rentalCategoryFilter === 'all'
+                        ? 'bg-background text-foreground shadow-xs border border-border/70 ring-1 ring-primary/20'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-background/40'
+                    }`}
+                  >
+                    <span>{t('All Rentals', 'அனைத்து வாடகைகள்')}</span>
+                    <Badge
+                      variant="secondary"
+                      className={`px-1.5 py-0 h-4 text-[10px] font-bold ${
+                        rentalCategoryFilter === 'all'
+                          ? 'bg-primary/15 text-primary dark:text-primary-foreground'
+                          : 'bg-muted-foreground/15 text-muted-foreground'
+                      }`}
+                    >
+                      {tenantProperties.length}
+                    </Badge>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRentalCategoryFilter('connected')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                      rentalCategoryFilter === 'connected'
+                        ? 'bg-background text-blue-700 dark:text-blue-300 shadow-xs border border-blue-300 dark:border-blue-800 ring-1 ring-blue-500/20'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-background/40'
+                    }`}
+                  >
+                    <Link2 className="h-3 w-3 text-blue-500 shrink-0" />
+                    <span>{t('Connected', 'இணைக்கப்பட்டது')}</span>
+                    <Badge
+                      variant="secondary"
+                      className={`px-1.5 py-0 h-4 text-[10px] font-bold ${
+                        rentalCategoryFilter === 'connected'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                          : 'bg-muted-foreground/15 text-muted-foreground'
+                      }`}
+                    >
+                      {connectedRentalsCount}
+                    </Badge>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRentalCategoryFilter('self_managed')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                      rentalCategoryFilter === 'self_managed'
+                        ? 'bg-background text-emerald-700 dark:text-emerald-300 shadow-xs border border-emerald-300 dark:border-emerald-800 ring-1 ring-emerald-500/20'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-background/40'
+                    }`}
+                  >
+                    <ShieldCheck className="h-3 w-3 text-emerald-600 shrink-0" />
+                    <span>{t('Self-Managed', 'சுய-நிர்வகிக்கப்பட்டது')}</span>
+                    <Badge
+                      variant="secondary"
+                      className={`px-1.5 py-0 h-4 text-[10px] font-bold ${
+                        rentalCategoryFilter === 'self_managed'
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                          : 'bg-muted-foreground/15 text-muted-foreground'
+                      }`}
+                    >
+                      {selfManagedRentalsCount}
+                    </Badge>
+                  </button>
+                </div>
+              </div>
+
+              {/* Status / Quick hint */}
+              <div className="text-[11px] text-muted-foreground shrink-0 hidden sm:block">
+                {rentalCategoryFilter === 'all' && (
+                  <span>{t('Showing all rentals in your portfolio', 'அனைத்து வாடகைகளும் காட்டப்படுகின்றன')}</span>
+                )}
+                {rentalCategoryFilter === 'connected' && (
+                  <span className="text-blue-600 dark:text-blue-400 font-medium">
+                    {t('Showing rentals connected to reSide landlords', 'reSide நிலப்பிரபுக்களுடன் இணைக்கப்பட்ட வாடகைகள்')}
+                  </span>
+                )}
+                {rentalCategoryFilter === 'self_managed' && (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                    {t('Showing your private, self-managed rentals', 'சுய-நிர்வகிக்கப்பட்ட வாடகைகள்')}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Inline Management Workspace */}
           {propertySection === 'owned' ? (
@@ -957,29 +1172,81 @@ export default function UserDashboard({
               </div>
             )
           ) : (
-            activeTenantProperty ? (
+            filteredTenantProperties.length > 0 && activeTenantProperty ? (
               <PropertyFullScreenView
                 property={activeTenantProperty}
-                properties={tenantProperties}
+                properties={filteredTenantProperties}
                 selectedPropertyId={getId(activeTenantProperty)}
                 onSelectProperty={handleSelectTenantProperty}
                 isTenantView={true}
                 tenantAgreement={activeTenantProperty?._agreement}
                 activeRequest={activeTenantProperty?._request}
               />
+            ) : tenantProperties.length === 0 ? (
+              <div className="rounded-2xl glass-panel bg-card/60 border border-border/60 p-8 sm:p-12 text-center space-y-4">
+                <div className="w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+                  <KeyRound className="h-7 w-7" />
+                </div>
+                <div className="space-y-1.5 max-w-md mx-auto">
+                  <h3 className="text-base sm:text-lg font-bold text-foreground">
+                    {t('Manage Your Rentals in One Place', 'உங்கள் வாடகைகளை ஒரே இடத்தில் நிர்வகிக்கவும்')}
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {t(
+                      'You can manage your rental information, rent schedule, payment history, receipts, lease dates, and maintenance expenses here — even if your landlord does not use reSide.',
+                      'உங்கள் நிலப்பிரபு reSide ஐப் பயன்படுத்தாவிட்டாலும், உங்கள் வாடகை தகவல், கட்டண வரலாறு, ரசீதுகள் மற்றும் பராமரிப்புச் செலவுகளை நீங்கள் இங்கே நிர்வகிக்கலாம்.'
+                    )}
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-3 pt-2 flex-wrap">
+                  <Button
+                    onClick={() => setIsAddRentalOpen(true)}
+                    className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs font-semibold"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    {t('Add Existing Rental', 'ஏற்கனவே உள்ள வாடகையை சேர்க்க')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => onBrowseProperties?.('rent')}
+                    className="gap-1.5 text-xs rounded-xl"
+                  >
+                    <Home className="h-3.5 w-3.5 text-emerald-600" />
+                    {t('Browse Rentals', 'வாடகைக்கு தேட')}
+                  </Button>
+                </div>
+              </div>
             ) : (
-              <div className="rounded-2xl glass-panel bg-card/60 border border-border/60 p-8 sm:p-12 text-center space-y-3">
-                <KeyRound className="h-10 w-10 text-muted-foreground/40 mx-auto" />
-                <h3 className="text-base font-semibold text-foreground">
-                  {t("You don't currently rent any properties", 'நீங்கள் தற்போது எந்த சொத்தையும் வாடகைக்கு எடுக்கவில்லை')}
+              <div className="rounded-2xl glass-panel bg-card/60 border border-border/60 p-8 text-center space-y-3">
+                <KeyRound className="h-9 w-9 text-muted-foreground/40 mx-auto" />
+                <h3 className="text-sm font-semibold text-foreground">
+                  {t('No rentals in this category', 'இந்த பிரிவில் வாடகைகள் எதுவும் இல்லை')}
                 </h3>
-                <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                  {t('You do not currently have any active rental agreements or pending rental applications. Browse available rentals to find your next home.', 'தற்போது தங்களிடம் வாடகை ஒப்பந்தங்கள் அல்லது நிலுவை விண்ணப்பங்கள் எதுவும் இல்லை. புதிய வீட்டைத் தேட வாடகை பட்டியல்களைப் பார்க்கவும்.')}
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                  {rentalCategoryFilter === 'self_managed'
+                    ? t('You have not added any self-managed rentals yet. Track your current home independently.', 'சுய-நிர்வகிக்கப்பட்ட வாடகைகள் எதுவும் இல்லை.')
+                    : t('You do not have any connected platform rentals.', 'இணைக்கப்பட்ட வாடகைகள் எதுவும் இல்லை.')}
                 </p>
-                <Button variant="outline" onClick={() => onBrowseProperties?.('rent')} className="gap-1.5 text-xs">
-                  <Home className="h-3.5 w-3.5 text-emerald-600" />
-                  {t('Browse Rentals', 'வாடகைக்கு தேட')}
-                </Button>
+                <div className="flex items-center justify-center gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setRentalCategoryFilter('all')}
+                    className="text-xs rounded-xl"
+                  >
+                    {t('View All Rentals', 'அனைத்தையும் காட்டு')}
+                  </Button>
+                  {rentalCategoryFilter === 'self_managed' && (
+                    <Button
+                      size="sm"
+                      onClick={() => setIsAddRentalOpen(true)}
+                      className="gap-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      {t('Add Existing Rental', 'வாடகையை சேர்க்க')}
+                    </Button>
+                  )}
+                </div>
               </div>
             )
           )}
@@ -1756,6 +2023,20 @@ export default function UserDashboard({
           setSelectedRequest(null);
           setMainTab('properties');
           setPropertySection('rents');
+        }}
+      />
+
+      {/* Add Existing Rental Modal */}
+      <AddExistingRentalDialog
+        open={isAddRentalOpen}
+        onOpenChange={setIsAddRentalOpen}
+        onSuccess={(created) => {
+          const newId = getId(created);
+          if (newId) {
+            setSelectedTenantId(newId);
+            setPropertySection('rents');
+            setRentalCategoryFilter('all');
+          }
         }}
       />
     </div>

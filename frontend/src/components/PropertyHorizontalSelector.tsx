@@ -12,7 +12,7 @@ export interface PropertySelectorItem {
   images?: string[];
   geoLocatedImage?: string;
   statusText?: string;
-  statusVariant?: 'occupied' | 'vacant' | 'listed' | 'private' | 'active' | 'pending' | 'warning' | 'default';
+  statusVariant?: 'occupied' | 'vacant' | 'listed' | 'private' | 'active' | 'pending' | 'warning' | 'default' | 'self_managed';
   isListed?: boolean;
   occupancyStatus?: string;
   saleStatus?: string;
@@ -101,6 +101,8 @@ export default function PropertyHorizontalSelector({
       badgeClass = 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 border-sky-200 dark:border-sky-800';
     } else if (item.statusVariant === 'warning') {
       badgeClass = 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-300 dark:border-amber-700';
+    } else if (item.statusVariant === 'self_managed') {
+      badgeClass = 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300 border-teal-300 dark:border-teal-700';
     }
 
     return (
@@ -155,10 +157,10 @@ export default function PropertyHorizontalSelector({
                   onSelect(item);
                 }
               }}
-              className={`flex items-center gap-2.5 p-2 rounded-xl border transition-all duration-200 cursor-pointer select-none text-left shrink-0 w-60 sm:w-64 min-w-[220px] max-w-[260px] ${
+              className={`flex items-center gap-2.5 p-2 rounded-xl border transition-all duration-200 cursor-pointer select-none text-left shrink-0 w-56 sm:w-60 min-w-[200px] max-w-[250px] ${
                 isSelected
-                  ? 'border-primary ring-2 ring-primary/40 bg-primary/10 dark:bg-primary/20 shadow-xs'
-                  : 'border-border/60 bg-card/80 hover:bg-card hover:border-border/90 shadow-2xs opacity-85 hover:opacity-100'
+                  ? 'border-2 border-blue-500 bg-blue-50/40 dark:bg-blue-950/30 shadow-xs ring-1 ring-blue-500/20'
+                  : 'border border-slate-200/90 dark:border-border/70 bg-white dark:bg-card hover:bg-slate-50/80 dark:hover:bg-muted/40 shadow-2xs'
               }`}
             >
               {/* Thumbnail */}

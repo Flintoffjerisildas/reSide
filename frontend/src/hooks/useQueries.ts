@@ -1079,3 +1079,177 @@ export function useAdminOverduePayments() {
     }
   });
 }
+
+// ==========================================
+// Self-Managed Rentals Hooks
+// ==========================================
+
+export function useGetSelfManagedRentals() {
+  const token = localStorage.getItem('token');
+  return useQuery({
+    queryKey: ['self-managed-rentals'],
+    enabled: !!token,
+    queryFn: async () => {
+      const res = await api.get('/self-managed-rentals');
+      return Array.isArray(res.data) ? res.data : [];
+    },
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
+export function useCreateSelfManagedRental() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: any) => {
+      const res = await api.post('/self-managed-rentals', payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['self-managed-rentals'] });
+    },
+  });
+}
+
+export function useUpdateSelfManagedRental() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await api.put(`/self-managed-rentals/${id}`, data);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['self-managed-rentals'] });
+    },
+  });
+}
+
+export function useDeleteSelfManagedRental() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.delete(`/self-managed-rentals/${id}`);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['self-managed-rentals'] });
+    },
+  });
+}
+
+export function useRecordRentPayment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ rentalId, payment }: { rentalId: string; payment: any }) => {
+      const res = await api.post(`/self-managed-rentals/${rentalId}/payments`, payment);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['self-managed-rentals'] });
+    },
+  });
+}
+
+export function useDeleteRecordedPayment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ rentalId, paymentId }: { rentalId: string; paymentId: string }) => {
+      const res = await api.delete(`/self-managed-rentals/${rentalId}/payments/${paymentId}`);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['self-managed-rentals'] });
+    },
+  });
+}
+
+export function useAttachRentalDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ rentalId, document }: { rentalId: string; document: any }) => {
+      const res = await api.post(`/self-managed-rentals/${rentalId}/documents`, document);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['self-managed-rentals'] });
+    },
+  });
+}
+
+export function useDeleteRentalDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ rentalId, docId }: { rentalId: string; docId: string }) => {
+      const res = await api.delete(`/self-managed-rentals/${rentalId}/documents/${docId}`);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['self-managed-rentals'] });
+    },
+  });
+}
+
+export function useRecordMaintenanceEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ rentalId, entry }: { rentalId: string; entry: any }) => {
+      const res = await api.post(`/self-managed-rentals/${rentalId}/maintenance`, entry);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['self-managed-rentals'] });
+    },
+  });
+}
+
+export function useUpdateMaintenanceEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ rentalId, maintenanceId, data }: { rentalId: string; maintenanceId: string; data: any }) => {
+      const res = await api.put(`/self-managed-rentals/${rentalId}/maintenance/${maintenanceId}`, data);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['self-managed-rentals'] });
+    },
+  });
+}
+
+export function useDeleteMaintenanceEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ rentalId, maintenanceId }: { rentalId: string; maintenanceId: string }) => {
+      const res = await api.delete(`/self-managed-rentals/${rentalId}/maintenance/${maintenanceId}`);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['self-managed-rentals'] });
+    },
+  });
+}
+
+export function useUpdateVacatePlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ rentalId, vacateData }: { rentalId: string; vacateData: any }) => {
+      const res = await api.put(`/self-managed-rentals/${rentalId}/vacate`, vacateData);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['self-managed-rentals'] });
+    },
+  });
+}
+
+export function useConnectLandlord() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ rentalId, landlordData }: { rentalId: string; landlordData: any }) => {
+      const res = await api.post(`/self-managed-rentals/${rentalId}/connect-landlord`, landlordData);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['self-managed-rentals'] });
+    },
+  });
+}
+

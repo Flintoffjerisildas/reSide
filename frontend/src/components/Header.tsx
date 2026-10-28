@@ -1,4 +1,4 @@
-import { Building2, Moon, Sun, LogIn, LogOut, User, Menu, LayoutDashboard, Home, Globe2, Grid2X2, Bell } from 'lucide-react';
+import { Building2, Moon, Sun, LogIn, LogOut, User, Menu, LayoutDashboard, Home, Globe2, Grid2X2, Bell, ChevronDown } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../contexts/AuthContext';
@@ -93,21 +93,23 @@ export default function Header({
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full glass-nav backdrop-blur-xl transition-colors">
-      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 flex min-h-[76px] items-center justify-between gap-4 py-3 lg:gap-6">
+    <header className="sticky top-0 z-50 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 shadow-2xs transition-colors">
+      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 flex h-14 sm:h-[58px] items-center justify-between gap-4">
         <div 
-          className="flex shrink-0 items-center gap-2.5 text-xl font-bold tracking-tight text-slate-900 transition-all hover:-translate-y-0.5 hover:text-blue-700 dark:text-white dark:hover:text-blue-200 cursor-pointer"
+          className="flex shrink-0 items-center gap-2.5 text-xl font-bold tracking-tight text-[#0B1736] transition-all hover:text-blue-600 dark:text-white dark:hover:text-blue-300 cursor-pointer"
           onClick={handleHomeNavigation}
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-600/20 transition-transform hover:rotate-3 hover:scale-105"><Building2 className="h-5 w-5" /></span>
-          <span>Reside</span>
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-600/30 transition-transform hover:scale-105">
+            <Building2 className="h-4.5 w-4.5" />
+          </span>
+          <span className="text-lg font-bold tracking-tight text-[#0B1736] dark:text-white">Reside</span>
         </div>
 
         {/* Desktop Actions */}
         <div className="hidden items-center gap-2 lg:flex">
           <Select value={language} onValueChange={(val: any) => setLanguage(val)}>
-            <SelectTrigger className="glass-pill h-10 w-auto min-w-[108px] rounded-full px-3 shadow-sm transition-all hover:-translate-y-0.5">
-              <Globe2 className="mr-1 h-4 w-4 text-blue-600" />
+            <SelectTrigger className="h-8.5 w-auto rounded-full px-3 text-xs bg-white dark:bg-slate-800 border-slate-200/90 dark:border-slate-700 shadow-2xs hover:bg-slate-50 transition-colors">
+              <Globe2 className="mr-1.5 h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
               <SelectValue placeholder={t('Language', 'மொழி')} />
             </SelectTrigger>
             <SelectContent>
@@ -117,28 +119,32 @@ export default function Header({
           </Select>
 
           <Button
-            variant="ghost"
+            variant="outline"
             size="icon"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="glass-pill rounded-full text-slate-600 transition-all hover:-translate-y-0.5 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-300"
+            className="h-8.5 w-8.5 rounded-full border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-600 dark:text-slate-300 shadow-2xs"
           >
-            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
             <span className="sr-only">Toggle theme</span>
           </Button>
 
           {isAuthenticated && (
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon"
               onClick={onNotificationsClick || onDashboardClick}
               title={t('Notifications', 'அறிவிப்புகள்')}
-              className="relative glass-pill rounded-full text-slate-600 transition-all hover:-translate-y-0.5 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-300"
+              className="relative h-8.5 w-8.5 rounded-full border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-600 dark:text-slate-300 shadow-2xs"
             >
-              <Bell className="h-5 w-5" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white shadow-sm animate-pulse">
+              <Bell className="h-4 w-4" />
+              {unreadCount > 0 ? (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white shadow-xs">
                   {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              ) : (
+                <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white shadow-2xs">
+                  1
                 </span>
               )}
             </Button>
@@ -149,21 +155,22 @@ export default function Header({
               variant="default"
               size="sm"
               onClick={onDashboardClick}
-              className="hidden gap-2 rounded-full bg-blue-600 px-4 shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5 hover:bg-blue-700 lg:flex"
+              className="h-8.5 gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-3.5 text-xs font-semibold shadow-xs flex transition-all"
             >
-              {isDashboardActive ? <Home className="h-4 w-4" /> : <Grid2X2 className="h-4 w-4" />}
-              {isDashboardActive ? t('Back to Home', 'முகப்புக்கு திரும்பவும்') : t('Go to Dashboard', 'டாஷ்போர்டுக்கு செல்லவும்')}
+              {isDashboardActive ? <Home className="h-3.5 w-3.5" /> : <Grid2X2 className="h-3.5 w-3.5" />}
+              <span>{isDashboardActive ? t('Back to Home', 'முகப்புக்கு திரும்பவும்') : t('Go to Dashboard', 'டாஷ்போர்டுக்கு செல்லவும்')}</span>
             </Button>
           )}
 
           {isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="glass-surface max-w-[180px] gap-2 rounded-full shadow-sm transition-all hover:-translate-y-0.5">
-                  <User className="h-4 w-4" />
-                  <span className="max-w-[150px] truncate">
-                    {userProfile?.name || user?.name || t('User', 'பயனர்')}
+                <Button variant="outline" className="h-8.5 gap-2 rounded-full border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-200 px-3 text-xs font-medium shadow-2xs">
+                  <User className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
+                  <span className="max-w-[120px] truncate">
+                    {userProfile?.name || user?.name || 'Customer'}
                   </span>
+                  <ChevronDown className="h-3 w-3 text-slate-400" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
