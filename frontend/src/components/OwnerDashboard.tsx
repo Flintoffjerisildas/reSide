@@ -936,19 +936,29 @@ export default function OwnerDashboard({
 
   const getId = (v: any) => String(v?._id || v?.id || v || '');
 
-  const pendingRentCount = requests.filter((r: any) => r.type === 'rent' && r.status === 'pending').length;
-  const pendingMaintenanceCount = maintenanceOverview.filter((m: any) => m.status === 'pending').length;
-  const pendingPaymentCount = paymentRequests.filter((p: any) => p.status === 'submitted' || p.status === 'pending').length;
-  const totalPendingRequests = pendingRentCount + pendingMaintenanceCount + pendingPaymentCount;
+  // Only include active valid requests whose property still exists
+  const pendingRequests = (requests || []).filter(
+    (r: any) => r && r.property && r.status === 'pending'
+  );
+  const pendingRentCount = pendingRequests.filter((r: any) => r.type === 'rent').length;
+  const pendingMaintenance = (maintenanceOverview || []).filter(
+    (m: any) => m && m.property && m.status === 'pending'
+  );
+  const pendingMaintenanceCount = pendingMaintenance.length;
+  const pendingPayments = (paymentRequests || []).filter(
+    (p: any) => p && p.property && (p.status === 'submitted' || p.status === 'pending')
+  );
+  const pendingPaymentCount = pendingPayments.length;
+  const totalPendingRequests = pendingRequests.length + pendingMaintenanceCount + pendingPaymentCount;
 
   // Notification for pending requests
   useEffect(() => {
-    if (totalPendingRequests > 0) {
-      const toastId = 'pending-requests-notification'; // Unique ID to prevent duplicates
+    const toastId = 'pending-requests-notification'; // Unique ID to prevent duplicates
+    if (pendingRequests && pendingRequests.length > 0) {
       toast.info(
         t(
-          `You have ${totalPendingRequests} pending requests`,
-          `${totalPendingRequests} நிலுவையில் உள்ள கோரிக்கைகள் உள்ளன`
+          `You have ${pendingRequests.length} pending request${pendingRequests.length > 1 ? 's' : ''}`,
+          `${pendingRequests.length} நிலுவையில் உள்ள கோரிக்கைகள் உள்ளன`
         ),
         {
           id: toastId,
@@ -968,8 +978,10 @@ export default function OwnerDashboard({
           }
         }
       );
+    } else {
+      toast.dismiss(toastId);
     }
-  }, [totalPendingRequests, t]);
+  }, [pendingRequests.length, t]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -1419,8 +1431,8 @@ export default function OwnerDashboard({
                 {t('Reports', 'அறிக்கைகள்')}
               </TabsTrigger>
               <TabsTrigger value="settings">
-                <Settings className="w-4 h-4 mr-2" />
-                {t('Settings', 'அமைப்புகள்')}
+                <User className="w-4 h-4 mr-2" />
+                {t('My Profile', 'என் சுயவிவரம்')}
               </TabsTrigger>
             </TabsList>
           )}

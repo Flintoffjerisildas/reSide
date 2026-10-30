@@ -3435,10 +3435,13 @@ function AdminProperties({ searchQuery, createSignal }: { searchQuery: string; c
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="flat">Flat</SelectItem>
+                    <SelectItem value="flat">Apartment / Flat</SelectItem>
                     <SelectItem value="house">House</SelectItem>
-                    <SelectItem value="pg">PG</SelectItem>
-                    <SelectItem value="land">Land</SelectItem>
+                    <SelectItem value="villa">Villa</SelectItem>
+                    <SelectItem value="pg">PG / Hostel</SelectItem>
+                    <SelectItem value="land">Land / Plot</SelectItem>
+                    <SelectItem value="commercial">Commercial</SelectItem>
+                    <SelectItem value="farmhouse">Farm House</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

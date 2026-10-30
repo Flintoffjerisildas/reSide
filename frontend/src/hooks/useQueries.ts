@@ -22,6 +22,10 @@ interface PropertyInput {
   landDimensions?: any;
   bedrooms?: number;
   facing?: string;
+  securityDeposit?: number;
+  monthlyMaintenance?: number;
+  reraNumber?: string;
+  ownershipType?: string;
 }
 
 // User Profile Queries
@@ -153,6 +157,13 @@ export function useAddProperty() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allProperties'] });
       queryClient.invalidateQueries({ queryKey: ['myProperties'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['owner-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['property-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-agreements'] });
+      queryClient.invalidateQueries({ queryKey: ['owner-agreements'] });
+      queryClient.invalidateQueries({ queryKey: ['selfManagedRentals'] });
     }
   });
 }
@@ -179,6 +190,13 @@ export function useUpdateProperty() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allProperties'] });
       queryClient.invalidateQueries({ queryKey: ['myProperties'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['owner-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['property-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-agreements'] });
+      queryClient.invalidateQueries({ queryKey: ['owner-agreements'] });
+      queryClient.invalidateQueries({ queryKey: ['selfManagedRentals'] });
     }
   });
 }
@@ -228,6 +246,13 @@ export function useDeleteProperty() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allProperties'] });
       queryClient.invalidateQueries({ queryKey: ['myProperties'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['owner-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['property-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-agreements'] });
+      queryClient.invalidateQueries({ queryKey: ['owner-agreements'] });
+      queryClient.invalidateQueries({ queryKey: ['selfManagedRentals'] });
     }
   });
 }

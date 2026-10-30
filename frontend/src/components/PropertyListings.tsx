@@ -86,11 +86,27 @@ export default function PropertyListings({
     if (normalized === 'house' || normalized === 'houses') {
       return 'house';
     }
+    if (normalized === 'villa' || normalized === 'villas') {
+      return 'villa';
+    }
     if (normalized === 'pg' || normalized === 'pgs') {
       return 'pg';
     }
     if (normalized === 'land' || normalized === 'plot' || normalized === 'plots') {
       return 'land';
+    }
+    if (
+      normalized === 'commercial' ||
+      normalized === 'office' ||
+      normalized === 'offices' ||
+      normalized === 'shop' ||
+      normalized === 'shops' ||
+      normalized === 'commercialspace'
+    ) {
+      return 'commercial';
+    }
+    if (normalized === 'farmhouse' || normalized === 'farmhouses' || normalized === 'farm') {
+      return 'farmhouse';
     }
     return normalized;
   };
@@ -129,7 +145,11 @@ export default function PropertyListings({
         : true;
 
       const propertyPrice = Number((property as any)?.price ?? 0);
-      const priceMatch = priceRange[1] === 0 || (propertyPrice >= priceRange[0] && propertyPrice <= priceRange[1]);
+      const hasMinPrice = priceRange[0] > 0;
+      const hasMaxPrice = priceRange[1] > 0;
+      const priceMatch =
+        (!hasMinPrice || propertyPrice >= priceRange[0]) &&
+        (!hasMaxPrice || propertyPrice <= priceRange[1]);
       
       const isRent = propertyTransactionType === 'rent';
       const occupancyEligible = isRent
@@ -305,6 +325,8 @@ export default function PropertyListings({
           onPropertyTypeChange={handlePropertyTypeChange}
           transactionType={transactionType}
           onTransactionTypeChange={handleTransactionTypeChange}
+          priceRange={priceRange as [number, number]}
+          onPriceRangeChange={setPriceRange}
           maxPrice={priceRange[1]}
           onMaxPriceChange={(value) => setPriceRange([0, value])}
           onSearch={() => document.getElementById('property-listings')?.scrollIntoView({ behavior: 'smooth' })}
@@ -354,8 +376,11 @@ export default function PropertyListings({
                   <option value="">{t('All Types', 'அனைத்து வகைகளும்')}</option>
                   <option value="flat">{t('Apartment / Flat', 'அபார்ட்மென்ட் / பிளாட்')}</option>
                   <option value="house">{t('House', 'வீடு')}</option>
-                  <option value="pg">PG</option>
-                  <option value="land">{t('Land', 'நிலம்')}</option>
+                  <option value="villa">{t('Villa', 'வில்லா')}</option>
+                  <option value="pg">{t('PG / Hostel', 'பி.ஜி / விடுதி')}</option>
+                  <option value="land">{t('Land / Plot', 'நிலம் / மனை')}</option>
+                  <option value="commercial">{t('Commercial', 'வணிக இடம்')}</option>
+                  <option value="farmhouse">{t('Farm House', 'பண்ணை வீடு')}</option>
                 </select>
               </div>
 
@@ -419,8 +444,11 @@ export default function PropertyListings({
                   { value: '', label: t('All', 'அனைத்தும்') },
                   { value: 'flat', label: t('Apartment / Flat', 'அபார்ட்மென்ட் / பிளாட்') },
                   { value: 'house', label: t('House', 'வீடு') },
-                  { value: 'pg', label: 'PG' },
+                  { value: 'villa', label: t('Villa', 'வில்லா') },
+                  { value: 'pg', label: t('PG', 'பி.ஜி') },
                   { value: 'land', label: t('Land', 'நிலம்') },
+                  { value: 'commercial', label: t('Commercial', 'வணிகம்') },
+                  { value: 'farmhouse', label: t('Farm House', 'பண்ணை வீடு') },
                 ].map((item) => (
                   <button
                     key={item.value || 'all'}

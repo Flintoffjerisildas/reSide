@@ -239,12 +239,16 @@ export default function RequestDetailsModal({
       toast.error(t('Please enter a valid payment amount', 'சரியான கட்டணத் தொகையை உள்ளிடவும்'));
       return;
     }
+    if (!paymentTxId || !paymentTxId.trim()) {
+      toast.error(t('Bank UTR or UPI Transaction Reference Number is required', 'வங்கி UTR அல்லது UPI குறிப்பு எண் தேவை'));
+      return;
+    }
     try {
       await submitPaymentMutation.mutateAsync({
         requestId: request._id,
         amount: numeric,
         mode: paymentMode,
-        transactionId: paymentTxId,
+        transactionId: paymentTxId.trim(),
         screenshot: paymentReceiptImg,
       });
       toast.success(t('Payment submitted for owner verification.', 'கட்டணம் சரிபார்ப்புக்கு சமர்ப்பிக்கப்பட்டது.'));
@@ -260,7 +264,7 @@ export default function RequestDetailsModal({
       await verifyPaymentMutation.mutateAsync(request._id);
       toast.success(
         isBuy
-          ? t('Payment verified! Property marked as SOLD.', 'கட்டணம் சரிபார்க்கப்பட்டது! சொத்து விற்கப்பட்டது.')
+          ? t('Payment verified! Ownership transferred to buyer.', 'கட்டணம் சரிபார்க்கப்பட்டு உரிமை மாற்றப்பட்டது.')
           : t('Payment verified successfully.', 'கட்டணம் வெற்றிகரமாக சரிபார்க்கப்பட்டது.')
       );
       onOpenChange(false);
@@ -786,7 +790,7 @@ export default function RequestDetailsModal({
 
               <div className="space-y-1.5">
                 <Label htmlFor="pay-tx" className="text-xs font-medium">
-                  {t('Transaction Reference / UTR Number', 'பரிவர்த்தனை குறிப்பு எண்')}
+                  {t('Bank UTR / UPI Transaction Reference Number', 'வங்கி UTR / UPI குறிப்பு எண்')} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="pay-tx"
@@ -926,7 +930,7 @@ export default function RequestDetailsModal({
                   </div>
                 )}
 
-                {isOwner && status === 'payment_pending' && (
+                {isOwner && (status === 'payment_pending' || status === 'Payment_Submitted') && (
                   <>
                     <Button
                       variant="outline"
@@ -935,7 +939,7 @@ export default function RequestDetailsModal({
                       onClick={() => setActiveAction('reject-payment')}
                     >
                       <XCircle className="w-3.5 h-3.5 mr-1.5" />
-                      {t('Reject Payment', 'கட்டணத்தை நிராகரி')}
+                      {t('Reject Payment with Reason', 'காரணத்துடன் நிராகரிக்கவும்')}
                     </Button>
                     <Button
                       size="sm"
@@ -945,7 +949,7 @@ export default function RequestDetailsModal({
                     >
                       {verifyPaymentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
                       <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-                      {t('Verify Payment & Complete', 'கட்டணத்தை சரிபார்த்து முடி')}
+                      {t('Verify & Accept Payment', 'கட்டணத்தை சரிபார்த்து ஏற்கவும்')}
                     </Button>
                   </>
                 )}
@@ -985,22 +989,22 @@ export default function RequestDetailsModal({
                   </>
                 )}
 
-                {/* Accepted request proceeds directly to payment! */}
-                {isBuyerOrTenant && ['accepted', 'approved', 'terms_confirmed'].includes(status) && (
+                {/* Accepted or Pending_Payment request proceeds to payment! */}
+                {isBuyerOrTenant && ['accepted', 'approved', 'terms_confirmed', 'Pending_Payment'].includes(status) && (
                   <Button
                     size="sm"
                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
                     onClick={() => setActiveAction('pay')}
                   >
                     <CreditCard className="w-3.5 h-3.5 mr-1.5" />
-                    {isBuy ? t('Pay Now (Advance / Deposit)', 'இப்போது செலுத்தவும் (முன்பணம்)') : t('Pay Now (First Month Rent)', 'இப்போது செலுத்தவும் (வாடகை)')}
+                    {isBuy ? t('Submit Payment Details', 'கட்டண விவரங்களை சமர்ப்பிக்கவும்') : t('Pay Now (First Month Rent)', 'இப்போது செலுத்தவும் (வாடகை)')}
                   </Button>
                 )}
 
-                {isBuyerOrTenant && status === 'payment_pending' && (
+                {isBuyerOrTenant && (status === 'payment_pending' || status === 'Payment_Submitted') && (
                   <div className="flex items-center gap-1.5 text-xs text-indigo-600 font-medium bg-indigo-50 dark:bg-indigo-950/50 px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800">
                     <Clock className="w-3.5 h-3.5 animate-spin" />
-                    {t('Payment submitted — awaiting owner verification', 'கட்டணம் சமர்ப்பிக்கப்பட்டது — சரிபார்ப்புக்கு காத்திருக்கிறது')}
+                    {t('Payment submitted — awaiting owner verification & deed transfer', 'கட்டணம் சமர்ப்பிக்கப்பட்டது — சரிபார்ப்புக்கு காத்திருக்கிறது')}
                   </div>
                 )}
 

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +16,7 @@ import {
   useMarkAllNotificationsRead,
   useApproveRequest,
   useRejectRequest,
+  useVerifyRequestPayment,
   useGetTenantAgreements,
   useGetSelfManagedRentals
 } from '../hooks/useQueries';
@@ -46,7 +48,8 @@ import {
   CheckCheck,
   MapPin,
   ShoppingBag,
-  SlidersHorizontal,
+  Loader2,
+  AlertCircle,
   Link2
 } from 'lucide-react';
 import OwnerDashboard from './OwnerDashboard';
@@ -55,7 +58,10 @@ import PropertyFullScreenView from './PropertyFullScreenView';
 import PropertyForm from './PropertyForm';
 import RequestDetailsModal from './RequestDetailsModal';
 import AddExistingRentalDialog from './AddExistingRentalDialog';
-import { PropertyRequest } from '../types';
+import ListingControlsDialog from './ListingControlsDialog';
+import SubmitPaymentModal from './SubmitPaymentModal';
+import RejectPaymentModal from './RejectPaymentModal';
+import { PropertyRequest, Property } from '../types';
 
 interface UserDashboardProps {
   onBrowseProperties?: (transactionType: 'rent' | 'buy') => void;
@@ -69,6 +75,9 @@ interface UserDashboardProps {
 export type UserDashboardTab =
   | 'overview'
   | 'properties'
+  | 'my-requests'
+  | 'incoming-requests'
+  | 'transactions'
   | 'notifications'
   | 'reports'
   | 'announcements'
@@ -83,8 +92,54 @@ export default function UserDashboard({
   initialPropertySection = 'owned'
 }: UserDashboardProps) {
   const { t } = useLanguage();
+  const queryClient = useQueryClient();
   const { data: userProfile } = useGetCallerUserProfile();
-  const { data: myProperties = [] } = useGetMyProperties();
+  const { data: rawMyProperties = [] } = useGetMyProperties();
+  const [properties, setProperties] = useState<Property[]>([]);
+
+  useEffect(() => {
+    if (rawMyProperties && rawMyProperties.length > 0) {
+      setProperties(rawMyProperties);
+    }
+  }, [rawMyProperties]);
+
+  const myProperties = properties.length > 0 ? properties : rawMyProperties;
+
+  const onUpdateProperty = (propId: string, updates: Partial<Property>) => {
+    setProperties((prev) =>
+      prev.map((p) => {
+        const id = (p as any)?._id || p?.id;
+        return id === propId || p.id === propId ? { ...p, ...updates } : p;
+      })
+    );
+
+    try {
+      const storedKeys = ['myProperties', 'properties', 'reSideAI_properties'];
+      storedKeys.forEach((key) => {
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            const updated = parsed.map((p: any) => {
+              const id = p?._id || p?.id;
+              return id === propId || p.id === propId ? { ...p, ...updates } : p;
+            });
+            localStorage.setItem(key, JSON.stringify(updated));
+          }
+        }
+      });
+    } catch (e) {
+      console.warn('localStorage update failed', e);
+    }
+
+    queryClient.setQueryData(['myProperties'], (old: any) => {
+      if (!Array.isArray(old)) return old;
+      return old.map((p: any) => {
+        const id = p?._id || p?.id;
+        return id === propId || p.id === propId ? { ...p, ...updates } : p;
+      });
+    });
+  };
   const { data: tenantAgreements = [] } = useGetTenantAgreements();
   const { data: ownerRequests = [] } = useGetOwnerRequests();
   const { data: tenantRequests = [] } = useGetTenantRequests();
@@ -95,9 +150,13 @@ export default function UserDashboard({
   const markAllReadMutation = useMarkAllNotificationsRead();
   const approveRequestMutation = useApproveRequest();
   const rejectRequestMutation = useRejectRequest();
+  const verifyPaymentMutation = useVerifyRequestPayment();
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
 
   const notifications = notificationData?.notifications || [];
-  const unreadCount = notificationData?.unreadCount || 0;
+  const unreadNotifications = notifications.filter((n: any) => !n.isRead && !n.read);
+  const unreadCount = notifications.length > 0 ? unreadNotifications.length : 0;
 
   const getInitialSection = (): 'owned' | 'rents' => {
     if (initialPropertySection) return initialPropertySection;
@@ -138,6 +197,7 @@ export default function UserDashboard({
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
   const [isAddRentalOpen, setIsAddRentalOpen] = useState(false);
+  const [isListingSettingsOpen, setIsListingSettingsOpen] = useState(false);
   const [rentalCategoryFilter, setRentalCategoryFilter] = useState<'all' | 'connected' | 'self_managed'>('all');
 
   // Derived tenant properties from tenantAgreements + tenantRequests for rent
@@ -419,13 +479,22 @@ export default function UserDashboard({
     [tenantRequests]
   );
 
+  // Pending purchase requests for buyer (Gopi)
+  const pendingPurchaseRequests = useMemo(() => {
+    return (tenantRequests || []).filter(
+      (r: any) =>
+        r.type === 'buy' &&
+        ['Pending_Payment', 'Payment_Submitted', 'accepted', 'approved', 'terms_confirmed', 'payment_pending'].includes(r.status)
+    );
+  }, [tenantRequests]);
+
   // Customer category counts (Requirement 6)
   const customerCounts = useMemo(() => {
     const list = tenantRequests || [];
     return {
       all: list.length,
       pending: list.filter((r: any) => ['pending', 'counteroffer'].includes(r.status)).length,
-      awaitingPayment: list.filter((r: any) => ['accepted', 'approved', 'terms_confirmed'].includes(r.status)).length,
+      awaitingPayment: list.filter((r: any) => ['accepted', 'approved', 'terms_confirmed', 'Pending_Payment', 'Payment_Submitted', 'payment_pending'].includes(r.status)).length,
       completedRejected: list.filter((r: any) => ['completed', 'rejected', 'cancelled'].includes(r.status)).length,
     };
   }, [tenantRequests]);
@@ -436,7 +505,7 @@ export default function UserDashboard({
     return {
       all: list.length,
       pending: list.filter((r: any) => r.status === 'pending').length,
-      awaitingPayment: list.filter((r: any) => ['accepted', 'approved', 'terms_confirmed', 'payment_pending'].includes(r.status)).length,
+      awaitingPayment: list.filter((r: any) => ['accepted', 'approved', 'terms_confirmed', 'payment_pending', 'Pending_Payment', 'Payment_Submitted'].includes(r.status)).length,
       completed: list.filter((r: any) => r.status === 'completed').length,
     };
   }, [ownerRequests]);
@@ -445,12 +514,12 @@ export default function UserDashboard({
   const activeTransactions = useMemo(() => {
     const list: Array<{ request: any; role: 'buyer' | 'owner' }> = [];
     (tenantRequests || []).forEach((r: any) => {
-      if (['accepted', 'approved', 'terms_confirmed', 'payment_pending', 'completed'].includes(r.status)) {
+      if (['accepted', 'approved', 'terms_confirmed', 'payment_pending', 'Pending_Payment', 'Payment_Submitted', 'completed'].includes(r.status)) {
         list.push({ request: r, role: 'buyer' });
       }
     });
     (ownerRequests || []).forEach((r: any) => {
-      if (['accepted', 'approved', 'terms_confirmed', 'payment_pending', 'completed'].includes(r.status)) {
+      if (['accepted', 'approved', 'terms_confirmed', 'payment_pending', 'Pending_Payment', 'Payment_Submitted', 'completed'].includes(r.status)) {
         // avoid duplicates if user somehow owns and tenants same request
         if (!list.some((item) => item.request._id === r._id)) {
           list.push({ request: r, role: 'owner' });
@@ -508,6 +577,19 @@ export default function UserDashboard({
     }
   };
 
+  const handleVerifyAndTransfer = async (req: any) => {
+    try {
+      await verifyPaymentMutation.mutateAsync(req._id);
+      toast.success(
+        req.type === 'buy'
+          ? t('Payment verified! Ownership transferred to buyer.', 'கட்டணம் சரிபார்க்கப்பட்டு உரிமை மாற்றப்பட்டது.')
+          : t('Payment verified successfully.', 'கட்டணம் சரிபார்க்கப்பட்டது.')
+      );
+    } catch (err: any) {
+      toast.error(err?.response?.data?.msg || t('Failed to verify payment', 'கட்டணத்தை சரிபார்க்க முடியவில்லை'));
+    }
+  };
+
   const renderStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
@@ -539,6 +621,14 @@ export default function UserDashboard({
             {t('Awaiting Payment', 'கட்டணம் நிலுவையில்')}
           </Badge>
         );
+      case 'Pending_Payment':
+        return (
+          <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300 text-[11px] px-2 py-0.5 font-medium">
+            <Clock className="w-3 h-3 mr-1 inline" />
+            {t('Pending Payment', 'கட்டணம் நிலுவையில்')}
+          </Badge>
+        );
+      case 'Payment_Submitted':
       case 'payment_pending':
         return (
           <Badge variant="outline" className="bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-300 text-[11px] px-2 py-0.5 font-medium">
@@ -579,9 +669,29 @@ export default function UserDashboard({
       const fullRequest = (ownerRequests as any[]).concat(tenantRequests as any[]).find((r: any) => r._id === (notif.request._id || notif.request));
       const targetReq = fullRequest || (typeof notif.request === 'object' ? notif.request : null);
       if (targetReq) {
+        setSelectedRequest(targetReq);
+        const isOwner = targetReq.owner === (userProfile as any)?._id || targetReq.owner?._id === (userProfile as any)?._id;
+
+        // If buyer received offer acceptance or payment rejection notification, trigger payment modal directly
+        if (!isOwner && (
+          notif.type === 'request_accepted' ||
+          notif.type === 'payment_rejected' ||
+          notif.title?.toLowerCase().includes('payment required') ||
+          notif.title?.toLowerCase().includes('offer accepted') ||
+          targetReq.status === 'Pending_Payment'
+        )) {
+          setIsPaymentModalOpen(true);
+          return;
+        }
+
+        // If owner received payment submitted notification, open incoming requests tab
+        if (isOwner && (notif.type === 'payment_submitted' || targetReq.status === 'Payment_Submitted')) {
+          setMainTab('incoming-requests');
+          return;
+        }
+
         const propId = getId(targetReq.property);
         setMainTab('properties');
-        const isOwner = targetReq.owner === (userProfile as any)?._id || targetReq.owner?._id === (userProfile as any)?._id;
         if (isOwner) {
           setPropertySection('owned');
           if (propId) setSelectedOwnedId(propId);
@@ -589,7 +699,6 @@ export default function UserDashboard({
           setPropertySection('rents');
           if (propId) setSelectedTenantId(propId);
         }
-        setSelectedRequest(targetReq);
       }
     }
   };
@@ -682,7 +791,7 @@ export default function UserDashboard({
         </div>
 
         {/* Container 2: Primary Navigation Tabs (Unified white container, equal-width tabs, pale cyan active highlight) */}
-        <TabsList className="w-full border border-slate-200/80 dark:border-border/80 rounded-2xl shadow-xs p-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 h-auto gap-1">
+        <TabsList className="w-full border border-slate-200/80 dark:border-sky-500/20 dark:bg-[#07111e]/80 rounded-2xl shadow-xs dark:shadow-xl dark:shadow-black/40 p-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 h-auto gap-1">
           <TabsTrigger
             value="overview"
             className="h-11 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-all duration-200 data-[state=active]:bg-[#e0f2fe]/75 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-950/60 dark:data-[state=active]:text-blue-300 data-[state=active]:font-bold data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
@@ -734,8 +843,8 @@ export default function UserDashboard({
             value="settings"
             className="h-11 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-all duration-200 data-[state=active]:bg-[#e0f2fe]/75 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-950/60 dark:data-[state=active]:text-blue-300 data-[state=active]:font-bold data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
           >
-            <Settings className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-            <span>{t('Settings', 'அமைப்புகள்')}</span>
+            <User className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+            <span>{t('My Profile', 'என் சுயவிவரம்')}</span>
           </TabsTrigger>
         </TabsList>
 
@@ -961,201 +1070,397 @@ export default function UserDashboard({
         {/* Tab 2: My Properties */}
         <TabsContent value="properties" className="mt-0 space-y-3.5">
           {/* Container 3: Property Category Toolbar */}
-          <div className="w-full min-h-[52px] sm:h-14 bg-white/95 dark:bg-card/90 backdrop-blur-md border border-slate-200/80 dark:border-border/80 rounded-2xl px-3 sm:px-4 py-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shadow-xs">
-            <div className="inline-flex p-1 bg-slate-100/80 dark:bg-muted/50 rounded-xl gap-1 self-start sm:self-auto flex-wrap">
-              <button
-                type="button"
-                id="tab-property-owned"
-                onClick={() => handleSwitchSection('owned')}
-                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                  propertySection === 'owned'
-                    ? 'bg-white text-blue-700 dark:bg-card dark:text-blue-300 shadow-xs border border-slate-200/80 font-bold'
-                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-                }`}
-              >
-                <Home className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                <span>{t('Property Owned', 'சொத்து உரிமையாளர்')}</span>
-                {myProperties.length > 0 && (
-                  <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
-                    {myProperties.length}
-                  </Badge>
-                )}
-                {pendingOwnerRequests > 0 && (
-                  <Badge variant="destructive" className="px-1.5 py-0 h-4 text-[10px] font-bold">
-                    {pendingOwnerRequests}
-                  </Badge>
-                )}
-              </button>
+          <div className="w-full min-h-[52px] glass-panel bg-white/80 dark:bg-[#0a1628]/85 dark:backdrop-blur-xl border border-slate-200/80 dark:border-sky-500/20 rounded-2xl px-3 sm:px-4 py-2 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 shadow-xs dark:shadow-xl dark:shadow-black/40 transition-colors">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap self-start md:self-auto">
+              <div className="inline-flex p-1 bg-slate-100/80 dark:bg-[#07111e]/80 rounded-xl gap-1 flex-wrap border border-slate-200/50 dark:border-sky-500/20">
+                <button
+                  type="button"
+                  id="tab-property-owned"
+                  onClick={() => handleSwitchSection('owned')}
+                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                    propertySection === 'owned'
+                      ? 'bg-white text-blue-700 shadow-xs border border-slate-200/80 dark:bg-blue-600/20 dark:text-blue-300 dark:border-blue-500/40 font-bold'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                  }`}
+                >
+                  <Home className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                  <span>{t('Property Owned', 'சொத்து உரிமையாளர்')}</span>
+                  {myProperties.length > 0 && (
+                    <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                      {myProperties.length}
+                    </Badge>
+                  )}
+                  {pendingOwnerRequests > 0 && (
+                    <Badge variant="destructive" className="px-1.5 py-0 h-4 text-[10px] font-bold">
+                      {pendingOwnerRequests}
+                    </Badge>
+                  )}
+                </button>
 
-              <button
-                type="button"
-                id="tab-my-rents"
-                onClick={() => handleSwitchSection('rents')}
-                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                  propertySection === 'rents'
-                    ? 'bg-white text-emerald-700 dark:bg-card dark:text-emerald-300 shadow-xs border border-slate-200/80 font-bold'
-                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-                }`}
-              >
-                <KeyRound className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>{t('My Rents', 'எனது வாடகைகள்')}</span>
-                {tenantProperties.length > 0 && (
-                  <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                    {tenantProperties.length}
-                  </Badge>
-                )}
-              </button>
+                <button
+                  type="button"
+                  id="tab-my-rents"
+                  onClick={() => handleSwitchSection('rents')}
+                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                    propertySection === 'rents'
+                      ? 'bg-white text-emerald-700 shadow-xs border border-slate-200/80 dark:bg-emerald-600/20 dark:text-emerald-300 dark:border-emerald-500/40 font-bold'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                  }`}
+                >
+                  <KeyRound className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>{t('My Rents', 'எனது வாடகைகள்')}</span>
+                  {tenantProperties.length > 0 && (
+                    <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                      {tenantProperties.length}
+                    </Badge>
+                  )}
+                </button>
+              </div>
+
+              {/* Filter Category section - only visible when My Rents is active */}
+              {propertySection === 'rents' && (
+                <div className="flex items-center gap-1.5 pl-2.5 sm:pl-3 border-l border-slate-200 dark:border-sky-500/20">
+                  <div
+                    id="rental-category-filter"
+                    data-testid="rental-category-filter"
+                    className="inline-flex p-1 bg-slate-100/80 dark:bg-[#07111e]/80 rounded-xl gap-1 flex-wrap border border-slate-200/50 dark:border-sky-500/20"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setRentalCategoryFilter('all')}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                        rentalCategoryFilter === 'all'
+                          ? 'bg-white text-foreground shadow-xs border border-slate-200/80 dark:bg-[#0f213d] dark:text-slate-100 dark:border-sky-400/20 font-bold'
+                          : 'text-slate-600 hover:text-foreground dark:text-slate-400 dark:hover:text-white'
+                      }`}
+                    >
+                      <span>{t('All Rentals', 'அனைத்து வாடகைகள்')}</span>
+                      <Badge
+                        variant="secondary"
+                        className={`px-1.5 py-0 h-4 text-[10px] font-bold ${
+                          rentalCategoryFilter === 'all'
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                            : 'bg-slate-200/80 text-slate-600 dark:bg-muted dark:text-slate-400'
+                        }`}
+                      >
+                        {tenantProperties.length}
+                      </Badge>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setRentalCategoryFilter('connected')}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                        rentalCategoryFilter === 'connected'
+                          ? 'bg-white text-blue-700 dark:text-blue-300 shadow-xs border border-blue-200 dark:bg-blue-600/20 dark:border-blue-500/40 font-bold'
+                          : 'text-slate-600 hover:text-foreground dark:text-slate-400 dark:hover:text-white'
+                      }`}
+                    >
+                      <Link2 className="h-3 w-3 text-blue-500 shrink-0" />
+                      <span>{t('Connected', 'இணைக்கப்பட்டது')}</span>
+                      <Badge
+                        variant="secondary"
+                        className={`px-1.5 py-0 h-4 text-[10px] font-bold ${
+                          rentalCategoryFilter === 'connected'
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                            : 'bg-slate-200/80 text-slate-600 dark:bg-muted dark:text-slate-400'
+                        }`}
+                      >
+                        {connectedRentalsCount}
+                      </Badge>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setRentalCategoryFilter('self_managed')}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                        rentalCategoryFilter === 'self_managed'
+                          ? 'bg-white text-emerald-700 dark:text-emerald-300 shadow-xs border border-emerald-200 dark:bg-emerald-600/20 dark:border-emerald-500/40 font-bold'
+                          : 'text-slate-600 hover:text-foreground dark:text-slate-400 dark:hover:text-white'
+                      }`}
+                    >
+                      <ShieldCheck className="h-3 w-3 text-emerald-600 shrink-0" />
+                      <span>{t('Self-Managed', 'சுய-நிர்வகிக்கப்பட்டது')}</span>
+                      <Badge
+                        variant="secondary"
+                        className={`px-1.5 py-0 h-4 text-[10px] font-bold ${
+                          rentalCategoryFilter === 'self_managed'
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                            : 'bg-slate-200/80 text-slate-600 dark:bg-muted dark:text-slate-400'
+                        }`}
+                      >
+                        {selfManagedRentalsCount}
+                      </Badge>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-              {propertySection === 'owned' ? (
+            {propertySection === 'rents' ? (
+              <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                <Button
+                  size="sm"
+                  onClick={() => setIsAddRentalOpen(true)}
+                  className="gap-1.5 text-xs rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs font-semibold h-9 px-3.5"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {t('Add Existing Rental', 'ஏற்கனவே உள்ள வாடகையை சேர்க்க')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsListingSettingsOpen(true)}
+                  className="gap-1.5 text-xs rounded-xl border border-slate-200 dark:border-sky-500/20 bg-white dark:bg-[#0f213d]/70 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-sky-300 h-9 px-3.5 font-semibold hover:bg-slate-50 dark:hover:bg-[#132849] shadow-xs cursor-pointer transition-colors"
+                >
+                  <Settings className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
+                  {t('Listing Controls', 'பட்டியல் கட்டுப்பாடுகள்')}
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
                 <Button
                   size="sm"
                   onClick={() => setIsPropertyFormOpen(true)}
-                  className="gap-1.5 text-xs rounded-xl shadow-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold h-9 px-4"
+                  className="gap-1.5 text-xs rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs font-semibold h-9 px-3.5"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  {t('List New Property', 'புதிய சொத்து சேர்க்க')}
+                  {t('Add Property', 'சொத்து சேர்க்க')}
                 </Button>
-              ) : (
-                <>
-                  <Button
-                    size="sm"
-                    onClick={() => setIsAddRentalOpen(true)}
-                    className="gap-1.5 text-xs rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs font-semibold h-9 px-3.5"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    {t('Add Existing Rental', 'ஏற்கனவே உள்ள வாடகையை சேர்க்க')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onBrowseProperties?.('rent')}
-                    className="gap-1.5 text-xs rounded-xl border-slate-200 h-9 px-3.5 font-semibold"
-                  >
-                    <Home className="h-3.5 w-3.5 text-emerald-600" />
-                    {t('Browse Rentals', 'வாடகைக்கு தேட')}
-                  </Button>
-                </>
-              )}
-            </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsListingSettingsOpen(true)}
+                  className="gap-1.5 text-xs rounded-xl border border-slate-200 dark:border-sky-500/20 bg-white dark:bg-[#0f213d]/70 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-sky-300 h-9 px-3.5 font-semibold hover:bg-slate-50 dark:hover:bg-[#132849] shadow-xs cursor-pointer transition-colors"
+                >
+                  <Settings className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
+                  {t('Listing Controls', 'பட்டியல் கட்டுப்பாடுகள்')}
+                </Button>
+              </div>
+            )}
           </div>
-
-          {/* Sub-Filter for My Rents: All vs Connected vs Self-Managed */}
-          {propertySection === 'rents' && (
-            <div
-              id="rental-category-filter"
-              data-testid="rental-category-filter"
-              className="w-full rounded-2xl glass-panel bg-card/90 dark:bg-card/85 backdrop-blur-md border border-border/80 shadow-xs p-2.5 sm:p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition-all"
-            >
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-foreground shrink-0">
-                  <div className="w-6 h-6 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                    <SlidersHorizontal className="h-3.5 w-3.5" />
-                  </div>
-                  <span>{t('Filter Category:', 'வகைப்படுத்து:')}</span>
-                </div>
-
-                <div className="inline-flex p-1 bg-muted/80 dark:bg-muted/50 rounded-xl border border-border/60 gap-1 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => setRentalCategoryFilter('all')}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                      rentalCategoryFilter === 'all'
-                        ? 'bg-background text-foreground shadow-xs border border-border/70 ring-1 ring-primary/20'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-background/40'
-                    }`}
-                  >
-                    <span>{t('All Rentals', 'அனைத்து வாடகைகள்')}</span>
-                    <Badge
-                      variant="secondary"
-                      className={`px-1.5 py-0 h-4 text-[10px] font-bold ${
-                        rentalCategoryFilter === 'all'
-                          ? 'bg-primary/15 text-primary dark:text-primary-foreground'
-                          : 'bg-muted-foreground/15 text-muted-foreground'
-                      }`}
-                    >
-                      {tenantProperties.length}
-                    </Badge>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRentalCategoryFilter('connected')}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                      rentalCategoryFilter === 'connected'
-                        ? 'bg-background text-blue-700 dark:text-blue-300 shadow-xs border border-blue-300 dark:border-blue-800 ring-1 ring-blue-500/20'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-background/40'
-                    }`}
-                  >
-                    <Link2 className="h-3 w-3 text-blue-500 shrink-0" />
-                    <span>{t('Connected', 'இணைக்கப்பட்டது')}</span>
-                    <Badge
-                      variant="secondary"
-                      className={`px-1.5 py-0 h-4 text-[10px] font-bold ${
-                        rentalCategoryFilter === 'connected'
-                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
-                          : 'bg-muted-foreground/15 text-muted-foreground'
-                      }`}
-                    >
-                      {connectedRentalsCount}
-                    </Badge>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRentalCategoryFilter('self_managed')}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                      rentalCategoryFilter === 'self_managed'
-                        ? 'bg-background text-emerald-700 dark:text-emerald-300 shadow-xs border border-emerald-300 dark:border-emerald-800 ring-1 ring-emerald-500/20'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-background/40'
-                    }`}
-                  >
-                    <ShieldCheck className="h-3 w-3 text-emerald-600 shrink-0" />
-                    <span>{t('Self-Managed', 'சுய-நிர்வகிக்கப்பட்டது')}</span>
-                    <Badge
-                      variant="secondary"
-                      className={`px-1.5 py-0 h-4 text-[10px] font-bold ${
-                        rentalCategoryFilter === 'self_managed'
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                          : 'bg-muted-foreground/15 text-muted-foreground'
-                      }`}
-                    >
-                      {selfManagedRentalsCount}
-                    </Badge>
-                  </button>
-                </div>
-              </div>
-
-              {/* Status / Quick hint */}
-              <div className="text-[11px] text-muted-foreground shrink-0 hidden sm:block">
-                {rentalCategoryFilter === 'all' && (
-                  <span>{t('Showing all rentals in your portfolio', 'அனைத்து வாடகைகளும் காட்டப்படுகின்றன')}</span>
-                )}
-                {rentalCategoryFilter === 'connected' && (
-                  <span className="text-blue-600 dark:text-blue-400 font-medium">
-                    {t('Showing rentals connected to reSide landlords', 'reSide நிலப்பிரபுக்களுடன் இணைக்கப்பட்ட வாடகைகள்')}
-                  </span>
-                )}
-                {rentalCategoryFilter === 'self_managed' && (
-                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                    {t('Showing your private, self-managed rentals', 'சுய-நிர்வகிக்கப்பட்ட வாடகைகள்')}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Inline Management Workspace */}
           {propertySection === 'owned' ? (
             activeOwnedProperty ? (
-              <PropertyFullScreenView
-                property={activeOwnedProperty}
-                properties={myProperties}
-                selectedPropertyId={getId(activeOwnedProperty)}
-                onSelectProperty={handleSelectOwnedProperty}
-                isTenantView={false}
-              />
+              <div className="space-y-4">
+                {pendingPurchaseRequests.length > 0 && (
+                  <div className="rounded-2xl border border-amber-300 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/30 p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        <h4 className="text-xs sm:text-sm font-bold text-amber-900 dark:text-amber-200">
+                          {t('Pending Purchase Payments', 'நிலுவையில் உள்ள கொள்முதல் கட்டணங்கள்')}
+                        </h4>
+                        <Badge className="bg-amber-600 text-white text-[10px] px-2 py-0.2">
+                          {pendingPurchaseRequests.length}
+                        </Badge>
+                      </div>
+                      <span className="text-[11px] text-amber-800 dark:text-amber-300">
+                        {t('Complete payment to transfer deed into your portfolio', 'உரிமை மாற்றத்தை முடிக்க கட்டணத்தை செலுத்துங்கள்')}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {pendingPurchaseRequests.map((req: any) => {
+                        const isAwaitingVerification = req.status === 'Payment_Submitted' || req.status === 'payment_pending';
+                        const isRejected = req.paymentDetails?.status === 'rejected' || !!req.rejectionReason;
+
+                        return (
+                          <div
+                            key={req._id}
+                            className="p-3 rounded-xl bg-white dark:bg-[#0a1628]/85 dark:backdrop-blur-xl border border-amber-200 dark:border-sky-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs dark:shadow-xl dark:shadow-black/40"
+                          >
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h5 className="text-xs sm:text-sm font-bold text-foreground truncate max-w-xs">
+                                  {req.property?.title || 'Property'}
+                                </h5>
+                                <Badge variant="secondary" className="text-[10px] uppercase font-bold">
+                                  {req.property?.propertyType || 'Purchase'}
+                                </Badge>
+                                {isAwaitingVerification ? (
+                                  <Badge variant="outline" className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border-indigo-300 text-[10px]">
+                                    <Clock className="w-2.5 h-2.5 mr-1 inline" />
+                                    {t('Payment Submitted (Waiting for Seller Verification)', 'கட்டணம் சமர்ப்பிக்கப்பட்டது')}
+                                  </Badge>
+                                ) : isRejected ? (
+                                  <Badge variant="destructive" className="text-[10px]">
+                                    <XCircle className="w-2.5 h-2.5 mr-1 inline" />
+                                    {t('Payment Rejected', 'கட்டணம் நிராகரிக்கப்பட்டது')}
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-amber-600 text-white text-[10px]">
+                                    <Clock className="w-2.5 h-2.5 mr-1 inline" />
+                                    {t('Offer Accepted — Payment Required', 'சலுகை ஏற்கப்பட்டது')}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {t('Seller:', 'விற்பனையாளர்:')} <b>{req.owner?.name || 'Naveen'}</b> • {t('Agreed Price:', 'விலை:')} <b>₹{Number(req.agreedAmount || req.offerAmount || req.property?.price || 0).toLocaleString('en-IN')}</b>
+                              </p>
+                              {isRejected && (
+                                <p className="text-xs text-rose-600 dark:text-rose-400 font-medium italic">
+                                  {t('Reason: ', 'காரணம்: ')}"{req.rejectionReason || req.paymentDetails?.rejectionReason}"
+                                </p>
+                              )}
+                              {isAwaitingVerification && req.paymentDetails?.transactionId && (
+                                <p className="text-[11px] text-muted-foreground font-mono">
+                                  UTR: <b className="text-indigo-600 dark:text-indigo-400">{req.paymentDetails.transactionId}</b> ({req.paymentDetails.mode || 'UPI'})
+                                </p>
+                              )}
+                            </div>
+
+                            <Button
+                              size="sm"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl h-8 px-3.5 shrink-0 shadow-xs"
+                              onClick={() => {
+                                setSelectedRequest(req);
+                                setIsPaymentModalOpen(true);
+                              }}
+                            >
+                              <CreditCard className="w-3.5 h-3.5 mr-1.5" />
+                              {isAwaitingVerification
+                                ? t('Update Payment Details', 'கட்டண விவரங்களை மாற்றுக')
+                                : isRejected
+                                ? t('Re-submit Payment', 'மீண்டும் சமர்ப்பி')
+                                : t('Proceed to Payment', 'கட்டணம் செலுத்த தொடரவும்')}
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <PropertyFullScreenView
+                  property={activeOwnedProperty}
+                  properties={myProperties}
+                  selectedPropertyId={getId(activeOwnedProperty)}
+                  onSelectProperty={handleSelectOwnedProperty}
+                  isTenantView={false}
+                />
+              </div>
+            ) : pendingPurchaseRequests.length > 0 ? (
+              /* Gopi does NOT see an empty state after offer acceptance */
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-amber-300 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/40 p-5 sm:p-6 space-y-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-lg bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 flex items-center justify-center">
+                          <CreditCard className="h-4 w-4" />
+                        </div>
+                        <h3 className="text-base sm:text-lg font-bold text-amber-950 dark:text-amber-100">
+                          {t('Pending Purchase Payments', 'நிலுவையில் உள்ள கொள்முதல் கட்டணங்கள்')}
+                        </h3>
+                        <Badge className="bg-amber-600 text-white text-xs px-2 py-0.5">
+                          {pendingPurchaseRequests.length}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-amber-800/90 dark:text-amber-300/90 max-w-xl">
+                        {t(
+                          'Your purchase offer has been accepted! Submit your payment reference to complete the deed transfer and add the property to your portfolio.',
+                          'உங்கள் கொள்முதல் சலுகை ஏற்கப்பட்டது! உரிமை மாற்றத்தை முடித்து உங்கள் போர்ட்ஃபோலியோவில் சொத்தை சேர்க்க கட்டண குறிப்பை சமர்ப்பிக்கவும்.'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 pt-1">
+                    {pendingPurchaseRequests.map((req: any) => {
+                      const isAwaitingVerification = req.status === 'Payment_Submitted' || req.status === 'payment_pending';
+                      const isRejected = req.paymentDetails?.status === 'rejected' || !!req.rejectionReason;
+
+                      return (
+                        <div
+                          key={req._id}
+                          className="p-4 rounded-xl bg-white dark:bg-[#0a1628]/85 dark:backdrop-blur-xl border border-amber-200 dark:border-sky-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs dark:shadow-xl dark:shadow-black/40"
+                        >
+                          <div className="space-y-1.5 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="text-sm font-bold text-foreground truncate max-w-sm">
+                                {req.property?.title || 'Property'}
+                              </h4>
+                              <Badge variant="secondary" className="text-[10px] uppercase font-bold">
+                                {req.property?.propertyType || 'Purchase'}
+                              </Badge>
+                              {isAwaitingVerification ? (
+                                <Badge variant="outline" className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border-indigo-300 text-xs px-2.5 py-0.5 font-medium">
+                                  <Clock className="w-3 h-3 mr-1 inline" />
+                                  {t('Payment Submitted (Waiting for Seller Verification)', 'கட்டணம் சமர்ப்பிக்கப்பட்டது')}
+                                </Badge>
+                              ) : isRejected ? (
+                                <Badge variant="destructive" className="text-xs px-2.5 py-0.5">
+                                  <XCircle className="w-3 h-3 mr-1 inline" />
+                                  {t('Payment Rejected', 'கட்டணம் நிராகரிக்கப்பட்டது')}
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-amber-600 text-white text-xs px-2.5 py-0.5 font-semibold">
+                                  <Clock className="w-3 h-3 mr-1 inline" />
+                                  {t('Offer Accepted — Payment Required', 'சலுகை ஏற்கப்பட்டது')}
+                                </Badge>
+                              )}
+                            </div>
+
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
+                              <span className="truncate">{req.property?.location || '-'}</span>
+                            </p>
+
+                            <div className="flex items-center gap-3 text-xs pt-0.5 flex-wrap">
+                              <span>
+                                <span className="text-muted-foreground">{t('Seller:', 'விற்பனையாளர்:')} </span>
+                                <b>{req.owner?.name || 'Naveen'}</b>
+                              </span>
+                              <span>
+                                <span className="text-muted-foreground">{t('Agreed Purchase Amount:', 'ஒப்பந்தத் தொகை:')} </span>
+                                <b className="text-emerald-700 dark:text-emerald-400">
+                                  ₹{Number(req.agreedAmount || req.offerAmount || req.property?.price || 0).toLocaleString('en-IN')}
+                                </b>
+                              </span>
+                            </div>
+
+                            {isRejected && (
+                              <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-700 dark:text-rose-300 flex items-start gap-1.5">
+                                <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-rose-600" />
+                                <div>
+                                  <span className="font-semibold">{t('Seller Note: ', 'விற்பனையாளர் குறிப்பு: ')}</span>
+                                  <span>"{req.rejectionReason || req.paymentDetails?.rejectionReason}"</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {isAwaitingVerification && req.paymentDetails?.transactionId && (
+                              <p className="text-xs text-indigo-700 dark:text-indigo-300 font-mono bg-indigo-50/70 dark:bg-indigo-950/40 px-2 py-0.5 rounded inline-block">
+                                Bank UTR / UPI Ref: <b>{req.paymentDetails.transactionId}</b> ({req.paymentDetails.mode || 'UPI'})
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Button
+                              size="sm"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl h-9 px-4 shadow-sm"
+                              onClick={() => {
+                                setSelectedRequest(req);
+                                setIsPaymentModalOpen(true);
+                              }}
+                            >
+                              <CreditCard className="w-3.5 h-3.5 mr-1.5" />
+                              {isAwaitingVerification
+                                ? t('Update Payment Details', 'கட்டண விவரங்களை மாற்றுக')
+                                : isRejected
+                                ? t('Re-submit Payment', 'மீண்டும் சமர்ப்பி')
+                                : t('Proceed to Payment', 'கட்டணம் செலுத்த தொடரவும்')}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="rounded-2xl glass-panel bg-card/60 border border-border/60 p-8 sm:p-12 text-center space-y-3">
                 <Building className="h-10 w-10 text-muted-foreground/40 mx-auto" />
@@ -1421,20 +1726,23 @@ export default function UserDashboard({
                             {t('Review Counteroffer', 'எதிர் சலுகையை காண்க')}
                           </Button>
                         )}
-                        {['accepted', 'approved', 'terms_confirmed'].includes(req.status) && (
+                        {['accepted', 'approved', 'terms_confirmed', 'Pending_Payment'].includes(req.status) && (
                           <Button
                             size="sm"
                             className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1.5 shadow-sm"
-                            onClick={() => setSelectedRequest(req)}
+                            onClick={() => {
+                              setSelectedRequest(req);
+                              setIsPaymentModalOpen(true);
+                            }}
                           >
                             <CreditCard className="w-3.5 h-3.5" />
-                            {t('Pay Now', 'கட்டணம் செலுத்து')}
+                            {t('Submit Payment Details', 'கட்டண விவரங்களை சமர்ப்பிக்கவும்')}
                           </Button>
                         )}
-                        {req.status === 'payment_pending' && (
-                          <Badge variant="outline" className="bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-300 text-xs px-2.5 py-1">
+                        {(req.status === 'Payment_Submitted' || req.status === 'payment_pending') && (
+                          <Badge variant="outline" className="bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-300 text-xs px-2.5 py-1 font-medium">
                             <Clock className="w-3 h-3 mr-1 inline" />
-                            {t('Verification Pending', 'சரிபார்ப்பு நிலுவையில்')}
+                            {t('Payment Submitted — Awaiting Verification', 'கட்டணம் சமர்ப்பிக்கப்பட்டது - சரிபார்ப்பு நிலுவையில்')}
                           </Badge>
                         )}
                         <Button
@@ -1588,6 +1896,30 @@ export default function UserDashboard({
                           </p>
                         </div>
 
+                        {(req.status === 'Payment_Submitted' || req.status === 'payment_pending') && (
+                          <div className="p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800 space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1">
+                                <CreditCard className="h-3.5 w-3.5 text-indigo-600" />
+                                {t('Payment Submitted by Buyer', 'வாங்குபவர் சமர்ப்பித்த கட்டணம்')}
+                              </span>
+                              <Badge className="bg-indigo-600 text-white text-[10px] px-2 py-0.2">
+                                {req.paymentDetails?.mode || 'UPI'}
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs pt-0.5">
+                              <div>
+                                <span className="text-[11px] text-muted-foreground block">{t('Amount Paid:', 'செலுத்தப்பட்ட தொகை:')}</span>
+                                <b className="text-foreground">₹{Number(req.paymentDetails?.amount || req.agreedAmount || req.offerAmount || 0).toLocaleString('en-IN')}</b>
+                              </div>
+                              <div>
+                                <span className="text-[11px] text-muted-foreground block">{t('Bank UTR / UPI Ref:', 'வங்கி UTR / UPI எண்:')}</span>
+                                <b className="font-mono text-indigo-700 dark:text-indigo-300">{req.paymentDetails?.transactionId || '-'}</b>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         <div className="flex items-center gap-4 text-xs pt-1 flex-wrap">
                           <span>
                             <span className="text-muted-foreground">{t('Listed Price: ', 'பட்டியல் விலை: ')}</span>
@@ -1642,15 +1974,34 @@ export default function UserDashboard({
                             </Button>
                           </>
                         )}
-                        {req.status === 'payment_pending' && (
-                          <Button
-                            size="sm"
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium gap-1 shadow-sm"
-                            onClick={() => setSelectedRequest(req)}
-                          >
-                            <CreditCard className="w-3.5 h-3.5" />
-                            {t('Verify Payment', 'கட்டணத்தை சரிபார்')}
-                          </Button>
+                        {(req.status === 'Payment_Submitted' || req.status === 'payment_pending') && (
+                          <>
+                            <Button
+                              size="sm"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1.5 shadow-sm"
+                              disabled={verifyPaymentMutation.isPending}
+                              onClick={() => handleVerifyAndTransfer(req)}
+                            >
+                              {verifyPaymentMutation.isPending ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              )}
+                              {t('Verify & Accept Payment', 'கட்டணத்தை சரிபார்த்து ஏற்கவும்')}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-400 dark:hover:bg-rose-950/40 font-semibold gap-1.5"
+                              onClick={() => {
+                                setSelectedRequest(req);
+                                setIsRejectModalOpen(true);
+                              }}
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                              {t('Reject Payment with Reason', 'காரணத்துடன் நிராகரிக்கவும்')}
+                            </Button>
+                          </>
                         )}
                         <Button
                           variant="outline"
@@ -2038,6 +2389,28 @@ export default function UserDashboard({
             setRentalCategoryFilter('all');
           }
         }}
+      />
+
+      {/* Listing Controls & Tenant Management Modal */}
+      <ListingControlsDialog
+        open={isListingSettingsOpen}
+        onOpenChange={setIsListingSettingsOpen}
+        properties={myProperties}
+        onUpdateProperty={onUpdateProperty}
+      />
+
+      {/* Gopi's Submit Payment Details Modal */}
+      <SubmitPaymentModal
+        open={isPaymentModalOpen}
+        onOpenChange={setIsPaymentModalOpen}
+        request={selectedRequest}
+      />
+
+      {/* Naveen's Reject Payment with Reason Modal */}
+      <RejectPaymentModal
+        open={isRejectModalOpen}
+        onOpenChange={setIsRejectModalOpen}
+        request={selectedRequest}
       />
     </div>
   );

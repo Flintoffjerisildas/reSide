@@ -41,7 +41,11 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
   const [location, setLocation] = useState('');
   const [geoLocation, setGeoLocation] = useState<LocationCoordinates | null>(null);
   const [price, setPrice] = useState('');
-  const [transactionType, setTransactionType] = useState('');
+  const [transactionType, setTransactionType] = useState('purchase');
+  const [securityDeposit, setSecurityDeposit] = useState('');
+  const [monthlyMaintenance, setMonthlyMaintenance] = useState('');
+  const [reraNumber, setReraNumber] = useState('');
+  const [ownershipType, setOwnershipType] = useState('');
   const [totalArea, setTotalArea] = useState('');
   const [cent, setCent] = useState('');
   const [bedrooms, setBedrooms] = useState('');
@@ -82,13 +86,14 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
   const generateDescription = (input: {
     bhkLabel: string;
     location: string;
-    rentAmount: number;
+    priceAmount: number;
+    transactionType: string;
     amenities?: string[];
     propertyCategory?: string;
   }) => {
     const bhk = input.bhkLabel.trim();
     const city = toTitleCase(input.location.trim());
-    const rent = formatInr(input.rentAmount);
+    const formattedPrice = formatInr(input.priceAmount);
     const amenities = (input.amenities || []).filter(Boolean);
     const categoryRaw = String(input.propertyCategory || '').toLowerCase();
     const homeWord =
@@ -98,19 +103,32 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
           ? 'PG'
           : categoryRaw === 'land'
             ? 'plot'
-            : 'apartment';
+            : categoryRaw === 'villa'
+              ? 'villa'
+              : categoryRaw === 'commercial'
+                ? 'commercial space'
+                : categoryRaw === 'farmhouse'
+                  ? 'farmhouse'
+                  : 'apartment';
 
     const isPg = categoryRaw === 'pg';
     const isLand = categoryRaw === 'land';
+    const isCommercial = categoryRaw === 'commercial';
     const b = Number.parseInt(bhk.replace(/[^0-9]/g, ''), 10);
     const audience =
       isPg
         ? 'students and working professionals'
         : isLand
           ? 'investors and home builders'
-          : b >= 3
-            ? 'families'
-            : 'working professionals';
+          : isCommercial
+            ? 'businesses and commercial enterprises'
+            : categoryRaw === 'villa'
+              ? 'premium luxury living seekers and families'
+              : categoryRaw === 'farmhouse'
+                ? 'peaceful retreat seekers and nature lovers'
+                : b >= 3
+                  ? 'families'
+                  : 'working professionals';
 
     const amenityPhrase =
       amenities.length > 0
@@ -124,13 +142,15 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
         : 'Well-connected location with easy access to daily essentials.';
 
     const bhkPrefix = bhk ? `${bhk} ` : '';
+    const isRent = input.transactionType === 'rent';
+    const priceText = isRent ? `₹${formattedPrice}/month` : `₹${formattedPrice}`;
     const templates = [
-      `Spacious ${bhkPrefix}${homeWord} in ${city} available for ₹${rent}. ${amenityPhrase} Ideal for ${audience}.`,
-      `Discover a well-maintained ${bhkPrefix}${homeWord} in ${city} for ₹${rent}. ${amenityPhrase} Perfect for ${audience}.`,
-      `Looking for a prime ${homeWord} in ${city}? This property is available for ₹${rent}. ${amenityPhrase} Great opportunity for ${audience}.`,
+      `Spacious ${bhkPrefix}${homeWord} in ${city} available for ${isRent ? 'rent' : 'purchase'} at ${priceText}. ${amenityPhrase} Ideal for ${audience}.`,
+      `Discover a well-maintained ${bhkPrefix}${homeWord} in ${city} available for ${priceText}. ${amenityPhrase} Perfect for ${audience}.`,
+      `Looking for a prime ${homeWord} in ${city}? This property is available for ${priceText}. ${amenityPhrase} Great opportunity for ${audience}.`,
     ];
 
-    const pick = (bhk.length + city.length + String(rent).length + amenities.length) % templates.length;
+    const pick = (bhk.length + city.length + String(formattedPrice).length + amenities.length) % templates.length;
     return templates[pick];
   };
 
@@ -178,10 +198,10 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
   };
 
   const handleGenerateDescription = () => {
-    const isLand = propertyType.toLowerCase() === 'land';
+    const isNoBedrooms = ['land', 'commercial'].includes(propertyType.toLowerCase());
     const priceNum = parseFloat(price);
 
-    if (isLand) {
+    if (isNoBedrooms) {
       if (!location.trim() || isNaN(priceNum) || priceNum <= 0) {
         toast.error(
           t(
@@ -196,21 +216,22 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
       if (!location.trim() || isNaN(priceNum) || priceNum <= 0 || isNaN(bedroomsNum) || bedroomsNum <= 0) {
         toast.error(
           t(
-            'Enter Bedrooms, Location, and Rent Amount to generate a description',
-            'விவரத்தை உருவாக்க Bedrooms, இடம் மற்றும் வாடகை தொகையை உள்ளிடவும்'
+            'Enter Bedrooms, Location, and Price/Rent Amount to generate a description',
+            'விவரத்தை உருவாக்க Bedrooms, இடம் மற்றும் வாடகை/விலை தொகையை உள்ளிடவும்'
           )
         );
         return;
       }
     }
 
-    const bhkLabel = isLand ? '' : `${parseInt(bedrooms, 10)}BHK`;
+    const bhkLabel = isNoBedrooms ? '' : `${parseInt(bedrooms, 10)}BHK`;
     const amenities = parseAmenities(amenitiesText);
     setDescription(
       generateDescription({
         bhkLabel,
         location,
-        rentAmount: priceNum,
+        priceAmount: priceNum,
+        transactionType,
         amenities,
         propertyCategory: propertyType,
       })
@@ -224,7 +245,12 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
       setPropertyType(pType);
       setLocation(initialData.location || '');
       setPrice(initialData.price?.toString() || '');
-      setTransactionType(initialData.transactionType || '');
+      const tx = (initialData.transactionType || 'purchase').toLowerCase();
+      setTransactionType(tx === 'rent' ? 'rent' : 'purchase');
+      setSecurityDeposit(initialData.securityDeposit !== undefined && initialData.securityDeposit !== null ? initialData.securityDeposit.toString() : '');
+      setMonthlyMaintenance(initialData.monthlyMaintenance !== undefined && initialData.monthlyMaintenance !== null ? initialData.monthlyMaintenance.toString() : '');
+      setReraNumber(initialData.reraNumber || '');
+      setOwnershipType(initialData.ownershipType || '');
       
       const areaStr = initialData.totalArea?.toString() || '';
       setTotalArea(areaStr);
@@ -270,7 +296,11 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
       setLocation('');
       setGeoLocation(null);
       setPrice('');
-      setTransactionType('');
+      setTransactionType('purchase');
+      setSecurityDeposit('');
+      setMonthlyMaintenance('');
+      setReraNumber('');
+      setOwnershipType('');
       setTotalArea('');
       setCent('');
       setBedrooms('');
@@ -295,10 +325,26 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
 
   const handleSubmit = async () => {
     const isLand = propertyType.toLowerCase() === 'land';
+    const isNoBedrooms = ['land', 'commercial'].includes(propertyType.toLowerCase());
 
-    if (!title.trim() || !propertyType || !location.trim() || !price || !transactionType || !totalArea || (!isLand && !bedrooms) || !facing) {
+    if (!title.trim() || !propertyType || !location.trim() || !price || !transactionType || !totalArea || (!isNoBedrooms && !bedrooms) || !facing) {
       toast.error(t('Please fill all required fields', 'அனைத்து அவசியமான புலங்களையும் நிரப்பவும்'));
       return;
+    }
+
+    if (transactionType === 'rent') {
+      const depositNum = parseFloat(securityDeposit);
+      if (!securityDeposit.trim() || isNaN(depositNum) || depositNum < 0) {
+        toast.error(t('Please enter a valid Security Deposit / Advance amount', 'சரியான முன்பணம் / வைப்புத் தொகையை உள்ளிடவும்'));
+        return;
+      }
+      if (monthlyMaintenance.trim() !== '') {
+        const maintNum = parseFloat(monthlyMaintenance);
+        if (isNaN(maintNum) || maintNum < 0) {
+          toast.error(t('Please enter a valid maintenance amount', 'சரியான பராமரிப்புத் தொகையை உள்ளிடவும்'));
+          return;
+        }
+      }
     }
 
     if (images.length === 0) {
@@ -332,13 +378,18 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
     }
 
     let bedroomsNum: number | undefined = undefined;
-    if (!isLand) {
+    if (!isNoBedrooms) {
       const parsedBedrooms = parseInt(bedrooms, 10);
       if (isNaN(parsedBedrooms) || parsedBedrooms <= 0) {
         toast.error(t('Please enter a valid number of bedrooms', 'சரியான படுக்கையறை எண்ணிக்கையை உள்ளிடவும்'));
         return;
       }
       bedroomsNum = parsedBedrooms;
+    } else if (bedrooms.trim() !== '') {
+      const parsedBedrooms = parseInt(bedrooms, 10);
+      if (!isNaN(parsedBedrooms) && parsedBedrooms >= 0) {
+        bedroomsNum = parsedBedrooms;
+      }
     }
 
     let validatedLandDimensions: { ab?: number; bc?: number; cd?: number; da?: number } | undefined = undefined;
@@ -387,7 +438,6 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
 
       if (initialData) {
         const propertyId = (initialData as any)._id || initialData.id;
-        console.log('[DEBUG] Updating property. ID:', propertyId, 'Full initialData:', initialData);
         
         if (!propertyId) {
           console.error('Property ID is missing');
@@ -403,6 +453,10 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
             location: location.trim(),
             price: Number(priceNum),
             transactionType: (transactionType as any),
+            securityDeposit: transactionType === 'rent' && securityDeposit.trim() ? Number(securityDeposit) : undefined,
+            monthlyMaintenance: transactionType === 'rent' && monthlyMaintenance.trim() ? Number(monthlyMaintenance) : undefined,
+            reraNumber: transactionType === 'purchase' && reraNumber.trim() ? reraNumber.trim() : undefined,
+            ownershipType: transactionType === 'purchase' && ownershipType ? ownershipType : undefined,
             totalArea: Number(totalAreaNum),
             cent: calculatedCent,
             landDimensions: isLand ? validatedLandDimensions : undefined,
@@ -420,8 +474,12 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
           title: title.trim(),
           propertyType,
           location: location.trim(),
-          price: Number(priceNum), // Send as number
+          price: Number(priceNum),
           transactionType: (transactionType as any),
+          securityDeposit: transactionType === 'rent' && securityDeposit.trim() ? Number(securityDeposit) : undefined,
+          monthlyMaintenance: transactionType === 'rent' && monthlyMaintenance.trim() ? Number(monthlyMaintenance) : undefined,
+          reraNumber: transactionType === 'purchase' && reraNumber.trim() ? reraNumber.trim() : undefined,
+          ownershipType: transactionType === 'purchase' && ownershipType ? ownershipType : undefined,
           totalArea: Number(totalAreaNum),
           cent: calculatedCent,
           landDimensions: isLand ? validatedLandDimensions : undefined,
@@ -430,7 +488,7 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
           amenities: parseAmenities(amenitiesText),
           description: description.trim() || undefined,
           status: PropertyStatus.pending,
-          images: base64NewImages, // For new property, all images are new
+          images: base64NewImages,
           geoLocatedImage: null,
           geoLocation: geoLocation || null,
         });
@@ -448,7 +506,11 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
       setLocation('');
       setGeoLocation(null);
       setPrice('');
-      setTransactionType('');
+      setTransactionType('purchase');
+      setSecurityDeposit('');
+      setMonthlyMaintenance('');
+      setReraNumber('');
+      setOwnershipType('');
       setTotalArea('');
       setCent('');
       setBedrooms('');
@@ -467,7 +529,6 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
   };
 
   const handleDialogChange = (open: boolean) => {
-    // Reset logic is now in useEffect when opening
     onOpenChange(open);
   };
 
@@ -483,53 +544,137 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
         </TabsTrigger>
       </TabsList>
 
-          <TabsContent value="details" className="mt-4">
-            <div className="grid grid-cols-12 gap-x-4 gap-y-4">
-              {/* Row 1: Property Title (~8 cols) and Property Type (~4 cols) */}
-              <div className="col-span-12 sm:col-span-8 grid gap-1.5">
-                <Label htmlFor="title" className="text-sm font-medium">
-                  {t('Title', 'தலைப்பு')} <span className="text-destructive">*</span>
+      <TabsContent value="details" className="mt-4 space-y-4">
+        {/* Prominent Transaction Type Segmented Tab Selector at Top */}
+        <div className="bg-slate-100 dark:bg-muted/70 p-1 rounded-2xl border border-slate-200/80 dark:border-border/80">
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={() => setTransactionType('purchase')}
+              className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                transactionType === 'purchase'
+                  ? 'bg-white dark:bg-card text-blue-600 dark:text-blue-400 shadow-xs border border-slate-200/90 dark:border-border font-bold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <span className="text-base">🏷️</span>
+              <span>{t('For Purchase / Sale', 'வாங்க / விற்பனைக்கு')}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTransactionType('rent')}
+              className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                transactionType === 'rent'
+                  ? 'bg-white dark:bg-card text-blue-600 dark:text-blue-400 shadow-xs border border-slate-200/90 dark:border-border font-bold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <span className="text-base">🔑</span>
+              <span>{t('For Rent', 'வாடகைக்கு')}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-12 gap-x-4 gap-y-4">
+          {/* Row 1: Property Title (~8 cols) and Property Type (~4 cols) */}
+          <div className="col-span-12 sm:col-span-8 grid gap-1.5">
+            <Label htmlFor="title" className="text-sm font-medium">
+              {t('Title', 'தலைப்பு')} <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="title"
+              placeholder={t('e.g., 3BHK Luxury Apartment', 'எ.கா., 3BHK ஆடம்பர அபார்ட்மெண்ட்')}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="h-10"
+            />
+          </div>
+          
+          <div className="col-span-12 sm:col-span-4 grid gap-1.5">
+            <Label htmlFor="type" className="text-sm font-medium">
+              {t('Property Type', 'சொத்து வகை')} <span className="text-destructive">*</span>
+            </Label>
+            <Select value={propertyType} onValueChange={handlePropertyTypeChange}>
+              <SelectTrigger id="type" className="h-10">
+                <SelectValue placeholder={t('Select type', 'வகையை தேர்ந்தெடுக்கவும்')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="flat">{t('Apartment / Flat', 'அபார்ட்மென்ட் / பிளாட்')}</SelectItem>
+                <SelectItem value="house">{t('House', 'வீடு')}</SelectItem>
+                <SelectItem value="villa">{t('Villa', 'வில்லா')}</SelectItem>
+                <SelectItem value="pg">{t('PG / Hostel', 'பி.ஜி / விடுதி')}</SelectItem>
+                <SelectItem value="land">{t('Land / Plot', 'நிலம் / மனை')}</SelectItem>
+                <SelectItem value="commercial">{t('Commercial', 'வணிக இடம்')}</SelectItem>
+                <SelectItem value="farmhouse">{t('Farm House', 'பண்ணை வீடு')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Row 2: Property Address / Location & GPS Interactive Map (Full Width) */}
+          <div className="col-span-12">
+            <LocationPickerMap
+              value={geoLocation}
+              onChange={setGeoLocation}
+              address={location}
+              onAddressChange={setLocation}
+              hideMap={transactionType === 'rent'}
+            />
+          </div>
+
+          {/* Row 3: Conditional Pricing and Transaction Specific Fields */}
+          {transactionType === 'rent' ? (
+            <>
+              {/* Monthly Rent (₹) * */}
+              <div className="col-span-12 sm:col-span-4 grid gap-1.5">
+                <Label htmlFor="price" className="text-sm font-medium">
+                  {t('Monthly Rent (₹)', 'மாத வாடகை (₹)')} <span className="text-destructive">*</span>
                 </Label>
                 <Input
-                  id="title"
-                  placeholder={t('e.g., 3BHK Luxury Apartment', 'எ.கா., 3BHK ஆடம்பர அபார்ட்மெண்ட்')}
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  id="price"
+                  type="number"
+                  placeholder={t('e.g., 20000', 'எ.கா., 20000')}
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
                   className="h-10"
                 />
               </div>
-              
-              <div className="col-span-12 sm:col-span-4 grid gap-1.5">
-                <Label htmlFor="type" className="text-sm font-medium">
-                  {t('Property Type', 'சொத்து வகை')} <span className="text-destructive">*</span>
-                </Label>
-                <Select value={propertyType} onValueChange={handlePropertyTypeChange}>
-                  <SelectTrigger id="type" className="h-10">
-                    <SelectValue placeholder={t('Select type', 'வகையை தேர்ந்தெடுக்கவும்')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="flat">{t('Apartment / Flat', 'அபார்ட்மென்ட் / பிளாட்')}</SelectItem>
-                    <SelectItem value="house">{t('House', 'வீடு')}</SelectItem>
-                    <SelectItem value="pg">PG</SelectItem>
-                    <SelectItem value="land">{t('Land', 'நிலம்')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
 
-              {/* Row 2 & 3: Property Address / Location & GPS Interactive Map (Full Width) */}
-              <div className="col-span-12">
-                <LocationPickerMap
-                  value={geoLocation}
-                  onChange={setGeoLocation}
-                  address={location}
-                  onAddressChange={setLocation}
+              {/* Security Deposit / Advance (₹) * */}
+              <div className="col-span-12 sm:col-span-4 grid gap-1.5">
+                <Label htmlFor="securityDeposit" className="text-sm font-medium">
+                  {t('Security Deposit / Advance (₹)', 'முன்பணம் / வைப்புத் தொகை (₹)')} <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="securityDeposit"
+                  type="number"
+                  placeholder={t('e.g., 100000', 'எ.கா., 100000')}
+                  value={securityDeposit}
+                  onChange={(e) => setSecurityDeposit(e.target.value)}
+                  className="h-10"
                 />
               </div>
 
-              {/* Row 4: Price (₹) - Full Width */}
-              <div className="col-span-12 grid gap-1.5">
+              {/* Monthly Maintenance (₹) (optional) */}
+              <div className="col-span-12 sm:col-span-4 grid gap-1.5">
+                <Label htmlFor="monthlyMaintenance" className="text-sm font-medium">
+                  {t('Monthly Maintenance (₹)', 'மாத பராமரிப்புத் தொகை (₹)')} <span className="text-xs text-muted-foreground font-normal">({t('optional', 'விருப்பத்திற்குரியது')})</span>
+                </Label>
+                <Input
+                  id="monthlyMaintenance"
+                  type="number"
+                  placeholder={t('e.g., 2000', 'எ.கா., 2000')}
+                  value={monthlyMaintenance}
+                  onChange={(e) => setMonthlyMaintenance(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Expected Selling Price (₹) * */}
+              <div className="col-span-12 sm:col-span-4 grid gap-1.5">
                 <Label htmlFor="price" className="text-sm font-medium">
-                  {t('Price (₹)', 'விலை (₹)')} <span className="text-destructive">*</span>
+                  {t('Expected Selling Price (₹)', 'எதிர்பார்க்கப்படும் விற்பனை விலை (₹)')} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="price"
@@ -541,299 +686,316 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
                 />
               </div>
 
-              {/* Row 5: Total Area (sq ft) and Cent (50% each on tablet/desktop) */}
-              <div className="col-span-12 sm:col-span-6 grid gap-1.5">
-                <Label htmlFor="totalArea" className="text-sm font-medium">
-                  {t('Total Area (sq ft)', 'மொத்த பரப்பளவு (சதுர அடி)')} <span className="text-destructive">*</span>
+              {/* Ownership Type dropdown */}
+              <div className="col-span-12 sm:col-span-4 grid gap-1.5">
+                <Label htmlFor="ownershipType" className="text-sm font-medium">
+                  {t('Ownership Type', 'உரிமை வகை')}
                 </Label>
-                <Input
-                  id="totalArea"
-                  type="number"
-                  step="any"
-                  min="0"
-                  placeholder={t('e.g., 1200', 'எ.கா., 1200')}
-                  value={totalArea}
-                  onChange={handleAreaChange}
-                  className="h-10"
-                />
-              </div>
-
-              <div className="col-span-12 sm:col-span-6 grid gap-1.5">
-                <Label htmlFor="cent" className="text-sm font-medium">
-                  {t('Cent', 'சென்ட்')}
-                </Label>
-                <Input
-                  id="cent"
-                  type="number"
-                  step="any"
-                  min="0"
-                  placeholder={t('e.g., 2.75', 'எ.கா., 2.75')}
-                  value={cent}
-                  onChange={handleCentChange}
-                  className="h-10"
-                />
-              </div>
-
-              {/* Row 6: Number of Bedrooms, Property Facing, and Transaction Type */}
-              {/* When property type is Land: Bedrooms is hidden and Facing + Transaction take 50% each */}
-              {propertyType.toLowerCase() !== 'land' && (
-                <div className="col-span-12 sm:col-span-4 grid gap-1.5">
-                  <Label htmlFor="bedrooms" className="text-sm font-medium">
-                    {t('Number of Bedrooms (BHK)', 'படுக்கையறை எண்ணிக்கை (BHK)')} <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="bedrooms"
-                    type="number"
-                    placeholder={t('e.g., 2', 'எ.கா., 2')}
-                    value={bedrooms}
-                    onChange={(e) => setBedrooms(e.target.value)}
-                    className="h-10"
-                  />
-                </div>
-              )}
-
-              <div className={`col-span-12 ${propertyType.toLowerCase() === 'land' ? 'sm:col-span-6' : 'sm:col-span-4'} grid gap-1.5`}>
-                <Label htmlFor="facing" className="text-sm font-medium">
-                  {t('Property Facing', 'சொத்து திசை')} <span className="text-destructive">*</span>
-                </Label>
-                <Select value={facing} onValueChange={setFacing}>
-                  <SelectTrigger id="facing" className="h-10">
-                    <SelectValue placeholder={t('Select facing', 'திசையைத் தேர்ந்தெடுக்கவும்')} />
+                <Select value={ownershipType} onValueChange={setOwnershipType}>
+                  <SelectTrigger id="ownershipType" className="h-10">
+                    <SelectValue placeholder={t('Select ownership type', 'உரிமை வகையை தேர்ந்தெடுக்கவும்')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="North">{t('North', 'வடக்கு')}</SelectItem>
-                    <SelectItem value="South">{t('South', 'தெற்கு')}</SelectItem>
-                    <SelectItem value="East">{t('East', 'கிழக்கு')}</SelectItem>
-                    <SelectItem value="West">{t('West', 'மேற்கு')}</SelectItem>
-                    <SelectItem value="North-East">{t('North-East', 'வடகிழக்கு')}</SelectItem>
-                    <SelectItem value="North-West">{t('North-West', 'வடமேற்கு')}</SelectItem>
-                    <SelectItem value="South-East">{t('South-East', 'தென்கிழக்கு')}</SelectItem>
-                    <SelectItem value="South-West">{t('South-West', 'தென்மேற்கு')}</SelectItem>
+                    <SelectItem value="Freehold">{t('Freehold', 'சுய உரிமை (Freehold)')}</SelectItem>
+                    <SelectItem value="Leasehold">{t('Leasehold', 'குத்தகை உரிமை (Leasehold)')}</SelectItem>
+                    <SelectItem value="Power of Attorney">{t('Power of Attorney', 'பவர் ஆஃப் அட்டார்னி (GPA)')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className={`col-span-12 ${propertyType.toLowerCase() === 'land' ? 'sm:col-span-6' : 'sm:col-span-4'} grid gap-1.5`}>
-                <Label htmlFor="transaction" className="text-sm font-medium">
-                  {t('Transaction Type', 'பரிவர்த்தனை வகை')} <span className="text-destructive">*</span>
-                </Label>
-                <Select value={transactionType} onValueChange={setTransactionType}>
-                  <SelectTrigger id="transaction" className="h-10">
-                    <SelectValue placeholder={t('Select type', 'வகையை தேர்ந்தெடுக்கவும்')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="rent">{t('Rent', 'வாடகை')}</SelectItem>
-                    <SelectItem value="purchase">{t('Purchase', 'வாங்க')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Row 7: Land Dimensions — Expandable / Collapsible (Only when Property Type is Land) */}
-              {propertyType.toLowerCase() === 'land' && (
-                <div className="col-span-12 rounded-xl border border-border/80 bg-muted/20 overflow-hidden transition-all">
-                  <button
-                    type="button"
-                    onClick={() => setIsLandDimensionsExpanded((prev) => !prev)}
-                    aria-expanded={isLandDimensionsExpanded}
-                    aria-controls="land-dimensions-panel"
-                    className="w-full flex items-center justify-between p-3.5 text-left hover:bg-muted/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-1.5 rounded-md bg-primary/10 text-primary shrink-0">
-                        <Compass className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-semibold tracking-tight text-foreground">
-                          {t('Land Dimensions (Optional)', 'நில அளவுகள் (விருப்பத்திற்குரியது)')}
-                        </h4>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {t(
-                            'Add boundary measurements to describe your plot',
-                            'உங்கள் நிலத்தின் எல்லை அளவுகளை உள்ளிடவும்'
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    <ChevronDown
-                      className={`w-4 h-4 text-muted-foreground transition-transform duration-200 shrink-0 ${
-                        isLandDimensionsExpanded ? 'rotate-180' : ''
-                      }`}
-                    />
-                  </button>
-
-                  {isLandDimensionsExpanded && (
-                    <div id="land-dimensions-panel" className="p-3.5 pt-0 space-y-3 border-t border-border/50">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
-                        {/* Left Column, Row 1: A -> B */}
-                        <div className="grid gap-1.5">
-                          <Label htmlFor="dimAB" className="text-xs font-medium">
-                            {t('A → B (Length)', 'A → B (நீளம்)')}
-                          </Label>
-                          <div className="relative">
-                            <Input
-                              id="dimAB"
-                              type="number"
-                              step="any"
-                              min="0"
-                              placeholder={t('e.g., 40.5', 'எ.கா., 40.5')}
-                              value={landDimensions.ab}
-                              onChange={(e) => setLandDimensions((prev) => ({ ...prev, ab: e.target.value }))}
-                              className="h-10 pr-10"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
-                              {t('ft', 'அடி')}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Right Column, Row 1: B -> C */}
-                        <div className="grid gap-1.5">
-                          <Label htmlFor="dimBC" className="text-xs font-medium">
-                            {t('B → C (Length)', 'B → C (நீளம்)')}
-                          </Label>
-                          <div className="relative">
-                            <Input
-                              id="dimBC"
-                              type="number"
-                              step="any"
-                              min="0"
-                              placeholder={t('e.g., 60', 'எ.கா., 60')}
-                              value={landDimensions.bc}
-                              onChange={(e) => setLandDimensions((prev) => ({ ...prev, bc: e.target.value }))}
-                              className="h-10 pr-10"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
-                              {t('ft', 'அடி')}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Left Column, Row 2: C -> D */}
-                        <div className="grid gap-1.5">
-                          <Label htmlFor="dimCD" className="text-xs font-medium">
-                            {t('C → D (Length)', 'C → D (நீளம்)')}
-                          </Label>
-                          <div className="relative">
-                            <Input
-                              id="dimCD"
-                              type="number"
-                              step="any"
-                              min="0"
-                              placeholder={t('e.g., 40', 'எ.கா., 40')}
-                              value={landDimensions.cd}
-                              onChange={(e) => setLandDimensions((prev) => ({ ...prev, cd: e.target.value }))}
-                              className="h-10 pr-10"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
-                              {t('ft', 'அடி')}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Right Column, Row 2: D -> A */}
-                        <div className="grid gap-1.5">
-                          <Label htmlFor="dimDA" className="text-xs font-medium">
-                            {t('D → A (Length)', 'D → A (நீளம்)')}
-                          </Label>
-                          <div className="relative">
-                            <Input
-                              id="dimDA"
-                              type="number"
-                              step="any"
-                              min="0"
-                              placeholder={t('e.g., 60.5', 'எ.கா., 60.5')}
-                              value={landDimensions.da}
-                              onChange={(e) => setLandDimensions((prev) => ({ ...prev, da: e.target.value }))}
-                              className="h-10 pr-10"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
-                              {t('ft', 'அடி')}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <p className="text-[11px] text-muted-foreground/80 leading-normal pt-1">
-                        {t(
-                          'Note: These measurements represent the four consecutive boundary lengths of the land in feet. Area is measured separately above and cannot be derived from four boundary lengths alone.',
-                          'குறிப்பு: இந்த அளவுகள் நிலத்தின் நான்கு தொடர்ச்சியான எல்லை நீளங்களை அடிகளில் குறிக்கின்றன. பரப்பளவு மேலே தனித்தனியாக அளவிடப்படுகிறது மற்றும் நான்கு எல்லை நீளங்களிலிருந்து மட்டுமே பெற முடியாது.'
-                        )}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Row 8: Amenities (optional) - Full Width */}
-              <div className="col-span-12 grid gap-1.5">
-                <Label htmlFor="amenities" className="text-sm font-medium">
-                  {t('Amenities (optional)', 'வசதிகள் (விருப்பம்)')}
+              {/* RERA Registration No. / Patta Number */}
+              <div className="col-span-12 sm:col-span-4 grid gap-1.5">
+                <Label htmlFor="reraNumber" className="text-sm font-medium">
+                  {t('RERA Registration No. / Patta Number', 'RERA எண் / பட்டா எண்')} <span className="text-xs text-muted-foreground font-normal">({t('optional', 'விருப்பத்திற்குரியது')})</span>
                 </Label>
                 <Input
-                  id="amenities"
-                  placeholder={t('e.g., parking, WiFi, lift', 'எ.கா., parking, WiFi, lift')}
-                  value={amenitiesText}
-                  onChange={(e) => setAmenitiesText(e.target.value)}
+                  id="reraNumber"
+                  placeholder={t('e.g., TN/01/Building/0123/2023 or Patta #', 'எ.கா., TN/01/Building/0123/2023 அல்லது பட்டா எண்')}
+                  value={reraNumber}
+                  onChange={(e) => setReraNumber(e.target.value)}
                   className="h-10"
                 />
               </div>
+            </>
+          )}
 
-              {/* Row 9: Description - Full Width with Generate Action */}
-              <div className="col-span-12 grid gap-1.5">
-                <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="description" className="text-sm font-medium">
-                    {t('Description', 'விவரம்')}
-                  </Label>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={handleGenerateDescription}
-                    className="h-8 text-xs font-medium"
-                  >
-                    {t('Generate Description', 'விவரத்தை உருவாக்கவும்')}
-                  </Button>
-                </div>
-                <Textarea
-                  id="description"
-                  placeholder={t(
-                    'A short, professional description will appear here…',
-                    'சுருக்கமான, தொழில்முறை விவரம் இங்கே தோன்றும்…'
-                  )}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="min-h-[100px] resize-y"
-                />
-              </div>
+          {/* Row 4: Total Area (sq ft) and Cent (50% each on tablet/desktop) */}
+          <div className="col-span-12 sm:col-span-6 grid gap-1.5">
+            <Label htmlFor="totalArea" className="text-sm font-medium">
+              {t('Total Area (sq ft)', 'மொத்த பரப்பளவு (சதுர அடி)')} <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="totalArea"
+              type="number"
+              step="any"
+              min="0"
+              placeholder={t('e.g., 1200', 'எ.கா., 1200')}
+              value={totalArea}
+              onChange={handleAreaChange}
+              className="h-10"
+            />
+          </div>
 
-              {/* Row 10: Navigation Action */}
-              <div className="col-span-12 pt-1">
-                <Button 
-                  type="button"
-                  onClick={() => setCurrentTab('images')} 
-                  variant="outline" 
-                  className="w-full h-10 font-medium"
-                >
-                  {t('Next: Upload Images', 'அடுத்தது: படங்களை பதிவேற்றவும்')}
-                </Button>
-              </div>
+          <div className="col-span-12 sm:col-span-6 grid gap-1.5">
+            <Label htmlFor="cent" className="text-sm font-medium">
+              {t('Cent', 'சென்ட்')}
+            </Label>
+            <Input
+              id="cent"
+              type="number"
+              step="any"
+              min="0"
+              placeholder={t('e.g., 2.75', 'எ.கா., 2.75')}
+              value={cent}
+              onChange={handleCentChange}
+              className="h-10"
+            />
+          </div>
+
+          {/* Row 5: Number of Bedrooms and Property Facing (50% each, or Facing 100% for Land/Commercial) */}
+          {!['land', 'commercial'].includes(propertyType.toLowerCase()) && (
+            <div className="col-span-12 sm:col-span-6 grid gap-1.5">
+              <Label htmlFor="bedrooms" className="text-sm font-medium">
+                {t('Number of Bedrooms (BHK)', 'படுக்கையறை எண்ணிக்கை (BHK)')} <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="bedrooms"
+                type="number"
+                placeholder={t('e.g., 2', 'எ.கா., 2')}
+                value={bedrooms}
+                onChange={(e) => setBedrooms(e.target.value)}
+                className="h-10"
+              />
             </div>
-          </TabsContent>
+          )}
 
-          <TabsContent value="images" className="mt-4">
-            <ImageUploadSection images={images} onImagesChange={setImages} />
-            <div className="flex gap-2 mt-4">
-              <Button 
+          <div className={`col-span-12 ${['land', 'commercial'].includes(propertyType.toLowerCase()) ? 'sm:col-span-12' : 'sm:col-span-6'} grid gap-1.5`}>
+            <Label htmlFor="facing" className="text-sm font-medium">
+              {t('Property Facing', 'சொத்து திசை')} <span className="text-destructive">*</span>
+            </Label>
+            <Select value={facing} onValueChange={setFacing}>
+              <SelectTrigger id="facing" className="h-10">
+                <SelectValue placeholder={t('Select facing', 'திசையைத் தேர்ந்தெடுக்கவும்')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="North">{t('North', 'வடக்கு')}</SelectItem>
+                <SelectItem value="South">{t('South', 'தெற்கு')}</SelectItem>
+                <SelectItem value="East">{t('East', 'கிழக்கு')}</SelectItem>
+                <SelectItem value="West">{t('West', 'மேற்கு')}</SelectItem>
+                <SelectItem value="North-East">{t('North-East', 'வடகிழக்கு')}</SelectItem>
+                <SelectItem value="North-West">{t('North-West', 'வடமேற்கு')}</SelectItem>
+                <SelectItem value="South-East">{t('South-East', 'தென்கிழக்கு')}</SelectItem>
+                <SelectItem value="South-West">{t('South-West', 'தென்மேற்கு')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Row 6: Land Dimensions — Expandable / Collapsible (Only when Property Type is Land) */}
+          {propertyType.toLowerCase() === 'land' && (
+            <div className="col-span-12 rounded-xl border border-border/80 bg-muted/20 overflow-hidden transition-all">
+              <button
                 type="button"
-                onClick={() => setCurrentTab('details')} 
-                variant="outline"
-                className="flex-1"
+                onClick={() => setIsLandDimensionsExpanded((prev) => !prev)}
+                aria-expanded={isLandDimensionsExpanded}
+                aria-controls="land-dimensions-panel"
+                className="w-full flex items-center justify-between p-3.5 text-left hover:bg-muted/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
-                {t('Back', 'பின்னால்')}
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-md bg-primary/10 text-primary shrink-0">
+                    <Compass className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold tracking-tight text-foreground">
+                      {t('Land Dimensions (Optional)', 'நில அளவுகள் (விருப்பத்திற்குரியது)')}
+                    </h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {t(
+                        'Add boundary measurements to describe your plot',
+                        'உங்கள் நிலத்தின் எல்லை அளவுகளை உள்ளிடவும்'
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <ChevronDown
+                  className={`w-4 h-4 text-muted-foreground transition-transform duration-200 shrink-0 ${
+                    isLandDimensionsExpanded ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+
+              {isLandDimensionsExpanded && (
+                <div id="land-dimensions-panel" className="p-3.5 pt-0 space-y-3 border-t border-border/50">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
+                    {/* Left Column, Row 1: A -> B */}
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="dimAB" className="text-xs font-medium">
+                        {t('A → B (Length)', 'A → B (நீளம்)')}
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="dimAB"
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder={t('e.g., 40.5', 'எ.கா., 40.5')}
+                          value={landDimensions.ab}
+                          onChange={(e) => setLandDimensions((prev) => ({ ...prev, ab: e.target.value }))}
+                          className="h-10 pr-10"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                          {t('ft', 'அடி')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Right Column, Row 1: B -> C */}
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="dimBC" className="text-xs font-medium">
+                        {t('B → C (Length)', 'B → C (நீளம்)')}
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="dimBC"
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder={t('e.g., 60', 'எ.கா., 60')}
+                          value={landDimensions.bc}
+                          onChange={(e) => setLandDimensions((prev) => ({ ...prev, bc: e.target.value }))}
+                          className="h-10 pr-10"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                          {t('ft', 'அடி')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Left Column, Row 2: C -> D */}
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="dimCD" className="text-xs font-medium">
+                        {t('C → D (Length)', 'C → D (நீளம்)')}
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="dimCD"
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder={t('e.g., 40', 'எ.கா., 40')}
+                          value={landDimensions.cd}
+                          onChange={(e) => setLandDimensions((prev) => ({ ...prev, cd: e.target.value }))}
+                          className="h-10 pr-10"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                          {t('ft', 'அடி')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Right Column, Row 2: D -> A */}
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="dimDA" className="text-xs font-medium">
+                        {t('D → A (Length)', 'D → A (நீளம்)')}
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="dimDA"
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder={t('e.g., 60.5', 'எ.கா., 60.5')}
+                          value={landDimensions.da}
+                          onChange={(e) => setLandDimensions((prev) => ({ ...prev, da: e.target.value }))}
+                          className="h-10 pr-10"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                          {t('ft', 'அடி')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-muted-foreground/80 leading-normal pt-1">
+                    {t(
+                      'Note: These measurements represent the four consecutive boundary lengths of the land in feet. Area is measured separately above and cannot be derived from four boundary lengths alone.',
+                      'குறிப்பு: இந்த அளவுகள் நிலத்தின் நான்கு தொடர்ச்சியான எல்லை நீளங்களை அடிகளில் குறிக்கின்றன. பரப்பளவு மேலே தனித்தனியாக அளவிடப்படுகிறது மற்றும் நான்கு எல்லை நீளங்களிலிருந்து மட்டுமே பெற முடியாது.'
+                    )}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Row 7: Amenities (optional) - Full Width */}
+          <div className="col-span-12 grid gap-1.5">
+            <Label htmlFor="amenities" className="text-sm font-medium">
+              {t('Amenities (optional)', 'வசதிகள் (விருப்பம்)')}
+            </Label>
+            <Input
+              id="amenities"
+              placeholder={t('e.g., parking, WiFi, lift', 'எ.கா., parking, WiFi, lift')}
+              value={amenitiesText}
+              onChange={(e) => setAmenitiesText(e.target.value)}
+              className="h-10"
+            />
+          </div>
+
+          {/* Row 8: Description - Full Width with Generate Action */}
+          <div className="col-span-12 grid gap-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="description" className="text-sm font-medium">
+                {t('Description', 'விவரம்')}
+              </Label>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleGenerateDescription}
+                className="h-8 text-xs font-medium"
+              >
+                {t('Generate Description', 'விவரத்தை உருவாக்கவும்')}
               </Button>
             </div>
-          </TabsContent>
-        </Tabs>
+            <Textarea
+              id="description"
+              placeholder={t(
+                'A short, professional description will appear here…',
+                'சுருக்கமான, தொழில்முறை விவரம் இங்கே தோன்றும்…'
+              )}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="min-h-[100px] resize-y"
+            />
+          </div>
+
+          {/* Row 9: Navigation Action */}
+          <div className="col-span-12 pt-1">
+            <Button 
+              type="button"
+              onClick={() => setCurrentTab('images')} 
+              variant="outline" 
+              className="w-full h-10 font-medium"
+            >
+              {t('Next: Upload Images', 'அடுத்தது: படங்களை பதிவேற்றவும்')}
+            </Button>
+          </div>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="images" className="mt-4">
+        <ImageUploadSection images={images} onImagesChange={setImages} />
+        <div className="flex gap-2 mt-4">
+          <Button 
+            type="button"
+            onClick={() => setCurrentTab('details')} 
+            variant="outline"
+            className="flex-1"
+          >
+            {t('Back', 'பின்னால்')}
+          </Button>
+        </div>
+      </TabsContent>
+    </Tabs>
   );
 
   const actionButtons = (

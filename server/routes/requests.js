@@ -470,7 +470,7 @@ const handleAcceptOrApprove = async (req, res) => {
     const conflictingRequest = await Request.findOne({
       property: property._id,
       _id: { $ne: request._id },
-      status: { $in: ['accepted', 'payment_pending'] }
+      status: { $in: ['accepted', 'payment_pending', 'Pending_Payment', 'Payment_Submitted'] }
     });
     if (conflictingRequest) {
       return res.status(400).json({
@@ -478,21 +478,31 @@ const handleAcceptOrApprove = async (req, res) => {
       });
     }
 
-    // Simplified, consistent workflow for both Buy and Rent:
-    // Acceptance transitions directly to 'accepted', unlocking immediate payment for customer.
-    request.status = 'accepted';
-    request.agreedAmount = request.counterOfferAmount || request.offerAmount || property.price;
-    request.termsConfirmedByOwner = true;
-    request.termsConfirmedByBuyer = true;
-    request.terms = request.terms || (request.type === 'buy'
-      ? 'Standard purchase agreement. Payment of agreed purchase amount/token advance required to finalize ownership transfer.'
-      : 'Standard 11-month rental agreement. Monthly rent due on 5th. Payment of initial rent required to activate lease.');
-    request.updatedAt = new Date();
-    await request.save();
-
+    // Multi-step Property Purchase & Ownership Transfer Workflow:
     if (request.type === 'buy') {
+      // 1. Offer Acceptance does NOT immediately grant ownership:
+      // Set status to 'Pending_Payment' with buyer marked as prospective buyer.
+      request.status = 'Pending_Payment';
+      request.agreedAmount = request.counterOfferAmount || request.offerAmount || property.price;
+      request.termsConfirmedByOwner = true;
+      request.termsConfirmedByBuyer = true;
+      request.terms = request.terms || 'Standard purchase agreement. Payment of agreed purchase amount/token advance required to finalize ownership transfer.';
+      request.updatedAt = new Date();
+      await request.save();
+
+      property.status = 'Pending_Payment';
       property.saleStatus = 'under_contract';
+      property.prospectiveBuyer = request.tenant;
+      // Do NOT transfer ownership yet - Naveen remains owner until payment verification
       await property.save();
+    } else {
+      request.status = 'accepted';
+      request.agreedAmount = request.counterOfferAmount || request.offerAmount || property.price;
+      request.termsConfirmedByOwner = true;
+      request.termsConfirmedByBuyer = true;
+      request.terms = request.terms || 'Standard 11-month rental agreement. Monthly rent due on 5th. Payment of initial rent required to activate lease.';
+      request.updatedAt = new Date();
+      await request.save();
     }
 
     // Send notification to customer (buyer/tenant)
@@ -597,8 +607,8 @@ router.put('/:id/payment', auth, async (req, res) => {
       return res.status(400).json({ msg: 'Payment is already submitted and pending owner verification.' });
     }
 
-    // Must be in acceptable status (accepted, terms_confirmed, approved, or payment_pending if resubmitting after rejection)
-    if (!['accepted', 'approved', 'terms_confirmed', 'payment_pending'].includes(request.status)) {
+    // Must be in acceptable status (accepted, Pending_Payment, terms_confirmed, approved, or payment_pending)
+    if (!['accepted', 'approved', 'terms_confirmed', 'payment_pending', 'Pending_Payment'].includes(request.status)) {
       return res.status(400).json({ msg: `Transaction is not eligible for payment in status "${request.status}"` });
     }
 
@@ -622,16 +632,22 @@ router.put('/:id/payment', auth, async (req, res) => {
       return res.status(400).json({ msg: `Invalid payment mode. Must be one of: ${validModes.join(', ')}` });
     }
 
-    // Update Request paymentDetails and status
+    if (!transactionId || !String(transactionId).trim()) {
+      return res.status(400).json({ msg: 'Bank UTR or UPI Transaction Reference Number is required' });
+    }
+
+    // Update Request paymentDetails and status to Payment_Submitted
     request.paymentDetails = {
       amount: numericAmount,
       mode: formattedMode,
-      transactionId: transactionId || '',
+      transactionId: String(transactionId).trim(),
       screenshot: screenshot || '',
       submittedAt: new Date(),
       status: 'submitted'
     };
-    request.status = 'payment_pending';
+    request.rejectionReason = undefined;
+    if (request.paymentDetails) request.paymentDetails.rejectionReason = undefined;
+    request.status = 'Payment_Submitted';
     request.updatedAt = new Date();
     await request.save();
 
@@ -703,7 +719,7 @@ router.put('/:id/verify-payment', auth, async (req, res) => {
       return res.status(400).json({ msg: 'Payment has already been verified and transaction is completed.' });
     }
 
-    if (request.status !== 'payment_pending') {
+    if (!['payment_pending', 'Payment_Submitted'].includes(request.status)) {
       return res.status(400).json({ msg: `Payment cannot be verified for request with status "${request.status}"` });
     }
 
@@ -730,6 +746,9 @@ router.put('/:id/verify-payment', auth, async (req, res) => {
     const property = await Property.findById(request.property);
 
     if (request.type === 'buy' && property) {
+      const buyerUser = await User.findById(request.tenant);
+      const buyerName = buyerUser?.name || 'Gopi';
+
       // Transfer property ownership to the buyer!
       const previousOwnerId = property.owner;
       property.previousOwner = previousOwnerId;
@@ -742,11 +761,17 @@ router.put('/:id/verify-payment', auth, async (req, res) => {
         price: request.agreedAmount || request.offerAmount || property.price
       });
 
-      // The buyer is now the owner of the property
+      // 3. Naveen's Verification & Deed Transfer:
+      // a) Update property's ownerId to Gopi's ID and ownerName to "Gopi"
       property.owner = request.tenant;
+      property.ownerId = request.tenant;
+      property.ownerName = buyerName;
+      // b) Update badge to "Acquired" -> buyer and saleStatus 'sold'
       property.buyer = request.tenant;
-      property.tenant = null; // Buyer owns the property, they are not a tenant!
+      property.prospectiveBuyer = null;
+      property.tenant = null;
       property.saleStatus = 'sold';
+      property.status = 'approved';
       property.occupancyStatus = 'occupied';
       property.listingStatus = 'unlisted';
       property.isListed = false;
@@ -757,7 +782,7 @@ router.put('/:id/verify-payment', auth, async (req, res) => {
 
       // Reject all other competing requests for this property
       await Request.updateMany(
-        { property: request.property, _id: { $ne: request._id }, status: { $in: ['pending', 'counteroffer', 'accepted'] } },
+        { property: request.property, _id: { $ne: request._id }, status: { $in: ['pending', 'counteroffer', 'accepted', 'Pending_Payment', 'Payment_Submitted'] } },
         { status: 'rejected', rejectionReason: 'Property has been sold to another buyer.' }
       );
     } else if (request.type === 'rent' && property) {
@@ -980,14 +1005,16 @@ router.put('/:id/reject-payment', auth, async (req, res) => {
       return res.status(403).json({ msg: 'Only the property owner can reject payments' });
     }
 
-    if (request.status !== 'payment_pending') {
+    if (!['payment_pending', 'Payment_Submitted'].includes(request.status)) {
       return res.status(400).json({ msg: `No pending payment to reject for request status "${request.status}"` });
     }
 
     const reason = req.body.reason ? String(req.body.reason).trim() : 'Invalid transaction details or verification failed.';
 
     request.paymentDetails.status = 'rejected';
-    request.status = 'accepted'; // Return to awaiting valid payment
+    request.paymentDetails.rejectionReason = reason;
+    request.rejectionReason = reason;
+    request.status = request.type === 'buy' ? 'Pending_Payment' : 'accepted'; // Return to awaiting valid payment
     request.updatedAt = new Date();
     await request.save();
 

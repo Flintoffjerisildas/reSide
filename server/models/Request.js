@@ -14,6 +14,8 @@ const requestSchema = new mongoose.Schema({
       'approved',
       'terms_confirmed',
       'payment_pending',
+      'Pending_Payment',
+      'Payment_Submitted',
       'completed',
       'rejected',
       'cancelled'

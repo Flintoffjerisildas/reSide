@@ -348,11 +348,13 @@ export default function AddExistingRentalDialog({
                     onChange={(e) => setPropertyType(e.target.value)}
                     className="w-full h-9 rounded-xl border border-input bg-background px-3 text-xs"
                   >
-                    <option value="Apartment">{t('Apartment', 'அபார்ட்மெண்ட்')}</option>
+                    <option value="Apartment">{t('Apartment / Flat', 'அபார்ட்மென்ட் / பிளாட்')}</option>
                     <option value="House">{t('House', 'தனி வீடு')}</option>
                     <option value="Villa">{t('Villa', 'வில்லா')}</option>
-                    <option value="Room">{t('Single Room / PG', 'தனி அறை')}</option>
+                    <option value="Room">{t('Single Room / PG', 'தனி அறை / பி.ஜி')}</option>
                     <option value="Commercial">{t('Commercial', 'வணிக இடம்')}</option>
+                    <option value="Farmhouse">{t('Farm House', 'பண்ணை வீடு')}</option>
+                    <option value="Land">{t('Land / Plot', 'நிலம் / மனை')}</option>
                     <option value="Other">{t('Other', 'மற்றவை')}</option>
                   </select>
                 </div>

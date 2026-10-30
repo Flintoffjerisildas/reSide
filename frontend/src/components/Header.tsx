@@ -1,5 +1,6 @@
 import { Building2, Moon, Sun, LogIn, LogOut, User, Menu, LayoutDashboard, Home, Globe2, Grid2X2, Bell, ChevronDown } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../contexts/AuthContext';
 import { useGetCallerUserProfile, useGetNotifications } from '../hooks/useQueries';
@@ -38,6 +39,7 @@ interface HeaderProps {
   isDashboardActive?: boolean;
   onLoginClick?: () => void;
   onNotificationsClick?: () => void;
+  onAccountClick?: () => void;
 }
 
 export default function Header({ 
@@ -49,15 +51,29 @@ export default function Header({
   onBuyClick,
   isDashboardActive = false,
   onLoginClick,
-  onNotificationsClick
+  onNotificationsClick,
+  onAccountClick
 }: HeaderProps) {
+  const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const { user, logout, isInitializing } = useAuth();
   const { data: userProfile } = useGetCallerUserProfile();
   const { data: notificationsData } = useGetNotifications();
-  const unreadCount = notificationsData?.unreadCount || 0;
+  const notifications = notificationsData?.notifications || [];
+  const unreadNotifications = notifications.filter((n: any) => !n.isRead && !n.read);
+  const unreadCount = notifications.length > 0 ? unreadNotifications.length : 0;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const { language, setLanguage, t } = useLanguage();
+
+  const handleMyAccountClick = () => {
+    setDropdownOpen(false);
+    if (onAccountClick) {
+      onAccountClick();
+    } else {
+      navigate({ to: '/dashboard/$tab', params: { tab: 'settings' } });
+    }
+  };
 
   const isAuthenticated = !!user;
   const isLoggingIn = isInitializing; // Simplified
@@ -138,34 +154,29 @@ export default function Header({
               className="relative h-8.5 w-8.5 rounded-full border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-600 dark:text-slate-300 shadow-2xs"
             >
               <Bell className="h-4 w-4" />
-              {unreadCount > 0 ? (
+              {notifications && notifications.length > 0 && unreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white shadow-xs">
                   {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              ) : (
-                <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white shadow-2xs">
-                  1
                 </span>
               )}
             </Button>
           )}
 
           {isAuthenticated && (
-            <Button
-              variant="default"
-              size="sm"
+            <button
+              type="button"
               onClick={onDashboardClick}
-              className="h-8.5 gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-3.5 text-xs font-semibold shadow-xs flex transition-all"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 text-gray-700 dark:text-slate-200 hover:text-blue-600 text-xs font-medium shadow-sm backdrop-blur-sm cursor-pointer transition-all"
             >
               {isDashboardActive ? <Home className="h-3.5 w-3.5" /> : <Grid2X2 className="h-3.5 w-3.5" />}
               <span>{isDashboardActive ? t('Back to Home', 'முகப்புக்கு திரும்பவும்') : t('Go to Dashboard', 'டாஷ்போர்டுக்கு செல்லவும்')}</span>
-            </Button>
+            </button>
           )}
 
           {isAuthenticated ? (
-            <DropdownMenu>
+            <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-8.5 gap-2 rounded-full border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-200 px-3 text-xs font-medium shadow-2xs">
+                <Button variant="outline" className="h-8.5 gap-2 rounded-full border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-200 px-3 text-xs font-medium shadow-2xs cursor-pointer">
                   <User className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
                   <span className="max-w-[120px] truncate">
                     {userProfile?.name || user?.name || 'Customer'}
@@ -173,21 +184,36 @@ export default function Header({
                   <ChevronDown className="h-3 w-3 text-slate-400" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>
-                  {t('My Account', 'என் கணக்கு')}
-                  {(((userProfile as any)?.internalRole === 'admin') || userProfile?.role || user?.role) && (
-                    <span className="block text-xs font-normal text-muted-foreground">
-                      {getRoleLabel(((userProfile as any)?.internalRole === 'admin') ? 'admin' : (userProfile?.role || user?.role || ''))}
+              <DropdownMenuContent align="end" className="w-60 p-1.5">
+                <DropdownMenuItem
+                  onClick={handleMyAccountClick}
+                  className="flex items-start gap-2.5 p-2 rounded-xl cursor-pointer transition-colors hover:bg-blue-50 focus:bg-blue-50 dark:hover:bg-blue-950/40 dark:focus:bg-blue-950/40"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300 mt-0.5">
+                    <User className="h-4 w-4" />
+                  </div>
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-semibold text-xs text-slate-900 dark:text-white">
+                        {t('My Account', 'என் கணக்கு')}
+                      </span>
+                      {(((userProfile as any)?.internalRole === 'admin') || userProfile?.role || user?.role) && (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+                          {getRoleLabel(((userProfile as any)?.internalRole === 'admin') ? 'admin' : (userProfile?.role || user?.role || ''))}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-muted-foreground mt-0.5">
+                      {t('Manage profile & settings', 'சுயவிவரம் & அமைப்புகளை நிர்வகிக்க')}
                     </span>
-                  )}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onDashboardClick}>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="my-1" />
+                <DropdownMenuItem onClick={onDashboardClick} className="cursor-pointer">
                   {isDashboardActive ? <Home className="mr-2 h-4 w-4" /> : <LayoutDashboard className="mr-2 h-4 w-4" />}
                   {isDashboardActive ? t('Back to Home', 'முகப்புக்கு திரும்பவும்') : t('Go to Dashboard', 'டாஷ்போர்டுக்கு செல்லவும்')}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
                   {t('Logout', 'வெளியேறு')}
                 </DropdownMenuItem>
@@ -249,17 +275,29 @@ export default function Header({
 
                 {isAuthenticated ? (
                   <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2 px-2 py-1 bg-muted rounded-md">
-                      <User className="h-4 w-4" />
-                      <div className="flex flex-col">
-                        <span className="font-medium">{userProfile?.name || user?.name || 'User'}</span>
-                        {(userProfile?.role || user?.role) && (
-                          <span className="text-xs text-muted-foreground">
-                            {getRoleLabel(userProfile?.role || user?.role || '')}
-                          </span>
-                        )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        handleMyAccountClick();
+                      }}
+                      className="flex items-center gap-2.5 p-2 bg-blue-50/60 hover:bg-blue-50 dark:bg-muted dark:hover:bg-muted/80 rounded-xl text-left transition-colors cursor-pointer"
+                    >
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300">
+                        <User className="h-4 w-4" />
                       </div>
-                    </div>
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-xs text-foreground">{userProfile?.name || user?.name || 'User'}</span>
+                          {(userProfile?.role || user?.role) && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+                              {getRoleLabel(userProfile?.role || user?.role || '')}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-muted-foreground">{t('Manage profile & settings', 'சுயவிவரம் & அமைப்புகளை நிர்வகிக்க')}</span>
+                      </div>
+                    </button>
                     {unreadCount > 0 && (
                       <button
                         type="button"

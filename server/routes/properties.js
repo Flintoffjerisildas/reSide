@@ -1,7 +1,26 @@
 const express = require('express');
 const router = express.Router();
 const Property = require('../models/Property');
+const Request = require('../models/Request');
+const Notification = require('../models/Notification');
+const Agreement = require('../models/Agreement');
+const MaintenanceRequest = require('../models/MaintenanceRequest');
+const VacateRequest = require('../models/VacateRequest');
+const Payment = require('../models/Payment');
 const auth = require('../middleware/auth');
+
+// Cascade deletion helper to remove orphaned requests, notifications, and contracts
+async function cascadeDeleteProperty(propertyId) {
+  await Promise.allSettled([
+    Property.findByIdAndDelete(propertyId),
+    Request.deleteMany({ property: propertyId }),
+    Notification.deleteMany({ property: propertyId }),
+    Agreement.deleteMany({ property: propertyId }),
+    MaintenanceRequest.deleteMany({ property: propertyId }),
+    VacateRequest.deleteMany({ property: propertyId }),
+    Payment.deleteMany({ property: propertyId })
+  ]);
+}
 
 // Get all public properties (only explicitly listed, available properties)
 router.get('/', async (req, res) => {
@@ -101,6 +120,7 @@ router.post('/', auth, async (req, res) => {
       propertyType,
       location,
       price,
+      transaction,
       transactionType,
       description,
       amenities,
@@ -109,6 +129,10 @@ router.post('/', auth, async (req, res) => {
       totalArea,
       bedrooms,
       facing,
+      securityDeposit,
+      monthlyMaintenance,
+      reraNumber,
+      ownershipType,
       listingStatus
     } = req.body;
 
@@ -119,12 +143,17 @@ router.post('/', auth, async (req, res) => {
       propertyType,
       location,
       price,
-      transactionType: transactionType || 'purchase',
+      transaction: transaction || (String(transactionType || transaction).toLowerCase() === 'purchase' ? 'Purchase' : 'Rent'),
+      transactionType: (transactionType || transaction || 'purchase').toLowerCase(),
       description,
       amenities,
       totalArea,
       bedrooms,
       facing,
+      securityDeposit: securityDeposit ? Number(securityDeposit) : undefined,
+      monthlyMaintenance: monthlyMaintenance ? Number(monthlyMaintenance) : undefined,
+      reraNumber: reraNumber || undefined,
+      ownershipType: ownershipType || undefined,
       images,
       geoLocation,
       owner: req.user.id,
@@ -164,7 +193,8 @@ router.put('/:id/listing-status', auth, async (req, res) => {
       return res.status(403).json({ msg: 'Not authorized: only property owner can change listing status' });
     }
 
-    const { listingStatus, transactionType, price, description } = req.body;
+    const { listingStatus, transactionType, price, description, tenantName } = req.body;
+    if (tenantName !== undefined) { property.tenantName = tenantName; if (tenantName && tenantName.trim()) { property.occupancyStatus = 'occupied'; } }
     if (!['listed', 'unlisted', 'unavailable'].includes(listingStatus)) {
       return res.status(400).json({ msg: 'Invalid listingStatus. Must be listed, unlisted, or unavailable' });
     }
@@ -273,6 +303,7 @@ router.put('/:id', auth, async (req, res) => {
       propertyType,
       location,
       price,
+      transaction,
       transactionType,
       description,
       amenities,
@@ -281,8 +312,21 @@ router.put('/:id', auth, async (req, res) => {
       totalArea,
       bedrooms,
       facing,
+      securityDeposit,
+      monthlyMaintenance,
+      reraNumber,
+      ownershipType,
       status,
-      listingStatus
+      listingStatus,
+      isListed,
+      tenantName,
+      ownerName,
+      occupancyStatus,
+      showPrice,
+      showAddress,
+      showAmenities,
+      acceptOffers,
+      customDetails
     } = req.body;
 
     let property = await Property.findById(req.params.id);
@@ -316,7 +360,34 @@ router.put('/:id', auth, async (req, res) => {
     if (totalArea !== undefined) propertyFields.totalArea = totalArea;
     if (bedrooms !== undefined) propertyFields.bedrooms = bedrooms;
     if (facing) propertyFields.facing = facing;
+    if (securityDeposit !== undefined) propertyFields.securityDeposit = securityDeposit ? Number(securityDeposit) : null;
+    if (monthlyMaintenance !== undefined) propertyFields.monthlyMaintenance = monthlyMaintenance ? Number(monthlyMaintenance) : null;
+    if (reraNumber !== undefined) propertyFields.reraNumber = reraNumber;
+    if (ownershipType !== undefined) propertyFields.ownershipType = ownershipType;
     if (status) propertyFields.status = status;
+    if (tenantName !== undefined) {
+      propertyFields.tenantName = tenantName;
+      if (tenantName && tenantName.trim()) { propertyFields.occupancyStatus = 'occupied'; } else if (tenantName === '') { propertyFields.occupancyStatus = 'vacant'; }
+    }
+    if (ownerName !== undefined) propertyFields.ownerName = ownerName;
+    if (occupancyStatus !== undefined) propertyFields.occupancyStatus = occupancyStatus;
+    if (showPrice !== undefined) propertyFields.showPrice = !!showPrice;
+    if (showAddress !== undefined) propertyFields.showAddress = !!showAddress;
+    if (showAmenities !== undefined) propertyFields.showAmenities = !!showAmenities;
+    if (acceptOffers !== undefined) propertyFields.acceptOffers = !!acceptOffers;
+    if (customDetails !== undefined) {
+      if (Array.isArray(customDetails)) {
+        propertyFields.customDetails = customDetails.filter(d => d && typeof d.key === 'string' && typeof d.value === 'string');
+      } else {
+        propertyFields.customDetails = [];
+      }
+    }
+    if (isListed !== undefined) {
+      propertyFields.isListed = !!isListed;
+      propertyFields.listingStatus = isListed ? 'listed' : 'unlisted';
+      if (isListed) propertyFields.listedAt = new Date();
+      else propertyFields.unlistedAt = new Date();
+    }
 
     if (listingStatus) {
       if (listingStatus === 'listed') {
@@ -365,9 +436,9 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(401).json({ msg: 'Not authorized' });
     }
 
-    await Property.findByIdAndDelete(req.params.id);
+    await cascadeDeleteProperty(property._id);
 
-    res.json({ msg: 'Property removed' });
+    res.json({ msg: 'Property and associated records removed' });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server Error');
@@ -473,7 +544,11 @@ router.put('/admin/:id', auth, auth.requireAdmin, async (req, res) => {
       'tenant',
       'currentTenantId',
       'currentAgreementId',
-      'owner'
+      'owner',
+      'securityDeposit',
+      'monthlyMaintenance',
+      'reraNumber',
+      'ownershipType'
     ];
 
     const update = {};
@@ -503,8 +578,8 @@ router.delete('/admin/:id', auth, auth.requireAdmin, async (req, res) => {
     const property = await Property.findById(req.params.id);
     if (!property) return res.status(404).json({ msg: 'Property not found' });
 
-    await Property.findByIdAndDelete(req.params.id);
-    res.json({ msg: 'Property removed' });
+    await cascadeDeleteProperty(property._id);
+    res.json({ msg: 'Property and associated records removed' });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server Error');

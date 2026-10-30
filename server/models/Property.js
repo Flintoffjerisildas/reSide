@@ -23,10 +23,14 @@ const propertySchema = new mongoose.Schema({
       'South-West'
     ]
   },
+  securityDeposit: { type: Number },
+  monthlyMaintenance: { type: Number },
+  reraNumber: { type: String },
+  ownershipType: { type: String },
   owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   status: {
     type: String,
-    enum: ['pending', 'approved', 'rejected'],
+    enum: ['pending', 'approved', 'rejected', 'Pending_Payment'],
     default: 'pending'
   },
   images: [{ type: String }], // Store URLs or base64
@@ -36,6 +40,10 @@ const propertySchema = new mongoose.Schema({
     longitude: { type: Number }
   },
   tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, // Track assigned tenant
+  ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  prospectiveBuyer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  tenantName: { type: String, default: '' },
+  ownerName: { type: String, default: '' },
   buyer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, // Track buyer if sold
   occupancyStatus: {
     type: String,
@@ -44,7 +52,7 @@ const propertySchema = new mongoose.Schema({
   },
   saleStatus: {
     type: String,
-    enum: ['available', 'under_contract', 'sold'],
+    enum: ['available', 'under_contract', 'Pending_Payment', 'sold'],
     default: 'available'
   },
   soldDate: { type: Date },
@@ -67,7 +75,15 @@ const propertySchema = new mongoose.Schema({
     default: false
   },
   listedAt: { type: Date },
-  unlistedAt: { type: Date }
+  unlistedAt: { type: Date },
+  showPrice: { type: Boolean, default: true },
+  showAddress: { type: Boolean, default: true },
+  showAmenities: { type: Boolean, default: true },
+  acceptOffers: { type: Boolean, default: true },
+  customDetails: [{
+    key: { type: String },
+    value: { type: String }
+  }]
 });
 
 module.exports = mongoose.model('Property', propertySchema);

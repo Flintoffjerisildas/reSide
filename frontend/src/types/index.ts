@@ -1,4 +1,11 @@
-export type PropertyType = 'flat' | 'house' | 'pg' | 'land';
+export type PropertyType =
+  | 'flat'
+  | 'house'
+  | 'villa'
+  | 'pg'
+  | 'land'
+  | 'commercial'
+  | 'farmhouse';
 export type TransactionType = 'rent' | 'lease' | 'purchase';
 
 export interface TenantDetails {
@@ -41,6 +48,10 @@ export interface Property {
   landDimensions?: LandDimensions;
   bedrooms?: number;
   facing?: string;
+  securityDeposit?: number;
+  monthlyMaintenance?: number;
+  reraNumber?: string;
+  ownershipType?: string;
   geoLocation?: GeoLocation | null;
   geoLocatedImage?: string | null;
   tenant?: string | {
@@ -64,7 +75,11 @@ export interface Property {
     idProofImage?: string;
   }; // ID or populated object
   tenantDetails?: TenantDetails; // Detailed tenant information
+  tenantName?: string;
+  ownerName?: string;
   buyer?: any;
+  prospectiveBuyer?: any;
+  ownerId?: string;
   previousOwner?: any;
   occupancyStatus?: 'vacant' | 'occupied' | 'maintenance';
   saleStatus?: 'available' | 'under_contract' | 'sold';
@@ -79,6 +94,11 @@ export interface Property {
     transferredAt: string;
     price?: number;
   }>;
+  showPrice?: boolean;
+  showAddress?: boolean;
+  showAmenities?: boolean;
+  acceptOffers?: boolean;
+  customDetails?: Array<{ key: string; value: string }>;
 }
 
 export type ListingStatus = 'listed' | 'unlisted' | 'unavailable';
@@ -90,6 +110,8 @@ export type RequestStatus =
   | 'approved'
   | 'terms_confirmed'
   | 'payment_pending'
+  | 'Pending_Payment'
+  | 'Payment_Submitted'
   | 'completed'
   | 'rejected'
   | 'cancelled';
@@ -100,6 +122,7 @@ export interface PaymentDetails {
   transactionId?: string;
   screenshot?: string;
   receiptNumber?: string;
+  rejectionReason?: string;
   submittedAt?: string;
   verifiedAt?: string;
   status?: 'unpaid' | 'submitted' | 'verified' | 'rejected';
@@ -170,7 +193,16 @@ export interface PropertyInput {
   landDimensions?: LandDimensions;
   bedrooms?: number;
   facing?: string;
+  securityDeposit?: number;
+  monthlyMaintenance?: number;
+  reraNumber?: string;
+  ownershipType?: string;
   geoLocation?: GeoLocation | null;
+  showPrice?: boolean;
+  showAddress?: boolean;
+  showAmenities?: boolean;
+  acceptOffers?: boolean;
+  customDetails?: Array<{ key: string; value: string }>;
 }
 
 export interface Message {

@@ -123,10 +123,19 @@ export default function PropertyCard({
         return '🏢';
       case 'house':
         return '🏠';
+      case 'villa':
+        return '🏡';
       case 'pg':
         return '🏘️';
       case 'land':
+      case 'plot':
         return '🌳';
+      case 'commercial':
+      case 'office':
+      case 'shop':
+        return '🏬';
+      case 'farmhouse':
+        return '🌾';
       default:
         return '🏗️';
     }
@@ -139,10 +148,17 @@ export default function PropertyCard({
         return t('Apartment / Flat', 'அபார்ட்மென்ட் / பிளாட்');
       case 'house':
         return t('House', 'வீடு');
+      case 'villa':
+        return t('Villa', 'வில்லா');
       case 'pg':
         return 'PG';
       case 'land':
-        return t('Land', 'நிலம்');
+      case 'plot':
+        return t('Land / Plot', 'நிலம் / மனை');
+      case 'commercial':
+        return t('Commercial', 'வணிக இடம்');
+      case 'farmhouse':
+        return t('Farm House', 'பண்ணை வீடு');
       default:
         return type;
     }
@@ -250,10 +266,18 @@ export default function PropertyCard({
               <h4 className="truncate text-xs sm:text-sm font-semibold">{displayTitle}</h4>
               <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
                 <MapPin className="h-3 w-3 flex-shrink-0 text-primary" />
-                <span className="truncate">{displayLocation}</span>
+                <span className="truncate">
+                  {!isOwnerView && property.showAddress === false
+                    ? t('Location upon request', 'இருப்பிடம் கோரிக்கையின் பேரில்')
+                    : displayLocation}
+                </span>
               </div>
               <div className="mt-1 flex items-center justify-between gap-1.5 flex-wrap">
-                <span className="text-xs sm:text-sm font-semibold text-primary">{formatPrice(property.price)}</span>
+                <span className="text-xs sm:text-sm font-semibold text-primary">
+                  {!isOwnerView && property.showPrice === false
+                    ? t('Price upon request', 'விலை கோரிக்கையின் பேரில்')
+                    : formatPrice(property.price)}
+                </span>
                 {getTransactionBadge(property.transactionType)}
               </div>
             </div>
@@ -356,17 +380,34 @@ export default function PropertyCard({
         {/* Location */}
         <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
           <MapPin className="h-3 w-3 flex-shrink-0 text-primary" />
-          <span className="truncate" title={displayLocation}>{displayLocation}</span>
+          <span className="truncate" title={!isOwnerView && property.showAddress === false ? t('Location upon request', 'இருப்பிடம் கோரிக்கையின் பேரில்') : displayLocation}>
+            {!isOwnerView && property.showAddress === false
+              ? t('Location upon request', 'இருப்பிடம் கோரிக்கையின் பேரில்')
+              : displayLocation}
+          </span>
         </div>
 
-        {/* Price and Transaction Badge */}
+                {/* Price and Transaction Badge */}
         <div className="flex items-center justify-between gap-2 pt-0.5">
           <div className="flex items-baseline gap-0.5">
-            <span className="text-sm sm:text-base font-bold text-primary tracking-tight">
-              {formatPrice(property.price)}
-            </span>
-            {property.transactionType?.toLowerCase() === 'rent' && (
-              <span className="text-[9px] text-muted-foreground font-normal">/mo</span>
+            {!isOwnerView && property.showPrice === false ? (
+              <span className="text-xs sm:text-sm font-semibold text-muted-foreground italic">
+                {t('Price upon request', 'விலை கோரிக்கையின் பேரில்')}
+              </span>
+            ) : (
+              <>
+                <span className="text-sm sm:text-base font-bold text-primary tracking-tight">
+                  {formatPrice(property.price)}
+                </span>
+                {property.transactionType?.toLowerCase() === 'rent' && (
+                  <span className="text-[9px] text-muted-foreground font-normal">/mo</span>
+                )}
+                {isOwnerView && property.showPrice === false && (
+                  <span className="text-[9px] font-normal text-amber-600 dark:text-amber-400 ml-1">
+                    ({t('Hidden', 'மறைக்கப்பட்டது')})
+                  </span>
+                )}
+              </>
             )}
           </div>
           {!isOwnerView && !showRequestButton && getTransactionBadge(property.transactionType)}
@@ -414,20 +455,43 @@ export default function PropertyCard({
             )}
           </div>
         )} */}
+
+        {/* Amenities Badges if enabled */}
+        {((!isOwnerView && property.showAmenities !== false && property.amenities && property.amenities.length > 0) ||
+          (isOwnerView && property.amenities && property.amenities.length > 0)) && (
+          <div className="flex items-center gap-1 overflow-hidden flex-nowrap pt-0.5">
+            {property.showAmenities === false && isOwnerView ? (
+              <span className="text-[9px] text-amber-600 dark:text-amber-400 italic">
+                {t('Amenities hidden from public', 'வசதிகள் பொதுவில் மறைக்கப்பட்டுள்ளன')}
+              </span>
+            ) : (
+              property.amenities?.slice(0, 3).map((amenity, i) => (
+                <span
+                  key={i}
+                  className="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-medium truncate shrink-0 max-w-[120px]"
+                >
+                  ✓ {amenity}
+                </span>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       {/* Footer Actions */}
       {(showRequestButton || onEdit || onDelete) && (
         <div className="px-2.5 sm:px-3 pb-2.5 pt-1 mt-auto">
           {showRequestButton ? (
-            <Button
+                        <Button
               size="sm"
               className="w-full h-7 sm:h-8 text-xs font-medium rounded-lg shadow-sm hover:shadow"
               onClick={handleRequest}
-              disabled={isUnavailable}
+              disabled={isUnavailable || (!isOwnerView && property.acceptOffers === false)}
             >
               {isUnavailable ? (
                 isBuy ? t('Sold Out', 'விற்கப்பட்டது') : t('Occupied', 'குடியேற்றப்பட்டது')
+              ) : !isOwnerView && property.acceptOffers === false ? (
+                t('Offers Paused', 'சலுகைகள் இடைநிறுத்தப்பட்டன')
               ) : (
                 <>
                   <Send className="mr-1 h-3 w-3" />

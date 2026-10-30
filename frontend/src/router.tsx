@@ -88,6 +88,13 @@ function RootLayout() {
         onBuyClick={() => handleBrowseProperties('buy')}
         onLoginClick={() => navigate({ to: '/login', search: {} })}
         onNotificationsClick={() => navigate({ to: '/dashboard/$tab', params: { tab: 'notifications' } })}
+        onAccountClick={() => {
+          if (isAdmin) {
+            navigate({ to: '/admin' });
+          } else {
+            navigate({ to: '/dashboard/$tab', params: { tab: 'settings' } });
+          }
+        }}
         isDashboardActive={isDashboardActive}
       />
       <main className="flex-1 w-full">
@@ -469,6 +476,15 @@ export const forgotPasswordRoute = createRoute({
   component: () => <LoginPageWrapper defaultView="forgot-email" />,
 });
 
+export const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/settings',
+  beforeLoad: ({ navigate }) => {
+    navigate({ to: '/dashboard/$tab', params: { tab: 'settings' } });
+  },
+  component: () => null,
+});
+
 export const dashboardBaseRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/dashboard',
@@ -531,6 +547,7 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   registerRoute,
   forgotPasswordRoute,
+  settingsRoute,
   propertyBaseRoute.addChildren([propertyDetailRoute]),
   dashboardBaseRoute.addChildren([
     dashboardIndexRoute,

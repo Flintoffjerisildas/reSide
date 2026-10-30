@@ -159,12 +159,12 @@ export default function PropertyHorizontalSelector({
               }}
               className={`flex items-center gap-2.5 p-2 rounded-xl border transition-all duration-200 cursor-pointer select-none text-left shrink-0 w-56 sm:w-60 min-w-[200px] max-w-[250px] ${
                 isSelected
-                  ? 'border-2 border-blue-500 bg-blue-50/40 dark:bg-blue-950/30 shadow-xs ring-1 ring-blue-500/20'
-                  : 'border border-slate-200/90 dark:border-border/70 bg-white dark:bg-card hover:bg-slate-50/80 dark:hover:bg-muted/40 shadow-2xs'
+                  ? 'border-2 border-blue-500 dark:border-sky-400 bg-blue-50/40 dark:bg-gradient-to-b dark:from-[#0e1d35]/95 dark:to-[#07111e]/95 dark:backdrop-blur-xl shadow-xs dark:shadow-xl dark:shadow-black/40 ring-1 ring-blue-500/20'
+                  : 'border border-slate-200/90 dark:border-sky-500/20 bg-white dark:bg-[#0a1628]/85 dark:backdrop-blur-xl hover:bg-slate-50/80 dark:hover:bg-[#0f213d]/90 shadow-2xs dark:shadow-xl dark:shadow-black/40'
               }`}
             >
               {/* Thumbnail */}
-              <div className="relative h-11 w-11 sm:h-12 sm:w-12 rounded-lg overflow-hidden bg-muted/60 shrink-0 border border-border/50">
+              <div className="relative h-11 w-11 sm:h-12 sm:w-12 rounded-lg overflow-hidden bg-muted/60 dark:bg-[#07111e] shrink-0 border border-border/50 dark:border-sky-500/20">
                 {thumbnail ? (
                   <img
                     src={thumbnail}

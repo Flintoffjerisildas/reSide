@@ -94,14 +94,22 @@ function SelectItem({ className, children, ...props }: React.ComponentProps<type
         <SelectPrimitive.Item
             data-slot="select-item"
             className={cn(
-                "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
+                "relative flex w-full cursor-pointer items-center gap-2 rounded-lg py-2 pr-8 pl-2.5 text-sm outline-hidden select-none transition-colors",
+                // Light mode hover/active styling: light blue background (#e0f2fe) with dark slate text (#0f172a) & font-weight 500
+                "focus:bg-sky-100 focus:text-slate-900 focus:font-medium data-[highlighted]:bg-sky-100 data-[highlighted]:text-slate-900 data-[highlighted]:font-medium",
+                // Dark mode hover/active styling
+                "dark:focus:bg-blue-600/30 dark:focus:text-blue-100 dark:focus:font-medium dark:data-[highlighted]:bg-blue-600/30 dark:data-[highlighted]:text-blue-100 dark:data-[highlighted]:font-medium",
+                "data-[state=checked]:font-medium data-[state=checked]:text-slate-900 dark:data-[state=checked]:text-blue-200",
+                "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+                "[&_svg:not([class*='text-'])]:text-muted-foreground focus:[&_svg:not([class*='text-'])]:text-slate-900 dark:focus:[&_svg:not([class*='text-'])]:text-blue-200",
+                "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
                 className
             )}
             {...props}
         >
             <span className="absolute right-2 flex size-3.5 items-center justify-center">
                 <SelectPrimitive.ItemIndicator>
-                    <CheckIcon className="size-4" />
+                    <CheckIcon className="size-4 text-blue-600 dark:text-blue-400" />
                 </SelectPrimitive.ItemIndicator>
             </span>
             <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>

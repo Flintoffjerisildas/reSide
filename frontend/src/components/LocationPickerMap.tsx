@@ -21,16 +21,17 @@ interface LocationPickerMapProps {
   address: string;
   onAddressChange: (address: string) => void;
   disabled?: boolean;
+  hideMap?: boolean;
 }
 
-// Custom modern SVG pin marker for Leaflet (with non-clipping viewBox and sharp pointer tail)
+// Custom modern SVG pin marker for Leaflet with sharp pointer tail and high contrast on satellite imagery
 const createMarkerIcon = (isGps: boolean = false) => {
   return L.divIcon({
     className: 'custom-property-marker !bg-transparent !border-0',
     html: `
       <div style="position: relative; width: 34px; height: 46px; background: transparent; border: none; overflow: visible; display: flex; align-items: center; justify-content: center;">
-        <svg viewBox="0 0 24 32" width="34" height="46" style="overflow: visible; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.4));">
-          <path d="M12 1 C6.48 1 2 5.48 2 11 c0 7.5 8.5 17.5 9.4 18.6 a0.8 0.8 0 0 0 1.2 0 c0.9-1.1 9.4-11.1 9.4-18.6 0-5.52-4.48-10-10-10 z" fill="#2563eb" stroke="#1d4ed8" stroke-width="0.8"/>
+        <svg viewBox="0 0 24 32" width="34" height="46" style="overflow: visible; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6));">
+          <path d="M12 1 C6.48 1 2 5.48 2 11 c0 7.5 8.5 17.5 9.4 18.6 a0.8 0.8 0 0 0 1.2 0 c0.9-1.1 9.4-11.1 9.4-18.6 0-5.52-4.48-10-10-10 z" fill="#2563eb" stroke="#ffffff" stroke-width="1.2"/>
           <circle cx="12" cy="11" r="4.3" fill="#ffffff"/>
           <circle cx="12" cy="11" r="2.2" fill="#1d4ed8"/>
         </svg>
@@ -49,6 +50,7 @@ export default function LocationPickerMap({
   address,
   onAddressChange,
   disabled = false,
+  hideMap = false,
 }: LocationPickerMapProps) {
   const { t } = useLanguage();
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -121,15 +123,24 @@ export default function LocationPickerMap({
     [onAddressChange, t]
   );
 
-  // Initialize and maintain map instance
+  // Initialize and maintain map instance when map is enabled
   useEffect(() => {
+    if (hideMap) {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        markerRef.current = null;
+      }
+      return;
+    }
+
     if (!mapContainerRef.current) return;
 
     if (!mapInstanceRef.current) {
       // Default initial view: property coords or Chennai / Tamil Nadu
       const initialLat = value?.latitude ?? 13.0827;
       const initialLng = value?.longitude ?? 80.2707;
-      const initialZoom = value ? 15 : 12;
+      const initialZoom = value ? 16 : 13;
 
       const map = L.map(mapContainerRef.current, {
         center: [initialLat, initialLng],
@@ -137,25 +148,32 @@ export default function LocationPickerMap({
         zoomControl: true,
       });
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19,
-      }).addTo(map);
+      // 100% Free Esri High-Resolution World Imagery (Satellite) tiles without API key
+      L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        {
+          attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics',
+          maxZoom: 19,
+        }
+      ).addTo(map);
 
-      // Handle map click to reposition marker
+      // Handle map click to drop/reposition marker
       map.on('click', (e: L.LeafletMouseEvent) => {
         if (disabled) return;
         const { lat, lng } = e.latlng;
-        // User manually selected position on map
         onChange({ latitude: Number(lat.toFixed(6)), longitude: Number(lng.toFixed(6)) });
         fetchAddressFromCoords(lat, lng);
       });
 
       mapInstanceRef.current = map;
 
-      // Invalidate size to ensure tiles render properly after DOM layout / modal animation
+      // Invalidate size to ensure satellite tiles render cleanly after layout mount
       setTimeout(() => {
         map.invalidateSize();
+      }, 250);
+    } else {
+      setTimeout(() => {
+        mapInstanceRef.current?.invalidateSize();
       }, 250);
     }
 
@@ -166,10 +184,12 @@ export default function LocationPickerMap({
         markerRef.current = null;
       }
     };
-  }, []); // Run once on mount
+  }, [hideMap]);
 
   // Sync marker position with coordinates
   useEffect(() => {
+    if (hideMap) return;
+
     const map = mapInstanceRef.current;
     if (!map) return;
 
@@ -204,14 +224,14 @@ export default function LocationPickerMap({
         markerRef.current = null;
       }
     }
-  }, [value, disabled, fetchAddressFromCoords, onChange]);
+  }, [value, disabled, fetchAddressFromCoords, onChange, hideMap]);
 
   // Recalculate map dimensions when visible or container changes
   const handleMapRefresh = () => {
     if (mapInstanceRef.current) {
       mapInstanceRef.current.invalidateSize();
       if (value) {
-        mapInstanceRef.current.setView([value.latitude, value.longitude], 16);
+        mapInstanceRef.current.setView([value.latitude, value.longitude], 17);
       }
     }
   };
@@ -273,7 +293,7 @@ export default function LocationPickerMap({
       onChange(newCoords);
 
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.flyTo([formattedLat, formattedLng], 16, {
+        mapInstanceRef.current.flyTo([formattedLat, formattedLng], 17, {
           duration: 1.2,
         });
       }
@@ -329,14 +349,38 @@ export default function LocationPickerMap({
 
   const handleCenterOnMarker = () => {
     if (mapInstanceRef.current && value) {
-      mapInstanceRef.current.setView([value.latitude, value.longitude], 16, { animate: true });
+      mapInstanceRef.current.setView([value.latitude, value.longitude], 17, { animate: true });
     }
   };
 
+  // When hideMap is active (e.g., For Rent mode), render ONLY the clean text input
+  if (hideMap) {
+    return (
+      <div className="grid gap-1.5">
+        <Label htmlFor="property-location" className="text-sm font-medium flex items-center gap-1.5">
+          <MapPin className="w-4 h-4 text-primary" />
+          {t('Property Address / Location', 'சொத்து முகவரி / இடம்')}{' '}
+          <span className="text-destructive">*</span>
+        </Label>
+        <Input
+          id="property-location"
+          placeholder={t(
+            'Enter street address, building name, area, city',
+            'தெரு முகவரி, கட்டிட பெயர், பகுதி, நகரத்தை உள்ளிடவும்'
+          )}
+          value={address}
+          onChange={(e) => onAddressChange(e.target.value)}
+          disabled={disabled}
+          className="h-10"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
-      {/* Existing Location / Address Input */}
-      <div className="grid gap-2">
+      {/* Property Address / Location Input for Purchase / Sale mode */}
+      <div className="grid gap-1.5">
         <div className="flex items-center justify-between">
           <Label htmlFor="property-location" className="text-sm font-medium flex items-center gap-1.5">
             <MapPin className="w-4 h-4 text-primary" />
@@ -352,15 +396,19 @@ export default function LocationPickerMap({
         </div>
         <Input
           id="property-location"
-          placeholder={t('e.g., Chennai, T Nagar or select on map', 'எ.கா., சென்னை, டி நகர் அல்லது வரைபடத்தில் தேர்ந்தெடுக்கவும்')}
+          placeholder={t(
+            'Enter street address, building name, area, city or pin on map',
+            'தெரு முகவரி, கட்டிட பெயர், பகுதி, நகரம் அல்லது வரைபடத்தில் தேர்ந்தெடுக்கவும்'
+          )}
           value={address}
           onChange={(e) => onAddressChange(e.target.value)}
           disabled={disabled}
+          className="h-10"
         />
       </div>
 
-      {/* Action Bar: Use Current Location & Map tools */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+      {/* Action Bar: Use Current Location & Map controls */}
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
         <Button
           type="button"
           variant="outline"
@@ -427,33 +475,36 @@ export default function LocationPickerMap({
         </div>
       )}
 
-      {/* Interactive Map Preview Container */}
-      <div className="relative rounded-xl border border-border/80 overflow-hidden bg-muted/40 shadow-inner">
+      {/* Free Esri High-Resolution World Imagery (Satellite) Map Preview */}
+      <div className="relative rounded-xl border border-border/80 overflow-hidden bg-slate-900 shadow-inner">
         <div
           ref={mapContainerRef}
           className="w-full h-[220px] sm:h-[260px] z-0"
           style={{ minHeight: '220px' }}
         />
 
-        {/* Map Overlay Helper Banner */}
-        <div className="absolute top-2 left-2 right-2 pointer-events-none z-[400] flex justify-between items-center">
-          <div className="bg-background/90 backdrop-blur-sm px-2.5 py-1 rounded-md text-[11px] font-medium text-muted-foreground border shadow-sm pointer-events-auto">
-            {value
-              ? t('Drag marker or click anywhere to adjust location', 'குறியீட்டை இழுக்கவும் அல்லது மாற்ற கிளிக் செய்யவும்')
-              : t('Click anywhere on the map to place property pin', 'சொத்து குறியீட்டை வைக்க வரைபடத்தில் கிளிக் செய்யவும்')}
+        {/* Satellite Map Helper Overlay */}
+        <div className="absolute top-2 left-2 right-2 pointer-events-none z-[400] flex justify-between items-center gap-2">
+          <div className="bg-slate-900/90 text-white backdrop-blur-sm px-2.5 py-1 rounded-md text-[11px] font-medium border border-white/20 shadow-sm pointer-events-auto flex items-center gap-1.5 truncate">
+            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+            <span className="truncate">
+              {value
+                ? t('Satellite View: Drag pin to exact boundary', 'செயற்கைக்கோள் பார்வை: எல்லையை குறிக்க குறியீட்டை இழுக்கவும்')
+                : t('Satellite View: Click anywhere to drop plot pin', 'செயற்கைக்கோள் பார்வை: நிலத்தின் எல்லையை குறிக்க கிளிக் செய்யவும்')}
+            </span>
           </div>
           <button
             type="button"
             onClick={handleMapRefresh}
-            className="bg-background/90 backdrop-blur-sm p-1.5 rounded-md text-muted-foreground hover:text-foreground border shadow-sm pointer-events-auto text-[10px]"
-            title={t('Refresh Map View', 'வரைபட காட்சியைப் புதுப்பிக்கவும்')}
+            className="bg-slate-900/90 text-white backdrop-blur-sm p-1.5 rounded-md hover:bg-slate-800 border border-white/20 shadow-sm pointer-events-auto text-[10px] shrink-0"
+            title={t('Refresh Satellite View', 'செயற்கைக்கோள் காட்சியைப் புதுப்பிக்கவும்')}
           >
             <Crosshair className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Readable Latitude and Longitude Display */}
+      {/* Selected Coordinates Display */}
       {value ? (
         <div className="p-3 bg-muted/30 border border-border/70 rounded-lg text-xs space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -467,7 +518,7 @@ export default function LocationPickerMap({
               </span>
             ) : (
               <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                {t('Manually Placed Pin', 'வரைபடத்தில் வைக்கப்பட்ட குறியீடு')}
+                {t('Manually Placed Satellite Pin', 'செயற்கைக்கோள் வரைபடத்தில் வைக்கப்பட்ட குறியீடு')}
               </span>
             )}
           </div>
@@ -485,8 +536,8 @@ export default function LocationPickerMap({
       ) : (
         <p className="text-[11px] text-muted-foreground italic">
           {t(
-            'GPS coordinates optional. Capture your current position or tap the map to save exact property location.',
-            'ஜிபிஎஸ் அட்சரேகை/தீர்க்கரேகை விருப்பத்திற்குரியது. துல்லியமான இடத்தை சேமிக்க வரைபடத்தில் தொடவும்.'
+            'GPS coordinates optional. Capture current position or tap the satellite map to pinpoint exact plot boundary.',
+            'ஜிபிஎஸ் அட்சரேகை/தீர்க்கரேகை விருப்பத்திற்குரியது. துல்லியமான இடத்தை சேமிக்க செயற்கைக்கோள் வரைபடத்தில் தொடவும்.'
           )}
         </p>
       )}

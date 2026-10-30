@@ -119,6 +119,10 @@ export function AIProvider({ children }: { children: ReactNode }) {
       'pg',
       'land',
       'plot',
+      'commercial',
+      'office',
+      'shop',
+      'farmhouse',
       '2bhk',
       '3bhk',
       'bhk',
@@ -278,11 +282,17 @@ export function AIProvider({ children }: { children: ReactNode }) {
     // Extract property type
     if (lowerMessage.includes('flat') || lowerMessage.includes('apartment') || lowerMessage.includes('பிளாட்')) {
       criteria.type = 'flat';
-    } else if (lowerMessage.includes('house') || lowerMessage.includes('villa') || lowerMessage.includes('வீடு')) {
+    } else if (lowerMessage.includes('villa') || lowerMessage.includes('வில்லா')) {
+      criteria.type = 'villa';
+    } else if (lowerMessage.includes('house') || lowerMessage.includes('வீடு')) {
       criteria.type = 'house';
-    } else if (lowerMessage.includes('pg') || lowerMessage.includes('பி.ஜி')) {
+    } else if (lowerMessage.includes('pg') || lowerMessage.includes('பி.ஜி') || lowerMessage.includes('விடுதி')) {
       criteria.type = 'pg';
-    } else if (lowerMessage.includes('land') || lowerMessage.includes('plot') || lowerMessage.includes('நிலம்')) {
+    } else if (lowerMessage.includes('commercial') || lowerMessage.includes('office') || lowerMessage.includes('shop') || lowerMessage.includes('வணிக')) {
+      criteria.type = 'commercial';
+    } else if (lowerMessage.includes('farmhouse') || lowerMessage.includes('farm house') || lowerMessage.includes('பண்ணை')) {
+      criteria.type = 'farmhouse';
+    } else if (lowerMessage.includes('land') || lowerMessage.includes('plot') || lowerMessage.includes('நிலம்') || lowerMessage.includes('மனை')) {
       criteria.type = 'land';
     }
     

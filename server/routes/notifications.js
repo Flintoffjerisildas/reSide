@@ -13,12 +13,21 @@ router.get('/', auth, async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(50);
 
-    const unreadCount = await Notification.countDocuments({
-      recipient: req.user.id,
-      read: false
-    });
+    // Clean up any orphaned notifications whose property was deleted
+    const orphanedNotificationIds = notifications
+      .filter(n => n && n._doc && n._doc.property && !n.property)
+      .map(n => n._id);
+    if (orphanedNotificationIds.length > 0) {
+      await Notification.deleteMany({ _id: { $in: orphanedNotificationIds } });
+    }
 
-    res.json({ notifications, unreadCount });
+    const validNotifications = notifications.filter(
+      n => !(n && n._doc && n._doc.property && !n.property)
+    );
+
+    const unreadCount = validNotifications.filter(n => !n.read && !n.isRead).length;
+
+    res.json({ notifications: validNotifications, unreadCount });
   } catch (err) {
     console.error('Error fetching notifications:', err.message);
     res.status(500).send('Server Error');

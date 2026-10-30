@@ -608,7 +608,7 @@ export default function RentalDetailsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[760px] max-h-[88vh] overflow-y-auto p-4 sm:p-5 gap-3 !bg-background/98 dark:!bg-slate-950/98 !backdrop-blur-3xl border border-border/80 shadow-2xl">
         {/* Property Details Containing Box */}
-        <div className="rounded-xl p-3 sm:p-3.5 bg-card/95 dark:bg-card/95 border border-border/80 shadow-xs backdrop-blur-md">
+        <div className="rounded-xl p-3 sm:p-3.5 bg-card dark:bg-card border border-border/80 shadow-xs backdrop-blur-md">
           <DialogHeader className="space-y-1.5">
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-0.5">
