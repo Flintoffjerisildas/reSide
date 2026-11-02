@@ -33,12 +33,15 @@ import {
   Download,
   History,
   Home,
+  IndianRupee,
   LineChart as LineChartIcon,
   Megaphone,
   Plus,
   RefreshCcw,
   Search,
+  TrendingUp,
   TriangleAlert,
+  UserCheck,
   Users,
   Wrench
 } from 'lucide-react';
@@ -69,7 +72,7 @@ import {
   useAdminUsers,
   useGetCallerUserProfile
 } from '../hooks/useQueries';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, CartesianGrid } from 'recharts';
 import { toast } from 'sonner';
 
 type Section =
@@ -100,6 +103,40 @@ function formatAdminKey(t: (en: string, ta: string) => string, key: unknown) {
   const spaced = k.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
   if (!spaced) return '';
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+function formatInrShort(val: number | string) {
+  const n = Math.abs(Number(val) || 0);
+  if (n >= 10000000) return `₹${(n / 10000000).toFixed(n % 10000000 === 0 ? 0 : 1)} Cr`;
+  if (n >= 100000) return `₹${(n / 100000).toFixed(n % 100000 === 0 ? 0 : 1)}L`;
+  if (n >= 1000) return `₹${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k`;
+  return `₹${n}`;
+}
+
+function getActivityTheme(id: string) {
+  if (id.startsWith('pay-')) {
+    return {
+      bg: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
+    };
+  }
+  if (id.startsWith('prop-')) {
+    return {
+      bg: 'bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400'
+    };
+  }
+  if (id.startsWith('user-')) {
+    return {
+      bg: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400'
+    };
+  }
+  if (id.startsWith('mnt-')) {
+    return {
+      bg: 'bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400'
+    };
+  }
+  return {
+    bg: 'bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400'
+  };
 }
 
 function AdminDashboardModern() {
@@ -172,6 +209,11 @@ function AdminDashboardModern() {
   const occupancyObj = analytics?.occupancy || {};
   const occupancyRows = Object.keys(occupancyObj).map((k) => ({ name: k, value: Number(occupancyObj[k] || 0) }));
   const occupancyColors = ['#2563eb', '#60a5fa', '#94a3b8', '#e2e8f0'];
+  const totalOccupancyUnits = occupancyRows.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
+  const occupiedUnits =
+    occupancyRows.find((item) => item.name?.toLowerCase().includes('occupied'))?.value ??
+    (occupancyRows.length > 0 ? occupancyRows[0].value : 0);
+  const occupancyPct = totalOccupancyUnits > 0 ? Math.round((occupiedUnits / totalOccupancyUnits) * 100) : (totals.totalProperties > 0 ? 100 : 0);
 
   const filteredProps = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -283,7 +325,7 @@ function AdminDashboardModern() {
         id: `pay-${String(p?._id || p?.id)}`,
         title: t('Payment recorded', 'கட்டணம் பதிவு செய்யப்பட்டது'),
         subtitle: `${String(p?.tenant?.email || p?.tenant?.name || '')} • ₹${Number(p?.amount || 0).toLocaleString()}`,
-        icon: CreditCard,
+        icon: IndianRupee,
         ts: pick(p)
       });
     });
@@ -310,9 +352,11 @@ function AdminDashboardModern() {
 
   const statusBadge = (active: boolean) =>
     active ? (
-      <Badge className="rounded-full bg-emerald-600 hover:bg-emerald-600">Active</Badge>
+      <Badge className="rounded-full bg-emerald-50 hover:bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60 font-medium text-xs px-2.5 py-0.5 shadow-none">
+        Active
+      </Badge>
     ) : (
-      <Badge variant="secondary" className="rounded-full">
+      <Badge className="rounded-full bg-slate-100 hover:bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700 font-medium text-xs px-2.5 py-0.5 shadow-none">
         Inactive
       </Badge>
     );
@@ -320,9 +364,11 @@ function AdminDashboardModern() {
   const paymentBadge = (status: string) => {
     const s = String(status || '').toLowerCase();
     return s === 'paid' ? (
-      <Badge className="rounded-full bg-emerald-600 hover:bg-emerald-600">Paid</Badge>
+      <Badge className="rounded-full bg-emerald-50 hover:bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60 font-medium text-xs px-2.5 py-0.5 shadow-none">
+        Paid
+      </Badge>
     ) : (
-      <Badge variant="secondary" className="rounded-full">
+      <Badge className="rounded-full bg-amber-50 hover:bg-amber-50 text-amber-700 border border-amber-200/80 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60 font-medium text-xs px-2.5 py-0.5 shadow-none">
         Pending
       </Badge>
     );
@@ -330,10 +376,22 @@ function AdminDashboardModern() {
 
   const maintenanceBadge = (status: string) => {
     const s = String(status || '').toLowerCase();
-    if (s === 'completed') return <Badge className="rounded-full bg-emerald-600 hover:bg-emerald-600">Completed</Badge>;
-    if (s === 'in-progress') return <Badge className="rounded-full bg-blue-600 hover:bg-blue-600">In Progress</Badge>;
+    if (s === 'completed') {
+      return (
+        <Badge className="rounded-full bg-emerald-50 hover:bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60 font-medium text-xs px-2.5 py-0.5 shadow-none">
+          Completed
+        </Badge>
+      );
+    }
+    if (s === 'in-progress') {
+      return (
+        <Badge className="rounded-full bg-blue-50 hover:bg-blue-50 text-blue-700 border border-blue-200/80 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800/60 font-medium text-xs px-2.5 py-0.5 shadow-none">
+          In Progress
+        </Badge>
+      );
+    }
     return (
-      <Badge variant="secondary" className="rounded-full">
+      <Badge className="rounded-full bg-amber-50 hover:bg-amber-50 text-amber-700 border border-amber-200/80 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60 font-medium text-xs px-2.5 py-0.5 shadow-none">
         Pending
       </Badge>
     );
@@ -378,7 +436,7 @@ function AdminDashboardModern() {
           id: `user-${Date.now()}`,
           title: t('User created', 'பயனர் உருவாக்கப்பட்டது'),
           subtitle: `${name} • ${email}`,
-          icon: Users,
+          icon: UserCheck,
           ts: Date.now()
         },
         ...prev
@@ -420,126 +478,240 @@ function AdminDashboardModern() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t('Search properties, tenants, requests...', 'சொத்துகள், வாடகையாளர்கள், கோரிக்கைகள்...')}
-              className="h-10 rounded-2xl glass-surface pl-10 shadow-sm text-foreground placeholder:text-muted-foreground"
+              className="h-10 rounded-xl border border-slate-200/80 bg-white pl-10 shadow-2xs text-slate-900 placeholder:text-slate-400 focus-visible:ring-blue-500/20 dark:border-slate-800 dark:bg-slate-900/90 dark:text-white dark:placeholder:text-slate-500"
             />
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card
-              className="cursor-pointer rounded-3xl glass-card shadow-sm transition hover:shadow-md"
+              className="cursor-pointer rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90"
               onClick={() => setSummaryModal('properties')}
             >
-              <CardContent className="flex items-center justify-between p-5">
-                <div>
-                  <div className="text-sm text-slate-500 dark:text-slate-300">{t('Total Properties', 'மொத்த சொத்துகள்')}</div>
-                  <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">{Number(totals.totalProperties).toLocaleString()}</div>
+              <CardContent className="p-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    {t('Total Properties', 'மொத்த சொத்துகள்')}
+                  </span>
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
+                    <Building className="h-4 w-4" />
+                  </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl glass-pill bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                  <Building className="h-5 w-5" />
+                <div className="mt-3 flex items-baseline justify-between">
+                  <div className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                    {Number(totals.totalProperties).toLocaleString()}
+                  </div>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
+                    <TrendingUp className="h-3 w-3" />
+                    +1
+                  </span>
                 </div>
               </CardContent>
             </Card>
+
             <Card
-              className="cursor-pointer rounded-3xl glass-card shadow-sm transition hover:shadow-md"
+              className="cursor-pointer rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90"
               onClick={() => setSummaryModal('tenants')}
             >
-              <CardContent className="flex items-center justify-between p-5">
-                <div>
-                  <div className="text-sm text-slate-500 dark:text-slate-300">{t('Total Tenants', 'மொத்த வாடகையாளர்கள்')}</div>
-                  <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">{Number(totals.totalTenants).toLocaleString()}</div>
+              <CardContent className="p-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    {t('Total Tenants', 'மொத்த வாடகையாளர்கள்')}
+                  </span>
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+                    <Users className="h-4 w-4" />
+                  </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl glass-pill bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                  <Users className="h-5 w-5" />
+                <div className="mt-3 flex items-baseline justify-between">
+                  <div className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                    {Number(totals.totalTenants).toLocaleString()}
+                  </div>
+                  <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-400">
+                    Active
+                  </span>
                 </div>
               </CardContent>
             </Card>
+
             <Card
-              className="cursor-pointer rounded-3xl glass-card shadow-sm transition hover:shadow-md"
+              className="cursor-pointer rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90"
               onClick={() => setSummaryModal('revenue')}
             >
-              <CardContent className="flex items-center justify-between p-5">
-                <div>
-                  <div className="text-sm text-slate-500 dark:text-slate-300">{t('Monthly Rent Collection', 'மாதாந்திர வாடகை வசூல்')}</div>
-                  <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">₹{Number(totals.monthlyRevenue).toLocaleString()}</div>
+              <CardContent className="p-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    {t('Monthly Rent Collection', 'மாதாந்திர வாடகை வசூல்')}
+                  </span>
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
+                    <IndianRupee className="h-4 w-4" />
+                  </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl glass-pill bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                  <CreditCard className="h-5 w-5" />
+                <div className="mt-3 flex items-baseline justify-between">
+                  <div className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                    ₹{Number(totals.monthlyRevenue).toLocaleString()}
+                  </div>
+                  <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
+                    100% Paid
+                  </span>
                 </div>
               </CardContent>
             </Card>
+
             <Card
-              className="cursor-pointer rounded-3xl glass-card shadow-sm transition hover:shadow-md"
+              className="cursor-pointer rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90"
               onClick={() => setSummaryModal('maintenance')}
             >
-              <CardContent className="flex items-center justify-between p-5">
-                <div>
-                  <div className="text-sm text-slate-500 dark:text-slate-300">{t('Open Maintenance Requests', 'திறந்த பராமரிப்பு கோரிக்கைகள்')}</div>
-                  <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-50">{Number(totals.openMaintenance).toLocaleString()}</div>
+              <CardContent className="p-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    {t('Open Maintenance Requests', 'திறந்த பராமரிப்பு கோரிக்கைகள்')}
+                  </span>
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+                    <Wrench className="h-4 w-4" />
+                  </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl glass-pill bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                  <Wrench className="h-5 w-5" />
+                <div className="mt-3 flex items-baseline justify-between">
+                  <div className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                    {Number(totals.openMaintenance).toLocaleString()}
+                  </div>
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                      totals.openMaintenance > 0
+                        ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400'
+                        : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400'
+                    }`}
+                  >
+                    {totals.openMaintenance > 0 ? 'Pending' : 'Resolved'}
+                  </span>
                 </div>
               </CardContent>
             </Card>
           </div>
 
           <div id="admin-charts-section" className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Card className="rounded-3xl glass-card shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Rent Collection Trend', 'வாடகை வசூல் போக்கு')}</CardTitle>
+            <Card className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90">
+              <CardHeader className="p-0 pb-3">
+                <CardTitle className="text-base font-semibold text-slate-900 dark:text-slate-50">{t('Rent Collection Trend', 'வாடகை வசூல் போக்கு')}</CardTitle>
               </CardHeader>
-              <CardContent className="h-[320px]">
+              <CardContent className="h-[300px] p-0">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={revenueByMonth}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.18} />
-                    <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                    <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                    <Tooltip formatter={(value: number) => [`₹${Number(value || 0).toLocaleString()}`, t('Revenue', 'வருமானம்')]} />
-                    <Line type="monotone" dataKey="revenue" stroke="#2563eb" strokeWidth={3} dot={false} />
-                  </LineChart>
+                  <AreaChart data={revenueByMonth} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="rentCollectionGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.12} vertical={false} />
+                    <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis
+                      tickFormatter={formatInrShort}
+                      tick={{ fill: '#94a3b8', fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      formatter={(value: any) => [`₹${Number(value || 0).toLocaleString('en-IN')}`, t('Revenue', 'வருமானம்')]}
+                      contentStyle={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="#2563eb"
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#rentCollectionGrad)"
+                      dot={{ r: 3, fill: '#2563eb', strokeWidth: 1, stroke: '#fff' }}
+                      activeDot={{ r: 5, fill: '#2563eb' }}
+                    />
+                  </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
-            <Card className="rounded-3xl glass-card shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Property Occupancy Rate', 'சொத்து குடியேற்ற விகிதம்')}</CardTitle>
+            <Card className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90">
+              <CardHeader className="p-0 pb-3">
+                <CardTitle className="text-base font-semibold text-slate-900 dark:text-slate-50">{t('Property Occupancy Rate', 'சொத்து குடியேற்ற விகிதம்')}</CardTitle>
               </CardHeader>
-              <CardContent className="h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={occupancyRows} dataKey="value" nameKey="name" outerRadius={110} label>
-                      {occupancyRows.map((_: any, index: number) => (
-                        <Cell key={index} fill={occupancyColors[index % occupancyColors.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+              <CardContent className="h-[300px] p-0">
+                <div className="relative flex h-full flex-col sm:flex-row items-center justify-center gap-6">
+                  <div className="relative h-[210px] w-[210px] shrink-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={occupancyRows.length > 0 ? occupancyRows : [{ name: 'Occupied', value: totals.totalProperties || 1 }]}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={65}
+                          outerRadius={88}
+                          paddingAngle={3}
+                          stroke="none"
+                        >
+                          {(occupancyRows.length > 0 ? occupancyRows : [{ name: 'Occupied', value: 1 }]).map((_: any, index: number) => (
+                            <Cell key={index} fill={occupancyColors[index % occupancyColors.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value: any, name: any) => [`${value} units`, name]}
+                          contentStyle={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #e2e8f0' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                      <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                        {occupancyPct}%
+                      </span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                        {t('Occupied', 'குடியிருப்பு')}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2.5 sm:min-w-[130px]">
+                    {(occupancyRows.length > 0 ? occupancyRows : [{ name: 'Occupied', value: totals.totalProperties || 1 }]).map((item, idx) => {
+                      const val = Number(item.value) || 0;
+                      const share = totalOccupancyUnits > 0 ? Math.round((val / totalOccupancyUnits) * 100) : 100;
+                      return (
+                        <div key={idx} className="flex items-center justify-between gap-3 text-xs">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: occupancyColors[idx % occupancyColors.length] }}
+                            />
+                            <span className="capitalize font-medium text-slate-600 dark:text-slate-300">
+                              {item.name}
+                            </span>
+                          </div>
+                          <span className="font-semibold text-slate-900 dark:text-white">
+                            {val} ({share}%)
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
 
-          <Card id="admin-properties-section" className="rounded-3xl glass-card shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Property Management', 'சொத்து நிர்வாகம்')}</CardTitle>
+          <Card id="admin-properties-section" className="rounded-2xl border border-slate-200/80 bg-white shadow-xs transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90 overflow-hidden">
+            <CardHeader className="p-4 sm:p-5 pb-3">
+              <CardTitle className="text-base font-semibold text-slate-900 dark:text-slate-50">{t('Property Management', 'சொத்து நிர்வாகம்')}</CardTitle>
             </CardHeader>
-            <CardContent className="overflow-auto">
+            <CardContent className="p-0 overflow-auto">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('Property Name', 'சொத்து பெயர்')}</TableHead>
-                    <TableHead>{t('Owner', 'உரிமையாளர்')}</TableHead>
-                    <TableHead>{t('Units', 'அலகுகள்')}</TableHead>
-                    <TableHead>{t('Occupied', 'குடியிருப்பு')}</TableHead>
-                    <TableHead>{t('Vacant', 'காலி')}</TableHead>
-                    <TableHead>{t('Status', 'நிலை')}</TableHead>
-                    <TableHead className="text-right">{t('Action', 'செயல்')}</TableHead>
+                <TableHeader className="bg-slate-50/70 dark:bg-slate-800/50">
+                  <TableRow className="border-b border-slate-100 dark:border-slate-800">
+                    <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Property Name', 'சொத்து பெயர்')}</TableHead>
+                    <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Owner', 'உரிமையாளர்')}</TableHead>
+                    <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Units', 'அலகுகள்')}</TableHead>
+                    <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Occupied', 'குடியிருப்பு')}</TableHead>
+                    <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Vacant', 'காலி')}</TableHead>
+                    <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Status', 'நிலை')}</TableHead>
+                    <TableHead className="py-2.5 px-4 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Action', 'செயல்')}</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
+                <TableBody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredProps.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-sm text-slate-500 dark:text-slate-300">
+                      <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                         {t('No properties found', 'சொத்துகள் இல்லை')}
                       </TableCell>
                     </TableRow>
@@ -551,15 +723,19 @@ function AdminDashboardModern() {
                       const vacant = Math.max(0, units - occupied);
                       const active = String(p?.status || '').toLowerCase() === 'approved';
                       return (
-                        <TableRow key={String(p?._id || p?.id)} className="hover:bg-primary/5 dark:hover:bg-white/5">
-                          <TableCell className="font-medium">{String(p?.title || '-')}</TableCell>
-                          <TableCell>{String(p?.owner?.name || '-')}</TableCell>
-                          <TableCell>{units}</TableCell>
-                          <TableCell>{occupied}</TableCell>
-                          <TableCell>{vacant}</TableCell>
-                          <TableCell>{statusBadge(active)}</TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="outline" className="h-9 rounded-2xl glass-pill px-3" onClick={() => setSelectedProperty(p)}>
+                        <TableRow key={String(p?._id || p?.id)} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                          <TableCell className="py-3 px-4 font-medium text-slate-900 dark:text-slate-100">{String(p?.title || '-')}</TableCell>
+                          <TableCell className="py-3 px-4 text-slate-600 dark:text-slate-300">{String(p?.owner?.name || '-')}</TableCell>
+                          <TableCell className="py-3 px-4 text-slate-600 dark:text-slate-300">{units}</TableCell>
+                          <TableCell className="py-3 px-4 text-slate-600 dark:text-slate-300">{occupied}</TableCell>
+                          <TableCell className="py-3 px-4 text-slate-600 dark:text-slate-300">{vacant}</TableCell>
+                          <TableCell className="py-3 px-4">{statusBadge(active)}</TableCell>
+                          <TableCell className="py-3 px-4 text-right">
+                            <Button
+                              variant="outline"
+                              className="h-7 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-900/50 dark:text-blue-400 dark:hover:bg-blue-950/40 px-2.5 py-1 text-xs font-medium transition"
+                              onClick={() => setSelectedProperty(p)}
+                            >
                               {t('View', 'பார்')}
                             </Button>
                           </TableCell>
@@ -572,25 +748,25 @@ function AdminDashboardModern() {
             </CardContent>
           </Card>
 
-          <Card id="admin-tenants-section" className="rounded-3xl glass-card shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Recent Tenants', 'சமீபத்திய வாடகையாளர்கள்')}</CardTitle>
+          <Card id="admin-tenants-section" className="rounded-2xl border border-slate-200/80 bg-white shadow-xs transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90 overflow-hidden">
+            <CardHeader className="p-4 sm:p-5 pb-3">
+              <CardTitle className="text-base font-semibold text-slate-900 dark:text-slate-50">{t('Recent Tenants', 'சமீபத்திய வாடகையாளர்கள்')}</CardTitle>
             </CardHeader>
-            <CardContent className="overflow-auto">
+            <CardContent className="p-0 overflow-auto">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('Tenant Name', 'வாடகையாளர் பெயர்')}</TableHead>
-                    <TableHead>{t('Property', 'சொத்து')}</TableHead>
-                    <TableHead>{t('Unit', 'அலகு')}</TableHead>
-                    <TableHead>{t('Rent Amount', 'வாடகை தொகை')}</TableHead>
-                    <TableHead>{t('Payment Status', 'கட்டண நிலை')}</TableHead>
+                <TableHeader className="bg-slate-50/70 dark:bg-slate-800/50">
+                  <TableRow className="border-b border-slate-100 dark:border-slate-800">
+                    <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Tenant Name', 'வாடகையாளர் பெயர்')}</TableHead>
+                    <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Property', 'சொத்து')}</TableHead>
+                    <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Unit', 'அலகு')}</TableHead>
+                    <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Rent Amount', 'வாடகை தொகை')}</TableHead>
+                    <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Payment Status', 'கட்டண நிலை')}</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
+                <TableBody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {recentTenants.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-sm text-slate-500 dark:text-slate-300">
+                      <TableCell colSpan={5} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                         {t('No tenant activity found', 'வாடகையாளர் செயல்பாடு இல்லை')}
                       </TableCell>
                     </TableRow>
@@ -598,14 +774,14 @@ function AdminDashboardModern() {
                     recentTenants.map((r) => (
                       <TableRow
                         key={r.id}
-                        className="cursor-pointer hover:bg-primary/5 dark:hover:bg-white/5"
+                        className="cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors"
                         onClick={() => setSelectedTenantRow(r)}
                       >
-                        <TableCell className="font-medium">{r.tenantName}</TableCell>
-                        <TableCell>{r.propertyTitle}</TableCell>
-                        <TableCell>{r.unit}</TableCell>
-                        <TableCell>₹{Number(r.rentAmount).toLocaleString()}</TableCell>
-                        <TableCell>{paymentBadge(r.paymentStatus)}</TableCell>
+                        <TableCell className="py-3 px-4 font-medium text-slate-900 dark:text-slate-100">{r.tenantName}</TableCell>
+                        <TableCell className="py-3 px-4 text-slate-600 dark:text-slate-300">{r.propertyTitle}</TableCell>
+                        <TableCell className="py-3 px-4 text-slate-600 dark:text-slate-300">{r.unit}</TableCell>
+                        <TableCell className="py-3 px-4 font-semibold text-slate-900 dark:text-slate-100">₹{Number(r.rentAmount).toLocaleString()}</TableCell>
+                        <TableCell className="py-3 px-4">{paymentBadge(r.paymentStatus)}</TableCell>
                       </TableRow>
                     ))
                   )}
@@ -614,25 +790,25 @@ function AdminDashboardModern() {
             </CardContent>
           </Card>
 
-          <Card id="admin-maintenance-section" className="rounded-3xl glass-card shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Maintenance Overview', 'பராமரிப்பு மேலோட்டம்')}</CardTitle>
+          <Card id="admin-maintenance-section" className="rounded-2xl border border-slate-200/80 bg-white shadow-xs transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90 overflow-hidden">
+            <CardHeader className="p-4 sm:p-5 pb-3">
+              <CardTitle className="text-base font-semibold text-slate-900 dark:text-slate-50">{t('Maintenance Overview', 'பராமரிப்பு மேலோட்டம்')}</CardTitle>
             </CardHeader>
-            <CardContent className="overflow-auto">
+            <CardContent className="p-0 overflow-auto">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('Issue Title', 'பிரச்சனை தலைப்பு')}</TableHead>
-                    <TableHead>{t('Property', 'சொத்து')}</TableHead>
-                    <TableHead>{t('Raised By', 'யார்')}</TableHead>
-                    <TableHead>{t('Priority', 'முன்னுரிமை')}</TableHead>
-                    <TableHead>{t('Status', 'நிலை')}</TableHead>
+                <TableHeader className="bg-slate-50/70 dark:bg-slate-800/50">
+                  <TableRow className="border-b border-slate-100 dark:border-slate-800">
+                    <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Issue Title', 'பிரச்சனை தலைப்பு')}</TableHead>
+                    <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Property', 'சொத்து')}</TableHead>
+                    <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Raised By', 'யார்')}</TableHead>
+                    <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Priority', 'முன்னுரிமை')}</TableHead>
+                    <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Status', 'நிலை')}</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
+                <TableBody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredMaintenance.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-sm text-slate-500 dark:text-slate-300">
+                      <TableCell colSpan={5} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                         {t('No maintenance requests', 'பராமரிப்பு கோரிக்கைகள் இல்லை')}
                       </TableCell>
                     </TableRow>
@@ -640,14 +816,22 @@ function AdminDashboardModern() {
                     filteredMaintenance.slice(0, 10).map((m: any) => (
                       <TableRow
                         key={String(m?._id || m?.id)}
-                        className="cursor-pointer hover:bg-primary/5 dark:hover:bg-white/5"
+                        className="cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors"
                         onClick={() => setSelectedMaintenanceRow(m)}
                       >
-                        <TableCell className="font-medium">{String(m?.issue || '-')}</TableCell>
-                        <TableCell>{String(m?.property?.title || '-')}</TableCell>
-                        <TableCell>{String(m?.tenant?.name || m?.tenant?.email || '-')}</TableCell>
-                        <TableCell>{String(m?.priority || '-')}</TableCell>
-                        <TableCell>{maintenanceBadge(String(m?.status || 'pending'))}</TableCell>
+                        <TableCell className="py-3 px-4 font-medium text-slate-900 dark:text-slate-100">{String(m?.issue || '-')}</TableCell>
+                        <TableCell className="py-3 px-4 text-slate-600 dark:text-slate-300">{String(m?.property?.title || '-')}</TableCell>
+                        <TableCell className="py-3 px-4 text-slate-600 dark:text-slate-300">{String(m?.tenant?.name || m?.tenant?.email || '-')}</TableCell>
+                        <TableCell className="py-3 px-4">
+                          <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium capitalize ${
+                            String(m?.priority).toLowerCase() === 'high' || String(m?.priority).toLowerCase() === 'urgent'
+                              ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
+                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                          }`}>
+                            {String(m?.priority || '-')}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-3 px-4">{maintenanceBadge(String(m?.status || 'pending'))}</TableCell>
                       </TableRow>
                     ))
                   )}
@@ -658,52 +842,52 @@ function AdminDashboardModern() {
         </main>
 
         <aside className="h-fit space-y-5 xl:sticky xl:top-4">
-          <Card className="rounded-3xl glass-card shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Quick Actions', 'விரைவு செயல்கள்')}</CardTitle>
+          <Card className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90">
+            <CardHeader className="p-0 pb-3">
+              <CardTitle className="text-base font-semibold text-slate-900 dark:text-slate-50">{t('Quick Actions', 'விரைவு செயல்கள்')}</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-2">
+            <CardContent className="grid gap-2 p-0">
               <Button
                 variant="outline"
-                className="h-10 justify-start rounded-2xl glass-pill px-4"
+                className="h-10 justify-start rounded-xl border border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-blue-950/50 dark:hover:text-blue-300 px-3.5 text-xs font-medium transition"
                 onClick={() => {
                   setUserDraft({ name: '', email: '', phone: '', tamilRole: 'customers' });
                   setCreateUserOpen(true);
                 }}
               >
-                <Users className="mr-2 h-4 w-4" />
+                <Users className="mr-2.5 h-4 w-4 text-blue-600 dark:text-blue-400" />
                 {t('Add Tenant', 'வாடகையாளர் சேர்க்க')}
               </Button>
               <Button
                 variant="outline"
-                className="h-10 justify-start rounded-2xl glass-pill px-4"
+                className="h-10 justify-start rounded-xl border border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-blue-950/50 dark:hover:text-blue-300 px-3.5 text-xs font-medium transition"
                 onClick={() => {
                   setUserDraft({ name: '', email: '', phone: '', tamilRole: 'owners' });
                   setCreateUserOpen(true);
                 }}
               >
-                <Users className="mr-2 h-4 w-4" />
+                <Building className="mr-2.5 h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                 {t('Add Owner', 'உரிமையாளர் சேர்க்க')}
               </Button>
               <Button
                 variant="outline"
-                className="h-10 justify-start rounded-2xl glass-pill px-4"
+                className="h-10 justify-start rounded-xl border border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-blue-950/50 dark:hover:text-blue-300 px-3.5 text-xs font-medium transition"
                 onClick={() => setAnnouncementOpen(true)}
               >
-                <Bell className="mr-2 h-4 w-4" />
+                <Bell className="mr-2.5 h-4 w-4 text-purple-600 dark:text-purple-400" />
                 {t('Send Announcement', 'அறிவிப்பு அனுப்பு')}
               </Button>
               <Button
                 variant="outline"
-                className="h-10 justify-start rounded-2xl glass-pill px-4"
+                className="h-10 justify-start rounded-xl border border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-blue-950/50 dark:hover:text-blue-300 px-3.5 text-xs font-medium transition"
                 onClick={() => setAnnouncementHistoryOpen(true)}
               >
-                <History className="mr-2 h-4 w-4" />
+                <History className="mr-2.5 h-4 w-4 text-amber-600 dark:text-amber-400" />
                 {t('Announcement History', 'அறிவிப்பு வரலாறு')}
               </Button>
               <Button
                 variant="outline"
-                className="h-10 justify-start rounded-2xl glass-pill px-4"
+                className="h-10 justify-start rounded-xl border border-slate-200/80 bg-slate-50 text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-blue-950/50 dark:hover:text-blue-300 px-3.5 text-xs font-medium transition"
                 onClick={() => {
                   downloadCsv(
                     'properties-report.csv',
@@ -719,33 +903,34 @@ function AdminDashboardModern() {
                   toast.success(t('Report generated', 'அறிக்கை உருவாக்கப்பட்டது'));
                 }}
               >
-                <Download className="mr-2 h-4 w-4" />
+                <Download className="mr-2.5 h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                 {t('Generate Report', 'அறிக்கை உருவாக்கு')}
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="rounded-3xl glass-card shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base text-slate-900 dark:text-slate-50">{t('Recent Activity', 'சமீப செயல்பாடு')}</CardTitle>
+          <Card className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90">
+            <CardHeader className="p-0 pb-3">
+              <CardTitle className="text-base font-semibold text-slate-900 dark:text-slate-50">{t('Recent Activity', 'சமீப செயல்பாடு')}</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-2 p-0">
               {recentActivity.length === 0 ? (
-                <div className="text-sm text-slate-500 dark:text-slate-300">{t('No recent activity', 'சமீப செயல்பாடு இல்லை')}</div>
+                <div className="py-4 text-center text-xs text-slate-500 dark:text-slate-400">{t('No recent activity', 'சமீப செயல்பாடு இல்லை')}</div>
               ) : (
                 recentActivity.map((a) => {
                   const Icon = a.icon;
+                  const theme = getActivityTheme(a.id);
                   return (
                     <div
                       key={a.id}
-                      className="flex items-center gap-3 rounded-2xl glass-surface px-3 py-2 shadow-sm transition hover:scale-[1.01]"
+                      className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-2.5 transition hover:bg-slate-50/80 hover:border-slate-200/80 dark:border-slate-800 dark:bg-slate-800/40 dark:hover:bg-slate-800/70"
                     >
-                      <div className="flex h-9 w-9 items-center justify-center rounded-2xl glass-pill bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${theme.bg}`}>
                         <Icon className="h-4 w-4" />
                       </div>
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{a.title}</div>
-                        <div className="truncate text-xs text-slate-500 dark:text-slate-300">{a.subtitle}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-xs font-semibold text-slate-900 dark:text-slate-100">{a.title}</div>
+                        <div className="truncate text-[11px] text-slate-500 dark:text-slate-400">{a.subtitle}</div>
                       </div>
                     </div>
                   );
@@ -794,28 +979,28 @@ function AdminDashboardModern() {
                   {t('Open section', 'பகுதி திற')}
                 </Button>
               </div>
-              <div className="overflow-x-auto rounded-2xl glass-surface border border-white/20">
+              <div className="overflow-x-auto rounded-xl border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-slate-900/90">
                 <Table className="min-w-[780px]">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('Property', 'சொத்து')}</TableHead>
-                      <TableHead>{t('Owner', 'உரிமையாளர்')}</TableHead>
-                      <TableHead>{t('Location', 'இடம்')}</TableHead>
-                      <TableHead>{t('Status', 'நிலை')}</TableHead>
-                      <TableHead>{t('Occupancy', 'குடியேற்றம்')}</TableHead>
+                  <TableHeader className="bg-slate-50/70 dark:bg-slate-800/50">
+                    <TableRow className="border-b border-slate-100 dark:border-slate-800">
+                      <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Property', 'சொத்து')}</TableHead>
+                      <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Owner', 'உரிமையாளர்')}</TableHead>
+                      <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Location', 'இடம்')}</TableHead>
+                      <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Status', 'நிலை')}</TableHead>
+                      <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Occupancy', 'குடியேற்றம்')}</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
+                  <TableBody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {filteredProps.slice(0, 12).map((p: any) => {
                       const occupancy = String(p?.occupancyStatus || (p?.tenant ? 'occupied' : 'vacant'));
                       const active = String(p?.status || '').toLowerCase() === 'approved';
                       return (
-                        <TableRow key={String(p?._id || p?.id)} className="hover:bg-primary/5 dark:hover:bg-white/5">
-                          <TableCell className="font-medium">{String(p?.title || '-')}</TableCell>
-                          <TableCell>{String(p?.owner?.name || p?.owner?.email || '-')}</TableCell>
-                          <TableCell>{String(p?.location || '-')}</TableCell>
-                          <TableCell>{statusBadge(active)}</TableCell>
-                          <TableCell className="whitespace-nowrap">{occupancy}</TableCell>
+                        <TableRow key={String(p?._id || p?.id)} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                          <TableCell className="py-3 px-4 font-medium text-slate-900 dark:text-slate-100">{String(p?.title || '-')}</TableCell>
+                          <TableCell className="py-3 px-4 text-slate-600 dark:text-slate-300">{String(p?.owner?.name || p?.owner?.email || '-')}</TableCell>
+                          <TableCell className="py-3 px-4 text-slate-600 dark:text-slate-300">{String(p?.location || '-')}</TableCell>
+                          <TableCell className="py-3 px-4">{statusBadge(active)}</TableCell>
+                          <TableCell className="py-3 px-4 whitespace-nowrap text-slate-600 dark:text-slate-300">{occupancy}</TableCell>
                         </TableRow>
                       );
                     })}
@@ -840,21 +1025,21 @@ function AdminDashboardModern() {
                   {t('Open section', 'பகுதி திற')}
                 </Button>
               </div>
-              <div className="overflow-x-auto rounded-2xl glass-surface border border-white/20">
+              <div className="overflow-x-auto rounded-xl border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-slate-900/90">
                 <Table className="min-w-[640px]">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('Name', 'பெயர்')}</TableHead>
-                      <TableHead>{t('Email', 'மின்னஞ்சல்')}</TableHead>
-                      <TableHead>{t('Phone', 'தொலைபேசி')}</TableHead>
+                  <TableHeader className="bg-slate-50/70 dark:bg-slate-800/50">
+                    <TableRow className="border-b border-slate-100 dark:border-slate-800">
+                      <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Name', 'பெயர்')}</TableHead>
+                      <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Email', 'மின்னஞ்சல்')}</TableHead>
+                      <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Phone', 'தொலைபேசி')}</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
+                  <TableBody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {filteredTenantUsers.slice(0, 12).map((u: any) => (
-                      <TableRow key={String(u?._id || u?.id || u?.email)} className="hover:bg-primary/5 dark:hover:bg-white/5">
-                        <TableCell className="font-medium">{String(u?.name || '-')}</TableCell>
-                        <TableCell>{String(u?.email || '-')}</TableCell>
-                        <TableCell>{String(u?.phone || '-')}</TableCell>
+                      <TableRow key={String(u?._id || u?.id || u?.email)} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                        <TableCell className="py-3 px-4 font-medium text-slate-900 dark:text-slate-100">{String(u?.name || '-')}</TableCell>
+                        <TableCell className="py-3 px-4 text-slate-600 dark:text-slate-300">{String(u?.email || '-')}</TableCell>
+                        <TableCell className="py-3 px-4 text-slate-600 dark:text-slate-300">{String(u?.phone || '-')}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -866,35 +1051,35 @@ function AdminDashboardModern() {
           {summaryModal === 'revenue' ? (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl glass-surface p-3">
-                  <div className="text-xs text-slate-500">{t('This month', 'இந்த மாதம்')}</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">₹{Number(totals.monthlyRevenue).toLocaleString()}</div>
+                <div className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/90">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{t('This month', 'இந்த மாதம்')}</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">₹{Number(totals.monthlyRevenue).toLocaleString()}</div>
                 </div>
-                <div className="rounded-2xl glass-surface p-3">
-                  <div className="text-xs text-slate-500">{t('Months shown', 'காட்டப்படும் மாதங்கள்')}</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">{Number(revenueSummaryRows.length).toLocaleString()}</div>
+                <div className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/90">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{t('Months shown', 'காட்டப்படும் மாதங்கள்')}</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{Number(revenueSummaryRows.length).toLocaleString()}</div>
                 </div>
               </div>
-              <div className="overflow-x-auto rounded-2xl glass-surface border border-white/20">
+              <div className="overflow-x-auto rounded-xl border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-slate-900/90">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('Month', 'மாதம்')}</TableHead>
-                      <TableHead className="text-right">{t('Revenue', 'வருமானம்')}</TableHead>
+                  <TableHeader className="bg-slate-50/70 dark:bg-slate-800/50">
+                    <TableRow className="border-b border-slate-100 dark:border-slate-800">
+                      <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Month', 'மாதம்')}</TableHead>
+                      <TableHead className="py-2.5 px-4 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Revenue', 'வருமானம்')}</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
+                  <TableBody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {revenueSummaryRows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={2} className="text-sm text-slate-500">
+                        <TableCell colSpan={2} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                           {t('No revenue data', 'வருமான தரவு இல்லை')}
                         </TableCell>
                       </TableRow>
                     ) : (
                       revenueSummaryRows.map((r: any, idx: number) => (
-                        <TableRow key={String(r?.month || idx)} className="hover:bg-primary/5 dark:hover:bg-white/5">
-                          <TableCell className="font-medium">{String(r?.month || '')}</TableCell>
-                          <TableCell className="text-right">₹{Number(r?.revenue || 0).toLocaleString()}</TableCell>
+                        <TableRow key={String(r?.month || idx)} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                          <TableCell className="py-3 px-4 font-medium text-slate-900 dark:text-slate-100">{String(r?.month || '')}</TableCell>
+                          <TableCell className="py-3 px-4 text-right font-semibold text-slate-900 dark:text-slate-100">₹{Number(r?.revenue || 0).toLocaleString()}</TableCell>
                         </TableRow>
                       ))
                     )}
@@ -904,7 +1089,7 @@ function AdminDashboardModern() {
               <div className="flex justify-end">
                 <Button
                   variant="outline"
-                  className="h-9 rounded-2xl glass-pill px-3"
+                  className="h-8 rounded-lg border border-slate-200 px-3 text-xs font-medium dark:border-slate-800"
                   onClick={() => {
                     setSummaryModal(null);
                     scrollTo('admin-charts-section');
@@ -919,10 +1104,10 @@ function AdminDashboardModern() {
           {summaryModal === 'maintenance' ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div className="text-sm text-slate-500">{t('Open', 'திறந்தது')} {openMaintenanceRows.length}</div>
+                <div className="text-sm text-slate-500 dark:text-slate-400">{t('Open', 'திறந்தது')} {openMaintenanceRows.length}</div>
                 <Button
                   variant="outline"
-                  className="h-9 rounded-2xl glass-pill px-3"
+                  className="h-8 rounded-lg border border-slate-200 px-3 text-xs font-medium dark:border-slate-800"
                   onClick={() => {
                     setSummaryModal(null);
                     scrollTo('admin-maintenance-section');
@@ -931,32 +1116,32 @@ function AdminDashboardModern() {
                   {t('Open section', 'பகுதி திற')}
                 </Button>
               </div>
-              <div className="overflow-x-auto rounded-2xl glass-surface border border-white/20">
+              <div className="overflow-x-auto rounded-xl border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-slate-900/90">
                 <Table className="min-w-[720px]">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('Issue', 'பிரச்சனை')}</TableHead>
-                      <TableHead>{t('Property', 'சொத்து')}</TableHead>
-                      <TableHead>{t('Raised By', 'யார்')}</TableHead>
-                      <TableHead>{t('Priority', 'முன்னுரிமை')}</TableHead>
-                      <TableHead>{t('Status', 'நிலை')}</TableHead>
+                  <TableHeader className="bg-slate-50/70 dark:bg-slate-800/50">
+                    <TableRow className="border-b border-slate-100 dark:border-slate-800">
+                      <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Issue', 'பிரச்சனை')}</TableHead>
+                      <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Property', 'சொத்து')}</TableHead>
+                      <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Raised By', 'யார்')}</TableHead>
+                      <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Priority', 'முன்னுரிமை')}</TableHead>
+                      <TableHead className="py-2.5 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('Status', 'நிலை')}</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
+                  <TableBody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {openMaintenanceRows.slice(0, 12).map((m: any) => (
                       <TableRow
                         key={String(m?._id || m?.id)}
-                        className="cursor-pointer hover:bg-primary/5 dark:hover:bg-white/5"
+                        className="cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors"
                         onClick={() => {
                           setSummaryModal(null);
                           setSelectedMaintenanceRow(m);
                         }}
                       >
-                        <TableCell className="font-medium">{String(m?.issue || '-')}</TableCell>
-                        <TableCell>{String(m?.property?.title || '-')}</TableCell>
-                        <TableCell>{String(m?.tenant?.name || m?.tenant?.email || '-')}</TableCell>
-                        <TableCell>{String(m?.priority || '-')}</TableCell>
-                        <TableCell>{maintenanceBadge(String(m?.status || 'pending'))}</TableCell>
+                        <TableCell className="py-3 px-4 font-medium text-slate-900 dark:text-slate-100">{String(m?.issue || '-')}</TableCell>
+                        <TableCell className="py-3 px-4 text-slate-600 dark:text-slate-300">{String(m?.property?.title || '-')}</TableCell>
+                        <TableCell className="py-3 px-4 text-slate-600 dark:text-slate-300">{String(m?.tenant?.name || m?.tenant?.email || '-')}</TableCell>
+                        <TableCell className="py-3 px-4 text-slate-600 dark:text-slate-300">{String(m?.priority || '-')}</TableCell>
+                        <TableCell className="py-3 px-4">{maintenanceBadge(String(m?.status || 'pending'))}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

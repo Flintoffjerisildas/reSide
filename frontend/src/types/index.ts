@@ -99,6 +99,7 @@ export interface Property {
   showAmenities?: boolean;
   acceptOffers?: boolean;
   customDetails?: Array<{ key: string; value: string }>;
+  customSections?: Array<{ title: string; enabled: boolean }>;
 }
 
 export type ListingStatus = 'listed' | 'unlisted' | 'unavailable';
@@ -203,6 +204,7 @@ export interface PropertyInput {
   showAmenities?: boolean;
   acceptOffers?: boolean;
   customDetails?: Array<{ key: string; value: string }>;
+  customSections?: Array<{ title: string; enabled: boolean }>;
 }
 
 export interface Message {

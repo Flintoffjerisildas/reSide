@@ -20,7 +20,7 @@ const auth = (req, res, next) => {
 router.get('/tenant', auth, async (req, res) => {
   try {
     const agreements = await Agreement.find({ tenant: req.user.id })
-      .populate('property', 'title location price propertyType images geoLocatedImage')
+      .populate('property')
       .populate('owner', 'name email phone address')
       .sort({ createdAt: -1 });
     res.json(agreements);
@@ -34,7 +34,7 @@ router.get('/tenant', auth, async (req, res) => {
 router.get('/owner', auth, async (req, res) => {
   try {
     const agreements = await Agreement.find({ owner: req.user.id })
-      .populate('property', 'title location price propertyType images geoLocatedImage')
+      .populate('property')
       .populate('tenant', 'name email phone address')
       .sort({ createdAt: -1 });
     res.json(agreements);
@@ -49,7 +49,7 @@ router.get('/property/:propertyId', auth, async (req, res) => {
   try {
     const { propertyId } = req.params;
     const agreements = await Agreement.find({ property: propertyId })
-      .populate('property', 'title location price propertyType location images geoLocatedImage')
+      .populate('property')
       .populate('tenant', 'name email phone')
       .populate('owner', 'name email phone')
       .sort({ createdAt: -1 });

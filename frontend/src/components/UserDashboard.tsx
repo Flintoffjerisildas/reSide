@@ -18,7 +18,8 @@ import {
   useRejectRequest,
   useVerifyRequestPayment,
   useGetTenantAgreements,
-  useGetSelfManagedRentals
+  useGetSelfManagedRentals,
+  useGetAllProperties
 } from '../hooks/useQueries';
 import { toast } from 'sonner';
 import {
@@ -95,6 +96,7 @@ export default function UserDashboard({
   const queryClient = useQueryClient();
   const { data: userProfile } = useGetCallerUserProfile();
   const { data: rawMyProperties = [] } = useGetMyProperties();
+  const { data: allPublicProperties = [] } = useGetAllProperties();
   const [properties, setProperties] = useState<Property[]>([]);
 
   useEffect(() => {
@@ -212,12 +214,20 @@ export default function UserDashboard({
       const rawPropId = (typeof ag.property === 'string' ? ag.property : null) || propObj._id || propObj.id || ag._id;
       if (rawPropId) seenPropertyIds.add(String(rawPropId));
 
-      const propTitle = propObj.title || ag.propertyTitle || ag.title || t('Rental Property', 'வாடகை சொத்து');
-      const propLoc = propObj.location || propObj.address || ag.propertyLocation || ag.location || t('Rental Location', 'வாடகை இடம்');
-      const propPrice = ag.rentAmount || propObj.price || 0;
+      const matchedProp = (allPublicProperties || []).find((p: any) => String(p._id || p.id) === String(rawPropId)) ||
+                          (myProperties || []).find((p: any) => String(p._id || p.id) === String(rawPropId)) || {};
+
+      const propTitle = propObj.title || matchedProp.title || ag.propertyTitle || ag.title || t('Rental Property', 'வாடகை சொத்து');
+      const propLoc = propObj.location || propObj.address || matchedProp.location || matchedProp.address || ag.propertyLocation || ag.location || t('Rental Location', 'வாடகை இடம்');
+      const propPrice = ag.rentAmount || propObj.price || matchedProp.price || 0;
+      const propAmenities = (propObj.amenities && propObj.amenities.length > 0) ? propObj.amenities : (matchedProp.amenities || []);
+      const propDescription = propObj.description || matchedProp.description || '';
 
       list.push({
+        ...matchedProp,
         ...propObj,
+        amenities: propAmenities,
+        description: propDescription,
         _id: rawPropId,
         id: rawPropId,
         title: propTitle,
@@ -238,12 +248,21 @@ export default function UserDashboard({
       if (!rawPropId || seenPropertyIds.has(String(rawPropId))) return;
 
       seenPropertyIds.add(String(rawPropId));
-      const propTitle = propObj.title || t('Rental Application', 'வாடகை விண்ணப்பம்');
-      const propLoc = propObj.location || propObj.address || '';
-      const propPrice = req.agreedAmount || req.offerAmount || propObj.price || 0;
+
+      const matchedProp = (allPublicProperties || []).find((p: any) => String(p._id || p.id) === String(rawPropId)) ||
+                          (myProperties || []).find((p: any) => String(p._id || p.id) === String(rawPropId)) || {};
+
+      const propTitle = propObj.title || matchedProp.title || t('Rental Application', 'வாடகை விண்ணப்பம்');
+      const propLoc = propObj.location || propObj.address || matchedProp.location || matchedProp.address || '';
+      const propPrice = req.agreedAmount || req.offerAmount || propObj.price || matchedProp.price || 0;
+      const propAmenities = (propObj.amenities && propObj.amenities.length > 0) ? propObj.amenities : (matchedProp.amenities || []);
+      const propDescription = propObj.description || matchedProp.description || '';
 
       list.push({
+        ...matchedProp,
         ...propObj,
+        amenities: propAmenities,
+        description: propDescription,
         _id: rawPropId,
         id: rawPropId,
         title: propTitle,
@@ -288,7 +307,7 @@ export default function UserDashboard({
     });
 
     return list;
-  }, [tenantAgreements, tenantRequests, selfManagedRentals, t]);
+  }, [tenantAgreements, tenantRequests, selfManagedRentals, allPublicProperties, myProperties, t]);
 
   // Synchronize selection with props or auto-detect section
   useEffect(() => {

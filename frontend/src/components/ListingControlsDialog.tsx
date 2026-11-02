@@ -27,10 +27,7 @@ import {
   Trash2,
   Loader2,
   Tag,
-  SlidersHorizontal,
-  Sparkles,
-  Plus,
-  X
+  SlidersHorizontal
 } from 'lucide-react';
 
 interface ListingControlsDialogProps {
@@ -63,9 +60,9 @@ export default function ListingControlsDialog({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [tenantNameInputs, setTenantNameInputs] = useState<Record<string, string>>({});
-  const [customKeyInputs, setCustomKeyInputs] = useState<Record<string, string>>({});
-  const [customValInputs, setCustomValInputs] = useState<Record<string, string>>({});
   const [savingPropertyId, setSavingPropertyId] = useState<string | null>(null);
+  const [addingSectionPropId, setAddingSectionPropId] = useState<string | null>(null);
+  const [newSectionName, setNewSectionName] = useState('');
 
   const getPropId = (prop: Property): string => {
     return (prop as any)?._id || prop?.id || '';
@@ -257,6 +254,12 @@ export default function ListingControlsDialog({
     const propId = getPropId(prop);
     if (!propId) return;
 
+    // Immediate optimistic state updates
+    setInternalProperties((prev) =>
+      prev.map((p) => (getPropId(p) === propId ? { ...p, [field]: value } : p))
+    );
+    onUpdateProperty?.(propId, { [field]: value });
+
     setSavingPropertyId(propId);
     try {
       await updatePropertyMutation.mutateAsync({
@@ -282,64 +285,109 @@ export default function ListingControlsDialog({
     }
   };
 
-  // Add Extra Property Detail (Custom Detail pair)
-  const handleAddCustomDetail = async (prop: Property) => {
+  // Add Custom Section
+  const handleSaveCustomSection = async (prop: Property) => {
     const propId = getPropId(prop);
     if (!propId) return;
 
-    const key = (customKeyInputs[propId] || '').trim();
-    const value = (customValInputs[propId] || '').trim();
-
-    if (!key || !value) {
-      toast.error(t('Please enter both field name and value', 'புலப் பெயர் மற்றும் மதிப்பு இரண்டையும் உள்ளிடவும்'));
+    const trimmedName = newSectionName.trim();
+    if (!trimmedName) {
+      toast.error(t('Please enter section name', 'பிரிவின் பெயரை உள்ளிடவும்'));
       return;
     }
 
-    const currentDetails = Array.isArray(prop.customDetails) ? [...prop.customDetails] : [];
-    const updatedDetails = [...currentDetails, { key, value }];
+    const currentSections = Array.isArray(prop.customSections) ? [...prop.customSections] : [];
+    const updatedSections = [...currentSections, { title: trimmedName, enabled: true }];
+
+    // Immediate state updates
+    setInternalProperties((prev) =>
+      prev.map((p) => (getPropId(p) === propId ? { ...p, customSections: updatedSections } : p))
+    );
+    onUpdateProperty?.(propId, { customSections: updatedSections });
+
+    setAddingSectionPropId(null);
+    setNewSectionName('');
 
     setSavingPropertyId(propId);
     try {
       await updatePropertyMutation.mutateAsync({
         id: propId,
         data: {
-          customDetails: updatedDetails,
+          customSections: updatedSections,
         } as any,
       });
 
-      setCustomKeyInputs((prev) => ({ ...prev, [propId]: '' }));
-      setCustomValInputs((prev) => ({ ...prev, [propId]: '' }));
-      toast.success(t(`Added detail: ${key} - ${value}`, `விவரம் சேர்க்கப்பட்டது: ${key} - ${value}`));
+      toast.success(t(`Added section: ${trimmedName}`, `பிரிவு சேர்க்கப்பட்டது: ${trimmedName}`));
       onPropertyUpdated?.();
     } catch (err: any) {
-      toast.error(err?.response?.data?.msg || t('Failed to add custom detail', 'விவரத்தை சேர்க்க முடியவில்லை'));
+      toast.error(err?.response?.data?.msg || t('Failed to save section', 'பிரிவை சேமிக்க முடியவில்லை'));
     } finally {
       setSavingPropertyId(null);
     }
   };
 
-  // Remove Extra Property Detail
-  const handleRemoveCustomDetail = async (prop: Property, indexToRemove: number) => {
+  // Toggle Custom Section Switch
+  const handleToggleCustomSection = async (prop: Property, indexToToggle: number, enabled: boolean) => {
     const propId = getPropId(prop);
     if (!propId) return;
 
-    const currentDetails = Array.isArray(prop.customDetails) ? [...prop.customDetails] : [];
-    const removedItem = currentDetails[indexToRemove];
-    const updatedDetails = currentDetails.filter((_, idx) => idx !== indexToRemove);
+    const currentSections = Array.isArray(prop.customSections) ? [...prop.customSections] : [];
+    const updatedSections = currentSections.map((sec, idx) =>
+      idx === indexToToggle ? { ...sec, enabled } : sec
+    );
+
+    // Immediate state updates
+    setInternalProperties((prev) =>
+      prev.map((p) => (getPropId(p) === propId ? { ...p, customSections: updatedSections } : p))
+    );
+    onUpdateProperty?.(propId, { customSections: updatedSections });
 
     setSavingPropertyId(propId);
     try {
       await updatePropertyMutation.mutateAsync({
         id: propId,
         data: {
-          customDetails: updatedDetails,
+          customSections: updatedSections,
         } as any,
       });
 
-      toast.success(t(`Removed: ${removedItem?.key || 'Detail'}`, `நீக்கப்பட்டது: ${removedItem?.key || 'விவரம்'}`));
+      toast.success(t('Section visibility updated', 'பிரிவு தெரிவுநிலை புதுப்பிக்கப்பட்டது'));
       onPropertyUpdated?.();
     } catch (err: any) {
-      toast.error(err?.response?.data?.msg || t('Failed to remove custom detail', 'விவரத்தை நீக்க முடியவில்லை'));
+      toast.error(err?.response?.data?.msg || t('Failed to update section', 'பிரிவை புதுப்பிக்க முடியவில்லை'));
+    } finally {
+      setSavingPropertyId(null);
+    }
+  };
+
+  // Delete Custom Section
+  const handleDeleteCustomSection = async (prop: Property, indexToDelete: number) => {
+    const propId = getPropId(prop);
+    if (!propId) return;
+
+    const currentSections = Array.isArray(prop.customSections) ? [...prop.customSections] : [];
+    const target = currentSections[indexToDelete];
+    const updatedSections = currentSections.filter((_, idx) => idx !== indexToDelete);
+
+    // Immediate state updates
+    setInternalProperties((prev) =>
+      prev.map((p) => (getPropId(p) === propId ? { ...p, customSections: updatedSections } : p))
+    );
+    onUpdateProperty?.(propId, { customSections: updatedSections });
+
+    setSavingPropertyId(propId);
+    try {
+      await updatePropertyMutation.mutateAsync({
+        id: propId,
+        data: {
+          customSections: updatedSections,
+        } as any,
+      });
+
+      toast.success(t(`Deleted section: ${target?.title || ''}`, `பிரிவு நீக்கப்பட்டது: ${target?.title || ''}`));
+      onPropertyUpdated?.();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.msg || t('Failed to delete section', 'பிரிவை நீக்க முடியவில்லை'));
     } finally {
       setSavingPropertyId(null);
     }
@@ -563,20 +611,78 @@ export default function ListingControlsDialog({
 
                   {/* Control 3: Configure Visible Sections */}
                   <div className="p-3.5 rounded-xl bg-white dark:bg-card border border-slate-200/80 dark:border-border/60 space-y-3">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <SlidersHorizontal className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                        <span className="text-xs font-bold text-foreground">
-                          {t('Configure Visible Sections', 'தெரியும் பகுதிகளை உள்ளமைக்கவும்')}
-                        </span>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <SlidersHorizontal className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                          <span className="text-xs font-bold text-foreground">
+                            {t('Configure Visible Sections', 'தெரியும் பகுதிகளை உள்ளமைக்கவும்')}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          {t(
+                            'Toggle which sections are visible to prospective buyers or tenants.',
+                            'சாத்தியமான வாங்குபவர்கள் அல்லது வாடகைதாரர்களுக்கு எந்தப் பகுதிகள் தெரிய வேண்டும் என்பதைத் தேர்வுசெய்க.'
+                          )}
+                        </p>
                       </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        {t(
-                          'Toggle which sections are visible to prospective buyers or tenants.',
-                          'சாத்தியமான வாங்குபவர்கள் அல்லது வாடகைதாரர்களுக்கு எந்தப் பகுதிகள் தெரிய வேண்டும் என்பதைத் தேர்வுசெய்க.'
-                        )}
-                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (addingSectionPropId === propId) {
+                            setAddingSectionPropId(null);
+                            setNewSectionName('');
+                          } else {
+                            setAddingSectionPropId(propId);
+                            setNewSectionName('');
+                          }
+                        }}
+                        className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-base font-bold shadow-sm cursor-pointer"
+                        title={t('Add section', 'பிரிவைச் சேர்')}
+                      >
+                        +
+                      </button>
                     </div>
+
+                    {/* Inline Add Section Form */}
+                    {addingSectionPropId === propId && (
+                      <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-muted/40 border border-slate-200/80 dark:border-border/60">
+                        <input
+                          type="text"
+                          value={newSectionName}
+                          onChange={(e) => setNewSectionName(e.target.value)}
+                          placeholder={t('Enter section name...', 'பிரிவின் பெயரை உள்ளிடவும்...')}
+                          className="flex-1 px-3 py-1.5 text-xs bg-white dark:bg-background border border-slate-200 dark:border-border rounded-lg text-foreground focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSaveCustomSection(prop);
+                            } else if (e.key === 'Escape') {
+                              setAddingSectionPropId(null);
+                              setNewSectionName('');
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveCustomSection(prop)}
+                          className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-xs cursor-pointer"
+                        >
+                          {t('Save', 'சேமி')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddingSectionPropId(null);
+                            setNewSectionName('');
+                          }}
+                          className="px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground rounded-lg cursor-pointer font-medium"
+                        >
+                          {t('Cancel', 'ரத்து')}
+                        </button>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                       {/* Toggle 1: Show Price / Rent Rate */}
@@ -654,93 +760,42 @@ export default function ListingControlsDialog({
                           disabled={isBusy}
                         />
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Control 4: Custom Details ("Add Extra Thing") */}
-                  <div className="p-3.5 rounded-xl bg-white dark:bg-card border border-slate-200/80 dark:border-border/60 space-y-3">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <Sparkles className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                        <span className="text-xs font-bold text-foreground">
-                          {t('Add Extra Property Details ("Add Extra Thing")', 'கூடுதல் சொத்து விவரங்கள் ("கூடுதல் விவரம் சேர்க்கவும்")')}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        {t(
-                          'Add custom specifications like Electricity Meter, Water Supply, Floor Number, etc. Displayed directly in Specifications & Details.',
-                          'மின்சார மீட்டர், நீர் வழங்கல், தரை எண் போன்ற தனிப்பயன் விவரங்களைச் சேர்க்கவும். விவரங்கள் அட்டையில் நேரடியாகக் காட்டப்படும்.'
-                        )}
-                      </p>
-                    </div>
-
-                    {/* Input Row: Field Name + Field Value + Add Button */}
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-                      <div className="sm:col-span-5">
-                        <Input
-                          value={customKeyInputs[propId] || ''}
-                          onChange={(e) => setCustomKeyInputs((prev) => ({ ...prev, [propId]: e.target.value }))}
-                          placeholder={t('Field Name (e.g., Electricity Meter)', 'புலப் பெயர் (எ.கா., மின்சார மீட்டர்)')}
-                          className="h-8 text-xs rounded-lg bg-slate-50 dark:bg-muted/40 border-slate-200 dark:border-border"
-                          disabled={isBusy}
-                        />
-                      </div>
-                      <div className="sm:col-span-5">
-                        <Input
-                          value={customValInputs[propId] || ''}
-                          onChange={(e) => setCustomValInputs((prev) => ({ ...prev, [propId]: e.target.value }))}
-                          placeholder={t('Field Value (e.g., Separate, 24/7 Borewell)', 'புல மதிப்பு (எ.கா., தனி, 24/7 போர்வெல்)')}
-                          className="h-8 text-xs rounded-lg bg-slate-50 dark:bg-muted/40 border-slate-200 dark:border-border"
-                          disabled={isBusy}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleAddCustomDetail(prop);
-                            }
-                          }}
-                        />
-                      </div>
-                      <div className="sm:col-span-2">
-                        <Button
-                          size="sm"
-                          disabled={isBusy}
-                          onClick={() => handleAddCustomDetail(prop)}
-                          className="w-full h-8 px-3 text-xs rounded-lg bg-blue-600 hover:bg-blue-700 text-white shrink-0 font-medium flex items-center justify-center gap-1 shadow-xs"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          {t('Add', 'சேர்')}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Removable Badge Tags */}
-                    {Array.isArray(prop.customDetails) && prop.customDetails.length > 0 && (
-                      <div className="pt-2 border-t border-slate-100 dark:border-border/50 space-y-1.5">
-                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
-                          {t('Custom Fields Active', 'செயலில் உள்ள தனிப்பயன் புலங்கள்')} ({prop.customDetails.length}):
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {prop.customDetails.map((detail, idx) => (
-                            <div
-                              key={idx}
-                              className="inline-flex items-center gap-1.5 text-xs py-1 px-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 border border-blue-200 dark:border-blue-800 shadow-2xs font-medium"
-                            >
-                              <span className="font-semibold text-blue-700 dark:text-blue-300">{detail.key}:</span>
-                              <span>{detail.value}</span>
-                              <button
-                                type="button"
-                                disabled={isBusy}
-                                onClick={() => handleRemoveCustomDetail(prop, idx)}
-                                className="ml-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-full p-0.5 transition-colors"
-                                title={t('Remove detail', 'விவரத்தை நீக்கு')}
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
+                      {/* Dynamic Custom Sections */}
+                      {Array.isArray(prop.customSections) &&
+                        prop.customSections.map((sec, idx) => (
+                          <div
+                            key={`custom-sec-${idx}`}
+                            className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-50/70 dark:bg-muted/30 border border-slate-200/60 dark:border-border/40"
+                          >
+                            <div className="space-y-0.5 min-w-0 pr-1 flex-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-xs font-semibold text-foreground block truncate">
+                                  {sec.title}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCustomSection(prop, idx)}
+                                  className="text-slate-400 hover:text-rose-500 opacity-60 hover:opacity-100 transition-opacity p-0.5 cursor-pointer"
+                                  title={t('Delete section', 'பிரிவை நீக்கு')}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
+                              <span className="text-[10px] text-muted-foreground block truncate">
+                                {sec.enabled !== false
+                                  ? t('Section visible', 'பிரிவு தெரியும்')
+                                  : t('Section hidden', 'பிரிவு மறைக்கப்பட்டது')}
+                              </span>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                            <Switch
+                              checked={sec.enabled !== false}
+                              onCheckedChange={(checked) => handleToggleCustomSection(prop, idx, checked)}
+                              disabled={isBusy}
+                            />
+                          </div>
+                        ))}
+                    </div>
                   </div>
                 </div>
               );

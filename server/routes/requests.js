@@ -270,7 +270,7 @@ router.post('/', auth, async (req, res) => {
 
     const populatedRequest = await Request.findById(savedRequest._id)
       .populate('tenant', 'name email phone')
-      .populate('property', 'title location price images transactionType propertyType saleStatus occupancyStatus');
+      .populate('property');
 
     res.json(populatedRequest);
   } catch (err) {
@@ -285,7 +285,7 @@ router.get('/owner', auth, async (req, res) => {
     const requests = await Request.find({ owner: req.user.id })
       .populate('tenant', 'name email phone address idType idNumber age dateOfBirth gender maritalStatus familyMembers religion occupation companyName monthlyIncome idProofImage')
       .populate('agreement')
-      .populate('property', 'title location price images transactionType propertyType saleStatus occupancyStatus')
+      .populate('property')
       .sort({ createdAt: -1 });
     res.json(requests);
   } catch (err) {
@@ -300,7 +300,7 @@ router.get('/tenant', auth, async (req, res) => {
     const requests = await Request.find({ tenant: req.user.id })
       .populate('owner', 'name email phone')
       .populate('agreement')
-      .populate('property', 'title location price images transactionType propertyType saleStatus occupancyStatus')
+      .populate('property')
       .sort({ createdAt: -1 });
     res.json(requests);
   } catch (err) {
@@ -316,7 +316,7 @@ router.get('/:id', auth, async (req, res) => {
       .populate('owner', 'name email phone')
       .populate('tenant', 'name email phone address idType idNumber age dateOfBirth gender maritalStatus familyMembers religion occupation companyName monthlyIncome idProofImage')
       .populate('agreement')
-      .populate('property', 'title location price images transactionType propertyType saleStatus occupancyStatus');
+      .populate('property');
 
     if (!request) return res.status(404).json({ msg: 'Request not found' });
 
@@ -378,7 +378,7 @@ router.put('/:id/counteroffer', auth, async (req, res) => {
     const populated = await Request.findById(request._id)
       .populate('owner', 'name email phone')
       .populate('tenant', 'name email phone')
-      .populate('property', 'title location price images transactionType propertyType saleStatus occupancyStatus');
+      .populate('property');
 
     res.json(populated);
   } catch (err) {
@@ -431,7 +431,7 @@ router.put('/:id/accept-counter', auth, async (req, res) => {
     const populated = await Request.findById(request._id)
       .populate('owner', 'name email phone')
       .populate('tenant', 'name email phone')
-      .populate('property', 'title location price images transactionType propertyType saleStatus occupancyStatus');
+      .populate('property');
 
     res.json(populated);
   } catch (err) {
@@ -524,7 +524,7 @@ const handleAcceptOrApprove = async (req, res) => {
     const populated = await Request.findById(request._id)
       .populate('owner', 'name email phone')
       .populate('tenant', 'name email phone')
-      .populate('property', 'title location price images transactionType propertyType saleStatus occupancyStatus');
+      .populate('property');
 
     res.json(populated);
   } catch (err) {
@@ -580,7 +580,7 @@ router.put('/:id/confirm-terms', auth, async (req, res) => {
     const populated = await Request.findById(request._id)
       .populate('owner', 'name email phone')
       .populate('tenant', 'name email phone')
-      .populate('property', 'title location price images transactionType propertyType saleStatus occupancyStatus');
+      .populate('property');
 
     res.json(populated);
   } catch (err) {
@@ -696,7 +696,7 @@ router.put('/:id/payment', auth, async (req, res) => {
     const populated = await Request.findById(request._id)
       .populate('owner', 'name email phone')
       .populate('tenant', 'name email phone')
-      .populate('property', 'title location price images transactionType propertyType saleStatus occupancyStatus');
+      .populate('property');
 
     res.json(populated);
   } catch (err) {
@@ -895,7 +895,7 @@ router.put('/:id/verify-payment', auth, async (req, res) => {
       .populate('owner', 'name email phone')
       .populate('tenant', 'name email phone')
       .populate('agreement')
-      .populate('property', 'title location price images transactionType propertyType saleStatus occupancyStatus');
+      .populate('property');
 
     res.json(populated);
   } catch (err) {
@@ -986,7 +986,7 @@ router.put('/:id/complete', auth, async (req, res) => {
       .populate('owner', 'name email phone')
       .populate('tenant', 'name email phone')
       .populate('agreement')
-      .populate('property', 'title location price images transactionType propertyType saleStatus occupancyStatus');
+      .populate('property');
 
     res.json(populated);
   } catch (err) {
@@ -1044,7 +1044,7 @@ router.put('/:id/reject-payment', auth, async (req, res) => {
     const populated = await Request.findById(request._id)
       .populate('owner', 'name email phone')
       .populate('tenant', 'name email phone')
-      .populate('property', 'title location price images transactionType propertyType saleStatus occupancyStatus');
+      .populate('property');
 
     res.json(populated);
   } catch (err) {
@@ -1105,7 +1105,7 @@ router.put('/:id/reject', auth, async (req, res) => {
     const populated = await Request.findById(request._id)
       .populate('owner', 'name email phone')
       .populate('tenant', 'name email phone')
-      .populate('property', 'title location price images transactionType propertyType saleStatus occupancyStatus');
+      .populate('property');
 
     res.json(populated);
   } catch (err) {
@@ -1164,7 +1164,7 @@ router.put('/:id/cancel', auth, async (req, res) => {
     const populated = await Request.findById(request._id)
       .populate('owner', 'name email phone')
       .populate('tenant', 'name email phone')
-      .populate('property', 'title location price images transactionType propertyType saleStatus occupancyStatus');
+      .populate('property');
 
     res.json(populated);
   } catch (err) {
