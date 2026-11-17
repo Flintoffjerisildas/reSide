@@ -52,6 +52,7 @@ export interface Property {
   monthlyMaintenance?: number;
   reraNumber?: string;
   ownershipType?: string;
+  googleMapsLink?: string;
   geoLocation?: GeoLocation | null;
   geoLocatedImage?: string | null;
   tenant?: string | {
@@ -98,6 +99,15 @@ export interface Property {
   showAddress?: boolean;
   showAmenities?: boolean;
   acceptOffers?: boolean;
+  isSelfManaged?: boolean;
+  category?: string;
+  totalUnits?: number;
+  rentDueDate?: string;
+  rentDueDay?: number;
+  leaseStartDate?: string | Date;
+  leaseEndDate?: string | Date;
+  contactNumber?: string;
+  maintenanceDetails?: string;
   customDetails?: Array<{ key: string; value: string }>;
   customSections?: Array<{ title: string; enabled: boolean }>;
 }
@@ -198,11 +208,21 @@ export interface PropertyInput {
   monthlyMaintenance?: number;
   reraNumber?: string;
   ownershipType?: string;
+  googleMapsLink?: string;
   geoLocation?: GeoLocation | null;
   showPrice?: boolean;
   showAddress?: boolean;
   showAmenities?: boolean;
   acceptOffers?: boolean;
+  isSelfManaged?: boolean;
+  category?: string;
+  totalUnits?: number;
+  rentDueDate?: string;
+  rentDueDay?: number;
+  leaseStartDate?: string | Date;
+  leaseEndDate?: string | Date;
+  contactNumber?: string;
+  maintenanceDetails?: string;
   customDetails?: Array<{ key: string; value: string }>;
   customSections?: Array<{ title: string; enabled: boolean }>;
 }

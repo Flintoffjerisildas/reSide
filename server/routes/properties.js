@@ -125,6 +125,7 @@ router.post('/', auth, async (req, res) => {
       description,
       amenities,
       images,
+      googleMapsLink,
       geoLocation,
       totalArea,
       bedrooms,
@@ -133,7 +134,18 @@ router.post('/', auth, async (req, res) => {
       monthlyMaintenance,
       reraNumber,
       ownershipType,
-      listingStatus
+      listingStatus,
+      isSelfManaged,
+      category,
+      totalUnits,
+      rentDueDate,
+      rentDueDay,
+      leaseStartDate,
+      leaseEndDate,
+      contactNumber,
+      ownerName,
+      maintenanceDetails,
+      occupancyStatus
     } = req.body;
 
     const initialListingStatus = listingStatus === 'unlisted' ? 'unlisted' : 'listed';
@@ -155,14 +167,25 @@ router.post('/', auth, async (req, res) => {
       reraNumber: reraNumber || undefined,
       ownershipType: ownershipType || undefined,
       images,
+      googleMapsLink,
       geoLocation,
       owner: req.user.id,
+      ownerName: ownerName || undefined,
       status: 'approved', // Auto-approve for demo purposes
       listingStatus: initialListingStatus,
       isListed: initialListingStatus === 'listed',
       listedAt: initialListingStatus === 'listed' ? new Date() : null,
-      occupancyStatus: 'vacant',
-      saleStatus: 'available'
+      occupancyStatus: occupancyStatus ? String(occupancyStatus).toLowerCase() : 'vacant',
+      saleStatus: 'available',
+      isSelfManaged: Boolean(isSelfManaged),
+      category: category || 'owned',
+      totalUnits: totalUnits ? Number(totalUnits) : 1,
+      rentDueDate: rentDueDate || undefined,
+      rentDueDay: rentDueDay ? Number(rentDueDay) : 5,
+      leaseStartDate: leaseStartDate ? new Date(leaseStartDate) : undefined,
+      leaseEndDate: leaseEndDate ? new Date(leaseEndDate) : undefined,
+      contactNumber: contactNumber || undefined,
+      maintenanceDetails: maintenanceDetails || undefined
     });
 
     const property = await newProperty.save();
@@ -308,6 +331,7 @@ router.put('/:id', auth, async (req, res) => {
       description,
       amenities,
       images,
+      googleMapsLink,
       geoLocation,
       totalArea,
       bedrooms,
@@ -356,6 +380,7 @@ router.put('/:id', auth, async (req, res) => {
     if (typeof description === 'string') propertyFields.description = description;
     if (Array.isArray(amenities)) propertyFields.amenities = amenities;
     if (images) propertyFields.images = images;
+    if (googleMapsLink !== undefined) propertyFields.googleMapsLink = googleMapsLink;
     if (geoLocation) propertyFields.geoLocation = geoLocation;
     if (totalArea !== undefined) propertyFields.totalArea = totalArea;
     if (bedrooms !== undefined) propertyFields.bedrooms = bedrooms;
@@ -478,6 +503,7 @@ router.post('/admin', auth, auth.requireAdmin, async (req, res) => {
       description,
       amenities,
       images,
+      googleMapsLink,
       geoLocation,
       totalArea,
       bedrooms,
@@ -503,6 +529,7 @@ router.post('/admin', auth, auth.requireAdmin, async (req, res) => {
       bedrooms,
       facing,
       images,
+      googleMapsLink,
       geoLocation,
       owner: ownerId,
       status: status || 'approved',

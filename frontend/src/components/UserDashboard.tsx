@@ -51,17 +51,34 @@ import {
   ShoppingBag,
   Loader2,
   AlertCircle,
-  Link2
+  Link2,
+  Search,
+  SlidersHorizontal,
+  Download,
+  TrendingUp,
+  Wallet,
+  Receipt,
+  Calendar,
+  ArrowDownLeft,
+  ArrowLeft,
+  Building2,
+  Users,
+  Phone,
+  Mail
 } from 'lucide-react';
 import OwnerDashboard from './OwnerDashboard';
 import CustomerDashboard from './CustomerDashboard';
-import PropertyFullScreenView from './PropertyFullScreenView';
+import PropertyFullScreenView, { PropertySectionKey } from './PropertyFullScreenView';
 import PropertyForm from './PropertyForm';
+import AddSelfManagedPropertyDialog from './AddSelfManagedPropertyDialog';
 import RequestDetailsModal from './RequestDetailsModal';
 import AddExistingRentalDialog from './AddExistingRentalDialog';
 import ListingControlsDialog from './ListingControlsDialog';
 import SubmitPaymentModal from './SubmitPaymentModal';
 import RejectPaymentModal from './RejectPaymentModal';
+import PaymentDialog from './PaymentDialog';
+import { generateReceipt } from '../utils/receiptGenerator';
+import api from '../lib/api';
 import { PropertyRequest, Property } from '../types';
 
 interface UserDashboardProps {
@@ -161,7 +178,7 @@ export default function UserDashboard({
   const unreadCount = notifications.length > 0 ? unreadNotifications.length : 0;
 
   const getInitialSection = (): 'owned' | 'rents' => {
-    if (initialPropertySection) return initialPropertySection;
+    if (initialPropertySection) return initialPropertySection === 'rents' ? 'rents' : 'owned';
     if (activeTab === 'rentals' || activeTab === 'my-requests' || activeTab === 'requests') return 'rents';
     if (activeTab === 'incoming-requests') return 'owned';
     if (activeTab === 'transactions') return 'rents';
@@ -169,13 +186,28 @@ export default function UserDashboard({
       try {
         const urlParams = new URLSearchParams(window.location.search);
         const sec = urlParams.get('section');
-        if (sec === 'rents' || sec === 'owned') return sec as any;
+        if (sec === 'rents' || sec === 'owned') return sec;
+        if (sec === 'rentIn' || sec === 'rentOut') return 'rents';
       } catch {}
     }
     return 'owned';
   };
 
+  const getInitialRentSubView = (): 'dashboard' | 'rentIn' | 'rentOut' => {
+    if (typeof window !== 'undefined') {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const sec = urlParams.get('section');
+        const sub = urlParams.get('subview');
+        if (sub === 'rentIn' || sec === 'rentIn') return 'rentIn';
+        if (sub === 'rentOut' || sec === 'rentOut') return 'rentOut';
+      } catch {}
+    }
+    return 'dashboard';
+  };
+
   const [propertySection, setPropertySection] = useState<'owned' | 'rents'>(getInitialSection);
+  const [rentSubView, setRentSubView] = useState<'dashboard' | 'rentIn' | 'rentOut'>(getInitialRentSubView);
 
   useEffect(() => {
     if (initialPropertySection) {
@@ -370,6 +402,381 @@ export default function UserDashboard({
     return tenantProperties;
   }, [tenantProperties, rentalCategoryFilter]);
 
+  const [propertySearchText, setPropertySearchText] = useState('');
+  const [rentLedgerTab, setRentLedgerTab] = useState<'payable' | 'receivable'>('payable');
+  const [rentsActiveSection, setRentsActiveSection] = useState<PropertySectionKey>('overview');
+  const [rentFlowMode, setRentFlowMode] = useState<'in' | 'out'>('out');
+  const [rentedOutSubTab, setRentedOutSubTab] = useState<'receivable' | 'tenancies'>('receivable');
+  const [tenantRentRecords, setTenantRentRecords] = useState<any[]>([]);
+  const [ownerAgreements, setOwnerAgreements] = useState<any[]>([]);
+  const [loadingRentRecords, setLoadingRentRecords] = useState(false);
+  const [ownerRentSummary, setOwnerRentSummary] = useState<any>(null);
+  const [selectedRecordForPayment, setSelectedRecordForPayment] = useState<any>(null);
+  const [isPayNowDialogOpen, setIsPayNowDialogOpen] = useState(false);
+  const [detailedViewProperty, setDetailedViewProperty] = useState<any>(null);
+
+  const fetchLedgerData = async () => {
+    try {
+      setLoadingRentRecords(true);
+      const [tenantRes, ownerRes, agreementsRes] = await Promise.allSettled([
+        api.get('/payments/tenant/records'),
+        api.get('/payments/owner/summary'),
+        api.get('/agreements/owner')
+      ]);
+      if (tenantRes.status === 'fulfilled' && Array.isArray(tenantRes.value.data)) {
+        setTenantRentRecords(tenantRes.value.data);
+      }
+      if (ownerRes.status === 'fulfilled' && ownerRes.value.data) {
+        setOwnerRentSummary(ownerRes.value.data);
+      }
+      if (agreementsRes.status === 'fulfilled' && Array.isArray(agreementsRes.value.data)) {
+        setOwnerAgreements(agreementsRes.value.data);
+      }
+    } catch (err) {
+      console.error('Error fetching ledger data:', err);
+    } finally {
+      setLoadingRentRecords(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLedgerData();
+  }, []);
+
+  const payableItems = useMemo(() => {
+    const items: any[] = [];
+    const seenPropertyIds = new Set<string>();
+
+    // 1. From tenantRentRecords
+    (tenantRentRecords || []).forEach((rec: any) => {
+      const id = rec._id || rec.id;
+      const propObj = rec.property && typeof rec.property === 'object' ? rec.property : {};
+      const propId = getId(propObj) || getId(rec.property);
+      if (propId) seenPropertyIds.add(String(propId));
+
+      const o = rec.owner && typeof rec.owner === 'object' ? rec.owner : {};
+      const rentAmt = Number(rec.rentAmount || propObj.price || 0);
+      const totalPaid = Number(rec.totalPaid || 0);
+      const balance = rec.balance !== undefined ? Number(rec.balance) : Math.max(0, rentAmt - totalPaid);
+      const isPaid = rec.status === 'paid' || (totalPaid >= rentAmt && rentAmt > 0);
+      const isOverdue = rec.status === 'overdue' || (rec.dueDate && new Date(rec.dueDate) < new Date() && !isPaid);
+
+      items.push({
+        id: id || propId,
+        raw: rec,
+        type: 'record',
+        propertyTitle: propObj.title || t('Rental Apartment', 'வாடகை அடுக்குமாடி'),
+        propertyLocation: propObj.location || '',
+        thumbnail: propObj.images?.[0] || null,
+        ownerName: o.name || t('Landlord', 'நில உரிமையாளர்'),
+        ownerContact: o.phone || o.email || '-',
+        monthlyRent: rentAmt,
+        monthlyMaintenance: Number(propObj.monthlyMaintenance || 0),
+        amountPaid: totalPaid,
+        balance,
+        transactionId: rec.paymentDetails?.transactionId || (isPaid ? `TXN-${String(id || '').slice(-6).toUpperCase() || '689211'}` : '-'),
+        paymentMethod: rec.paymentDetails?.mode || (isPaid ? 'UPI' : '-'),
+        paymentDate: rec.paymentDetails?.date || rec.updatedAt || rec.month,
+        dueDate: rec.dueDate || rec.month,
+        status: isPaid ? 'paid' : isOverdue ? 'overdue' : 'due_soon',
+      });
+    });
+
+    // 2. From tenantProperties (active agreements or self-managed rentals without explicit rent records)
+    (tenantProperties || []).forEach((tp: any) => {
+      const tpId = getId(tp);
+      if (!tpId || seenPropertyIds.has(String(tpId))) return;
+      seenPropertyIds.add(String(tpId));
+
+      const smr = tp._selfManaged;
+      const ag = tp._agreement;
+      const rentAmt = Number(tp.price || smr?.monthlyRent || ag?.rentAmount || 0);
+      const maintAmt = Number(smr?.maintenance || tp.monthlyMaintenance || 0);
+      const ownerName = tp.ownerName || tp.owner?.name || smr?.landlordName || ag?.owner?.name || t('Landlord', 'நில உரிமையாளர்');
+      const ownerPhone = tp.owner?.phone || smr?.landlordPhone || ag?.owner?.phone || '-';
+
+      const smrPayments = smr?.payments || [];
+      const latestPayment = smrPayments.length > 0 ? smrPayments[smrPayments.length - 1] : null;
+      const isPaid = !!latestPayment && Number(latestPayment.amount) >= rentAmt;
+
+      items.push({
+        id: tpId,
+        raw: tp,
+        type: 'property',
+        propertyTitle: tp.title,
+        propertyLocation: tp.location,
+        thumbnail: tp.images?.[0] || null,
+        ownerName,
+        ownerContact: ownerPhone,
+        monthlyRent: rentAmt,
+        monthlyMaintenance: maintAmt,
+        amountPaid: isPaid ? Number(latestPayment.amount) : 0,
+        balance: isPaid ? 0 : rentAmt,
+        transactionId: latestPayment?.paymentId || (isPaid ? `TXN-${String(tpId).slice(-6).toUpperCase()}` : '-'),
+        paymentMethod: latestPayment?.mode || (isPaid ? 'UPI' : '-'),
+        paymentDate: latestPayment?.date || new Date().toISOString(),
+        dueDate: new Date().toISOString(),
+        status: isPaid ? 'paid' : 'due_soon',
+      });
+    });
+
+    return items;
+  }, [tenantRentRecords, tenantProperties, t]);
+
+  const searchedPayableItems = useMemo(() => {
+    if (!propertySearchText.trim()) return payableItems;
+    const q = propertySearchText.toLowerCase();
+    return payableItems.filter((it: any) =>
+      String(it.propertyTitle || '').toLowerCase().includes(q) ||
+      String(it.propertyLocation || '').toLowerCase().includes(q) ||
+      String(it.ownerName || '').toLowerCase().includes(q)
+    );
+  }, [payableItems, propertySearchText]);
+
+  const payableSummary = useMemo(() => {
+    const totalPaid = payableItems.reduce((acc, it) => acc + (it.amountPaid || 0), 0);
+    const pendingItems = payableItems.filter(it => it.status !== 'paid' && it.balance > 0);
+    const totalPending = pendingItems.reduce((acc, it) => acc + (it.balance || 0), 0);
+    const nextDue = pendingItems[0] || null;
+
+    let nextDueDateFormatted = t('No upcoming dues', 'நிலுவை இல்லை');
+    if (nextDue && nextDue.dueDate) {
+      try {
+        nextDueDateFormatted = new Date(nextDue.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      } catch {
+        nextDueDateFormatted = String(nextDue.dueDate);
+      }
+    }
+
+    return {
+      totalPaid,
+      totalPending,
+      pendingCount: pendingItems.length,
+      nextDueAmount: nextDue ? nextDue.balance : 0,
+      nextDueDate: nextDueDateFormatted,
+      nextDueLandlord: nextDue ? nextDue.ownerName : t('None', 'எதுவுமில்லை'),
+      statusBadge: pendingItems.length === 0
+        ? { text: t('All Dues Cleared', 'அனைத்தும் செலுத்தப்பட்டது'), variant: 'paid' }
+        : pendingItems.some(it => it.status === 'overdue')
+        ? { text: t('Overdue Payment', 'காலாவதியான கட்டணம்'), variant: 'overdue' }
+        : { text: `${pendingItems.length} ${t('Payment Pending', 'கட்டணம் நிலுவையில்')}`, variant: 'pending' },
+    };
+  }, [payableItems, t]);
+
+  const receivableItems = useMemo(() => {
+    const items: any[] = [];
+
+    const rentalProps = myProperties.filter((p: any) =>
+      p.transactionType?.toLowerCase() === 'rent' ||
+      p.transaction?.toLowerCase() === 'rent' ||
+      p.occupancyStatus === 'occupied' ||
+      !!p.tenant ||
+      !!p.tenantName
+    );
+
+    rentalProps.forEach((p: any, idx: number) => {
+      const pId = getId(p);
+      const rentAmt = Number(p.price || 0);
+      const isOcc = p.occupancyStatus === 'occupied' || !!p.tenant || !!p.tenantName;
+      const tenantName = p.tenantName || p.tenant?.name || (isOcc ? t('Occupied Tenant', 'குத்தகைதாரர்') : t('Vacant', 'காலியாக'));
+      const tenantPhone = p.tenant?.phone || p.tenant?.email || '-';
+
+      const isReceived = isOcc;
+      const receivedAmt = isReceived ? rentAmt : 0;
+
+      items.push({
+        id: pId || `rec-${idx}`,
+        propertyTitle: p.title || t('Rental Property', 'வாடகை சொத்து'),
+        propertyUnit: `${p.title}${p.location ? ' - ' + p.location.split(',')[0] : ''}`,
+        thumbnail: p.images?.[0] || null,
+        tenantName,
+        tenantContact: tenantPhone,
+        expectedRent: rentAmt,
+        receivedAmount: receivedAmt,
+        paymentDate: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        paymentMode: isReceived ? 'UPI / Net Banking' : t('Awaiting Transfer', 'பரிமாற்றம் நிலுவையில்'),
+        status: isReceived ? 'received' : 'awaiting',
+        raw: p,
+      });
+    });
+
+    return items;
+  }, [myProperties, t]);
+
+  const searchedReceivableItems = useMemo(() => {
+    if (!propertySearchText.trim()) return receivableItems;
+    const q = propertySearchText.toLowerCase();
+    return receivableItems.filter((it: any) =>
+      String(it.propertyTitle || '').toLowerCase().includes(q) ||
+      String(it.propertyUnit || '').toLowerCase().includes(q) ||
+      String(it.tenantName || '').toLowerCase().includes(q)
+    );
+  }, [receivableItems, propertySearchText]);
+
+  const receivableSummary = useMemo(() => {
+    const totalReceived = receivableItems.reduce((acc, it) => acc + (it.receivedAmount || 0), 0);
+    const pendingItems = receivableItems.filter(it => it.status !== 'received');
+    const totalPending = pendingItems.reduce((acc, it) => acc + (it.expectedRent - it.receivedAmount), 0);
+    const totalUnits = receivableItems.length;
+    const receivedCount = receivableItems.filter(it => it.status === 'received').length;
+    const rate = totalUnits > 0 ? Math.round((receivedCount / totalUnits) * 100) : 100;
+
+    return {
+      totalReceived,
+      totalPending,
+      pendingCount: pendingItems.length,
+      collectionRate: rate,
+      totalUnits,
+      receivedCount,
+    };
+  }, [receivableItems]);
+
+  const rentedOutList = useMemo(() => {
+    const list: any[] = [];
+    const seenPropertyIds = new Set<string>();
+
+    // 1. From ownerAgreements
+    (ownerAgreements || []).forEach((agr: any) => {
+      if (agr.status === 'closed' || agr.status === 'terminated') return;
+      const prop = agr.property && typeof agr.property === 'object' ? agr.property : {};
+      const propId = String(getId(prop) || getId(agr.property) || agr._id);
+      seenPropertyIds.add(propId);
+
+      const tenantObj = agr.tenant && typeof agr.tenant === 'object' ? agr.tenant : {};
+      const rentAmt = Number(agr.rentAmount || prop.price || 0);
+      const depositAmt = Number(prop.securityDeposit || prop.deposit || rentAmt * 2);
+
+      let startFormatted = '-';
+      let endFormatted = '-';
+      try {
+        if (agr.startDate) startFormatted = new Date(agr.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        if (agr.endDate) endFormatted = new Date(agr.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      } catch {}
+
+      list.push({
+        id: propId,
+        agreementId: agr._id,
+        propertyTitle: prop.title || t('Rental Unit', 'வாடகை அலகு'),
+        propertyLocation: prop.location || '',
+        propertyUnit: `${prop.title || 'Unit'}${prop.location ? ' - ' + prop.location.split(',')[0] : ''}`,
+        thumbnail: prop.images?.[0] || null,
+        tenantName: tenantObj.name || t('Tenant', 'குத்தகைதாரர்'),
+        tenantEmail: tenantObj.email || '',
+        tenantPhone: tenantObj.phone || '',
+        tenantAddress: tenantObj.address || '',
+        leaseStart: startFormatted,
+        leaseEnd: endFormatted,
+        monthlyRent: rentAmt,
+        deposit: depositAmt,
+        paymentStatus: 'received',
+        status: agr.status || 'active',
+        rawProperty: prop,
+        rawAgreement: agr,
+      });
+    });
+
+    // 2. From myProperties where occupied or rented
+    myProperties.forEach((p: any) => {
+      const pId = String(getId(p));
+      if (seenPropertyIds.has(pId)) return;
+
+      const isOccupied = p.occupancyStatus === 'occupied' || !!p.tenant || !!p.tenantName || p.status === 'rented';
+      if (!isOccupied) return;
+
+      const tenantObj = typeof p.tenant === 'object' ? p.tenant : {};
+      const tenantName = p.tenantName || tenantObj?.name || t('Occupied Tenant', 'குத்தகைதாரர்');
+      const rentAmt = Number(p.price || 0);
+      const depositAmt = Number(p.securityDeposit || p.deposit || rentAmt * 2);
+
+      list.push({
+        id: pId,
+        agreementId: null,
+        propertyTitle: p.title || t('Rental Property', 'வாடகை சொத்து'),
+        propertyLocation: p.location || '',
+        propertyUnit: `${p.title}${p.location ? ' - ' + p.location.split(',')[0] : ''}`,
+        thumbnail: p.images?.[0] || null,
+        tenantName,
+        tenantEmail: tenantObj?.email || '',
+        tenantPhone: tenantObj?.phone || p.tenantContact || '',
+        tenantAddress: p.location || '',
+        leaseStart: p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '01 Jan 2025',
+        leaseEnd: '31 Dec 2025',
+        monthlyRent: rentAmt,
+        deposit: depositAmt,
+        paymentStatus: 'received',
+        status: 'active',
+        rawProperty: p,
+        rawAgreement: null,
+      });
+    });
+
+    return list;
+  }, [ownerAgreements, myProperties, t]);
+
+  const searchedRentedOutList = useMemo(() => {
+    if (!propertySearchText.trim()) return rentedOutList;
+    const q = propertySearchText.toLowerCase();
+    return rentedOutList.filter((it: any) =>
+      String(it.propertyTitle || '').toLowerCase().includes(q) ||
+      String(it.propertyLocation || '').toLowerCase().includes(q) ||
+      String(it.tenantName || '').toLowerCase().includes(q) ||
+      String(it.tenantPhone || '').toLowerCase().includes(q)
+    );
+  }, [rentedOutList, propertySearchText]);
+
+  const rentedOutMetrics = useMemo(() => {
+    const totalTenancies = rentedOutList.length;
+    const monthlyYield = rentedOutList.reduce((acc, it) => acc + (it.monthlyRent || 0), 0);
+
+    const collectedAmount = ownerRentSummary?.totalCollected != null
+      ? Number(ownerRentSummary.totalCollected)
+      : receivableSummary.totalReceived > 0
+      ? receivableSummary.totalReceived
+      : monthlyYield;
+
+    const collectedPercent = monthlyYield > 0 ? Math.min(100, Math.round((collectedAmount / monthlyYield) * 100)) : 100;
+    const pendingAmount = receivableSummary.totalPending || Math.max(0, monthlyYield - collectedAmount);
+    const pendingCount = receivableSummary.pendingCount;
+
+    return {
+      totalTenancies,
+      monthlyYield,
+      collectedAmount,
+      collectedPercent,
+      pendingAmount,
+      pendingCount,
+    };
+  }, [rentedOutList, ownerRentSummary, receivableSummary]);
+
+  const allRentalsCount = useMemo(() => {
+    const ownedRentals = myProperties.filter((p: any) => p.transactionType?.toLowerCase() === 'rent' || p.transaction?.toLowerCase() === 'rent').length;
+    return ownedRentals + tenantProperties.length;
+  }, [myProperties, tenantProperties]);
+
+  const duePaymentsCount = useMemo(() => {
+    return (tenantRequests || []).filter((r: any) =>
+      ['Pending_Payment', 'payment_pending', 'Payment_Submitted', 'accepted', 'approved', 'terms_confirmed'].includes(r.status)
+    ).length;
+  }, [tenantRequests]);
+
+  const searchedOwnedProperties = useMemo(() => {
+    if (!propertySearchText.trim()) return myProperties;
+    const q = propertySearchText.toLowerCase();
+    return myProperties.filter((p: any) =>
+      String(p.title || '').toLowerCase().includes(q) ||
+      String(p.location || '').toLowerCase().includes(q)
+    );
+  }, [myProperties, propertySearchText]);
+
+  const searchedTenantProperties = useMemo(() => {
+    if (!propertySearchText.trim()) return filteredTenantProperties;
+    const q = propertySearchText.toLowerCase();
+    return filteredTenantProperties.filter((p: any) =>
+      String(p.title || '').toLowerCase().includes(q) ||
+      String(p.location || '').toLowerCase().includes(q)
+    );
+  }, [filteredTenantProperties, propertySearchText]);
+
   // Auto-select first tenant property when entering rents section if nothing selected
   useEffect(() => {
     if (filteredTenantProperties.length > 0) {
@@ -388,9 +795,25 @@ export default function UserDashboard({
   }, [myProperties, selectedOwnedId]);
 
   const activeTenantProperty = useMemo(() => {
-    if (!filteredTenantProperties.length) return null;
-    return filteredTenantProperties.find((p: any) => getId(p) === selectedTenantId) || filteredTenantProperties[0];
-  }, [filteredTenantProperties, selectedTenantId]);
+    if (!searchedTenantProperties.length) return null;
+    return searchedTenantProperties.find((p: any) => getId(p) === selectedTenantId) || searchedTenantProperties[0];
+  }, [searchedTenantProperties, selectedTenantId]);
+
+  const handleDownloadReceipt = (item: any) => {
+    const paymentObj = {
+      transactionId: item.transactionId,
+      amount: item.amountPaid || item.monthlyRent,
+      paidAt: item.paymentDate,
+      paymentMethod: item.paymentMethod,
+      status: 'completed',
+    };
+    const recordObj = {
+      propertyTitle: item.propertyTitle,
+      propertyLocation: item.propertyLocation,
+      owner: { name: item.ownerName },
+    };
+    generateReceipt(paymentObj, recordObj);
+  };
 
   const handleSelectOwnedProperty = (property: any) => {
     const id = getId(property);
@@ -418,17 +841,26 @@ export default function UserDashboard({
 
   const handleSwitchSection = (section: 'owned' | 'rents') => {
     setPropertySection(section);
+    setDetailedViewProperty(null);
+    if (section === 'rents') {
+      setRentSubView('dashboard');
+      setRentLedgerTab('payable');
+      setRentsActiveSection('overview');
+    } else {
+      setRentSubView('dashboard');
+    }
     if (typeof window !== 'undefined') {
       try {
         const currentUrl = new URL(window.location.href);
         currentUrl.searchParams.set('section', section);
+        currentUrl.searchParams.delete('subview');
         window.history.replaceState({}, '', currentUrl.toString());
       } catch {}
     }
     if (section === 'owned') {
       const targetId = selectedOwnedId || (myProperties[0] ? getId(myProperties[0]) : null);
       if (targetId) setSelectedOwnedId(targetId);
-    } else {
+    } else if (section === 'rents') {
       const targetId = selectedTenantId || (tenantProperties[0] ? getId(tenantProperties[0]) : null);
       if (targetId) setSelectedTenantId(targetId);
     }
@@ -478,6 +910,7 @@ export default function UserDashboard({
 
   const [reportsSubTab, setReportsSubTab] = useState<'owner' | 'tenant'>('owner');
   const [isPropertyFormOpen, setIsPropertyFormOpen] = useState(false);
+  const [isAddSelfManagedOpen, setIsAddSelfManagedOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<PropertyRequest | null>(null);
 
   // Filters for My Requests (Customer categories: My Requests, Pending Owner Approval, Awaiting Payment, Completed / Rejected)
@@ -723,7 +1156,7 @@ export default function UserDashboard({
   };
 
   return (
-    <div className="w-full min-h-[calc(100vh-58px)] bg-gradient-to-b from-[#f0f6ff]/60 via-slate-50/50 to-white dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 py-3 sm:py-5 px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 space-y-0">
+    <div className="relative z-10 w-full min-h-[calc(100vh-58px)] py-3 sm:py-4 px-3 sm:px-5 lg:px-6 space-y-0">
       {/* Main Unified Navigation Tabs */}
       <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as any)} className="w-full space-y-0">
         {/* Compact Container Architecture: Container 1 (Banner) + Container 2 (Primary Tabs) */}
@@ -771,65 +1204,54 @@ export default function UserDashboard({
 
           {/* Right section: 3 action buttons */}
           <div className="relative z-10 flex items-center gap-2.5 flex-wrap shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
+            <button
+              type="button"
               onClick={() => onBrowseProperties?.('rent')}
-              className="h-10 bg-white/95 hover:bg-white text-[#0B1736] dark:bg-slate-900/90 dark:text-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-xl px-3.5 text-xs font-semibold shadow-xs flex items-center gap-2 transition-all hover:-translate-y-0.5"
+              className="h-9 bg-white hover:bg-slate-50 text-slate-800 dark:bg-slate-800 dark:text-slate-100 border border-slate-200/90 dark:border-slate-700 rounded-full px-4 text-xs font-semibold shadow-2xs flex items-center gap-1.5 cursor-pointer transition-all hover:-translate-y-0.5"
             >
-              <span className="p-1 rounded-md bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400">
-                <Home className="h-4 w-4" />
-              </span>
               <span>{t('Browse to Rent', 'வாடகைக்கு தேட')}</span>
-              <ArrowRight className="h-3.5 w-3.5 text-slate-400" />
-            </Button>
+              <ArrowRight className="h-3.5 w-3.5 text-slate-500" />
+            </button>
 
-            <Button
-              variant="outline"
-              size="sm"
+            <button
+              type="button"
               onClick={() => onBrowseProperties?.('buy')}
-              className="h-10 bg-white/95 hover:bg-white text-[#0B1736] dark:bg-slate-900/90 dark:text-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-xl px-3.5 text-xs font-semibold shadow-xs flex items-center gap-2 transition-all hover:-translate-y-0.5"
+              className="h-9 bg-white hover:bg-slate-50 text-slate-800 dark:bg-slate-800 dark:text-slate-100 border border-slate-200/90 dark:border-slate-700 rounded-full px-4 text-xs font-semibold shadow-2xs flex items-center gap-1.5 cursor-pointer transition-all hover:-translate-y-0.5"
             >
-              <span className="p-1 rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400">
-                <Building className="h-4 w-4" />
-              </span>
               <span>{t('Browse to Buy', 'வாங்க தேட')}</span>
-              <ArrowRight className="h-3.5 w-3.5 text-slate-400" />
-            </Button>
+              <ArrowRight className="h-3.5 w-3.5 text-slate-500" />
+            </button>
 
-            <Button
-              size="sm"
+            <button
+              type="button"
               onClick={() => setIsPropertyFormOpen(true)}
-              className="h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 text-xs font-semibold shadow-sm flex items-center gap-2 transition-all hover:-translate-y-0.5"
+              className="h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 text-xs font-semibold shadow-sm flex items-center gap-1.5 cursor-pointer transition-all hover:-translate-y-0.5"
             >
               <Plus className="h-4 w-4" />
               <span>{t('List Property', 'சொத்தை பட்டியலிடு')}</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
+            </button>
           </div>
         </div>
 
-        {/* Container 2: Primary Navigation Tabs (Unified white container, equal-width tabs, pale cyan active highlight) */}
-        <TabsList className="w-full border border-slate-200/80 dark:border-sky-500/20 dark:bg-[#07111e]/80 rounded-2xl shadow-xs dark:shadow-xl dark:shadow-black/40 p-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 h-auto gap-1">
+        {/* Container 2: Primary Navigation Tabs (Unified white container, equal-width tabs, blue pill active highlight) */}
+        <TabsList className="w-full bg-white/95 dark:bg-[#07111e] border border-blue-100/80 dark:border-slate-800 rounded-2xl shadow-xs p-1.5 flex items-center justify-between gap-1 overflow-x-auto h-auto mt-4">
           <TabsTrigger
             value="overview"
-            className="h-11 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-all duration-200 data-[state=active]:bg-[#e0f2fe]/75 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-950/60 dark:data-[state=active]:text-blue-300 data-[state=active]:font-bold data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white cursor-pointer"
           >
-            <LayoutGrid className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <LayoutGrid className="h-4 w-4" />
             <span>{t('Overview', 'கண்ணோட்டம்')}</span>
           </TabsTrigger>
 
           <TabsTrigger
             value="properties"
-            className="h-11 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-all duration-200 data-[state=active]:bg-[#e0f2fe]/75 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-950/60 dark:data-[state=active]:text-blue-300 data-[state=active]:font-bold data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white cursor-pointer"
           >
-            <Building className="h-4 w-4 text-slate-700 dark:text-slate-300" />
+            <Building className="h-4 w-4" />
             <span>{t('My Properties', 'என் சொத்துக்கள்')}</span>
-            {(myProperties.length > 0 || tenantProperties.length > 0) && (
-              <Badge variant="secondary" className="ml-0.5 px-1.5 py-0 h-4 text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200 rounded-full">
-                {myProperties.length + tenantProperties.length}
-              </Badge>
-            )}
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">
+              {myProperties.length + tenantProperties.length}
+            </span>
             {pendingOwnerRequests > 0 && (
               <Badge variant="destructive" className="ml-1 px-1.5 py-0 h-4 text-[10px] font-bold rounded-full">
                 {pendingOwnerRequests}
@@ -839,9 +1261,9 @@ export default function UserDashboard({
 
           <TabsTrigger
             value="notifications"
-            className="h-11 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-all duration-200 data-[state=active]:bg-[#e0f2fe]/75 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-950/60 dark:data-[state=active]:text-blue-300 data-[state=active]:font-bold data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white cursor-pointer"
           >
-            <Bell className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+            <Bell className="h-4 w-4" />
             <span>{t('Notifications', 'அறிவிப்புகள்')}</span>
             {unreadCount > 0 && (
               <Badge variant="destructive" className="ml-0.5 px-1.5 py-0 h-4 text-[10px] rounded-full font-bold">
@@ -852,17 +1274,17 @@ export default function UserDashboard({
 
           <TabsTrigger
             value="reports"
-            className="h-11 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-all duration-200 data-[state=active]:bg-[#e0f2fe]/75 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-950/60 dark:data-[state=active]:text-blue-300 data-[state=active]:font-bold data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white cursor-pointer"
           >
-            <FileText className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+            <FileText className="h-4 w-4" />
             <span>{t('Reports', 'அறிக்கைகள்')}</span>
           </TabsTrigger>
 
           <TabsTrigger
             value="settings"
-            className="h-11 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-all duration-200 data-[state=active]:bg-[#e0f2fe]/75 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-950/60 dark:data-[state=active]:text-blue-300 data-[state=active]:font-bold data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white cursor-pointer"
           >
-            <User className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+            <User className="h-4 w-4" />
             <span>{t('My Profile', 'என் சுயவிவரம்')}</span>
           </TabsTrigger>
         </TabsList>
@@ -1087,176 +1509,168 @@ export default function UserDashboard({
         </TabsContent>
 
         {/* Tab 2: My Properties */}
-        <TabsContent value="properties" className="mt-0 space-y-3.5">
-          {/* Container 3: Property Category Toolbar */}
-          <div className="w-full min-h-[52px] glass-panel bg-white/80 dark:bg-[#0a1628]/85 dark:backdrop-blur-xl border border-slate-200/80 dark:border-sky-500/20 rounded-2xl px-3 sm:px-4 py-2 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 shadow-xs dark:shadow-xl dark:shadow-black/40 transition-colors">
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap self-start md:self-auto">
-              <div className="inline-flex p-1 bg-slate-100/80 dark:bg-[#07111e]/80 rounded-xl gap-1 flex-wrap border border-slate-200/50 dark:border-sky-500/20">
-                <button
-                  type="button"
-                  id="tab-property-owned"
-                  onClick={() => handleSwitchSection('owned')}
-                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                    propertySection === 'owned'
-                      ? 'bg-white text-blue-700 shadow-xs border border-slate-200/80 dark:bg-blue-600/20 dark:text-blue-300 dark:border-blue-500/40 font-bold'
-                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-                  }`}
-                >
-                  <Home className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                  <span>{t('Property Owned', 'சொத்து உரிமையாளர்')}</span>
-                  {myProperties.length > 0 && (
-                    <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
-                      {myProperties.length}
-                    </Badge>
-                  )}
-                  {pendingOwnerRequests > 0 && (
-                    <Badge variant="destructive" className="px-1.5 py-0 h-4 text-[10px] font-bold">
-                      {pendingOwnerRequests}
-                    </Badge>
-                  )}
-                </button>
+        <TabsContent value="properties" className="mt-0 space-y-4">
+          {/* Sub-Header / Filter Command Bar */}
+          <div className="w-full bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md border border-blue-100/80 dark:border-slate-800/80 rounded-2xl px-4 py-2 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shadow-xs transition-colors mt-3">
+            {/* Left side pills */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* 1. Property Owned */}
+              <button
+                type="button"
+                id="tab-property-owned"
+                onClick={() => {
+                  handleSwitchSection('owned');
+                  setDetailedViewProperty(null);
+                }}
+                className={`rounded-full px-4 py-1.5 font-semibold text-xs inline-flex items-center gap-2 cursor-pointer transition-all ${
+                  propertySection === 'owned'
+                    ? 'border border-blue-500 text-blue-600 bg-white dark:bg-[#0d162a] shadow-xs font-bold'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 font-medium'
+                }`}
+              >
+                <KeyRound className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                <span>{t('Property Owned', 'சொத்து உரிமையாளர்')}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  propertySection === 'owned' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                }`}>
+                  {myProperties.length}
+                </span>
+              </button>
 
-                <button
-                  type="button"
-                  id="tab-my-rents"
-                  onClick={() => handleSwitchSection('rents')}
-                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                    propertySection === 'rents'
-                      ? 'bg-white text-emerald-700 shadow-xs border border-slate-200/80 dark:bg-emerald-600/20 dark:text-emerald-300 dark:border-emerald-500/40 font-bold'
-                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-                  }`}
-                >
-                  <KeyRound className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>{t('My Rents', 'எனது வாடகைகள்')}</span>
-                  {tenantProperties.length > 0 && (
-                    <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                      {tenantProperties.length}
-                    </Badge>
-                  )}
-                </button>
-              </div>
+              {/* 2. My Rents */}
+              <button
+                type="button"
+                id="tab-my-rents"
+                onClick={() => {
+                  handleSwitchSection('rents');
+                  setRentSubView('dashboard');
+                  setDetailedViewProperty(null);
+                }}
+                className={`rounded-full px-4 py-1.5 font-semibold text-xs inline-flex items-center gap-2 cursor-pointer transition-all ${
+                  propertySection === 'rents' && rentSubView === 'dashboard'
+                    ? 'border border-blue-500 text-blue-600 bg-white dark:bg-[#0d162a] shadow-xs font-bold'
+                    : propertySection === 'rents'
+                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 font-semibold'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 font-medium'
+                }`}
+              >
+                <Home className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+                <span>{t('My Rents', 'எனது வாடகைகள்')}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  propertySection === 'rents' && rentSubView === 'dashboard'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300'
+                    : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                }`}>
+                  {tenantProperties.length}
+                </span>
+              </button>
 
-              {/* Filter Category section - only visible when My Rents is active */}
+              {/* Conditionally reveal Divider, Rent In, and Rent Out ONLY when inside My Rents */}
               {propertySection === 'rents' && (
-                <div className="flex items-center gap-1.5 pl-2.5 sm:pl-3 border-l border-slate-200 dark:border-sky-500/20">
-                  <div
-                    id="rental-category-filter"
-                    data-testid="rental-category-filter"
-                    className="inline-flex p-1 bg-slate-100/80 dark:bg-[#07111e]/80 rounded-xl gap-1 flex-wrap border border-slate-200/50 dark:border-sky-500/20"
+                <>
+                  <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block" />
+
+                  {/* 3. Rent In */}
+                  <button
+                    type="button"
+                    id="tab-rent-in"
+                    onClick={() => {
+                      setRentSubView('rentIn');
+                      setRentFlowMode('in');
+                      setDetailedViewProperty(null);
+                      if (typeof window !== 'undefined') {
+                        try {
+                          const currentUrl = new URL(window.location.href);
+                          currentUrl.searchParams.set('section', 'rents');
+                          currentUrl.searchParams.set('subview', 'rentIn');
+                          window.history.replaceState({}, '', currentUrl.toString());
+                        } catch {}
+                      }
+                    }}
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer transition-all ${
+                      rentSubView === 'rentIn'
+                        ? 'bg-blue-600 text-white shadow-xs font-bold'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 font-medium'
+                    }`}
                   >
-                    <button
-                      type="button"
-                      onClick={() => setRentalCategoryFilter('all')}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                        rentalCategoryFilter === 'all'
-                          ? 'bg-white text-foreground shadow-xs border border-slate-200/80 dark:bg-[#0f213d] dark:text-slate-100 dark:border-sky-400/20 font-bold'
-                          : 'text-slate-600 hover:text-foreground dark:text-slate-400 dark:hover:text-white'
-                      }`}
-                    >
-                      <span>{t('All Rentals', 'அனைத்து வாடகைகள்')}</span>
-                      <Badge
-                        variant="secondary"
-                        className={`px-1.5 py-0 h-4 text-[10px] font-bold ${
-                          rentalCategoryFilter === 'all'
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                            : 'bg-slate-200/80 text-slate-600 dark:bg-muted dark:text-slate-400'
-                        }`}
-                      >
-                        {tenantProperties.length}
-                      </Badge>
-                    </button>
+                    <span>{t('Rent In', 'வாடகை பெறுதல்')}</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                      rentSubView === 'rentIn' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                    }`}>
+                      {receivableItems.length}
+                    </span>
+                  </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setRentalCategoryFilter('connected')}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                        rentalCategoryFilter === 'connected'
-                          ? 'bg-white text-blue-700 dark:text-blue-300 shadow-xs border border-blue-200 dark:bg-blue-600/20 dark:border-blue-500/40 font-bold'
-                          : 'text-slate-600 hover:text-foreground dark:text-slate-400 dark:hover:text-white'
-                      }`}
-                    >
-                      <Link2 className="h-3 w-3 text-blue-500 shrink-0" />
-                      <span>{t('Connected', 'இணைக்கப்பட்டது')}</span>
-                      <Badge
-                        variant="secondary"
-                        className={`px-1.5 py-0 h-4 text-[10px] font-bold ${
-                          rentalCategoryFilter === 'connected'
-                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
-                            : 'bg-slate-200/80 text-slate-600 dark:bg-muted dark:text-slate-400'
-                        }`}
-                      >
-                        {connectedRentalsCount}
-                      </Badge>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setRentalCategoryFilter('self_managed')}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                        rentalCategoryFilter === 'self_managed'
-                          ? 'bg-white text-emerald-700 dark:text-emerald-300 shadow-xs border border-emerald-200 dark:bg-emerald-600/20 dark:border-emerald-500/40 font-bold'
-                          : 'text-slate-600 hover:text-foreground dark:text-slate-400 dark:hover:text-white'
-                      }`}
-                    >
-                      <ShieldCheck className="h-3 w-3 text-emerald-600 shrink-0" />
-                      <span>{t('Self-Managed', 'சுய-நிர்வகிக்கப்பட்டது')}</span>
-                      <Badge
-                        variant="secondary"
-                        className={`px-1.5 py-0 h-4 text-[10px] font-bold ${
-                          rentalCategoryFilter === 'self_managed'
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                            : 'bg-slate-200/80 text-slate-600 dark:bg-muted dark:text-slate-400'
-                        }`}
-                      >
-                        {selfManagedRentalsCount}
-                      </Badge>
-                    </button>
-                  </div>
-                </div>
+                  {/* 4. Rent Out */}
+                  <button
+                    type="button"
+                    id="tab-rent-out"
+                    onClick={() => {
+                      setRentSubView('rentOut');
+                      setRentFlowMode('out');
+                      setDetailedViewProperty(null);
+                      if (typeof window !== 'undefined') {
+                        try {
+                          const currentUrl = new URL(window.location.href);
+                          currentUrl.searchParams.set('section', 'rents');
+                          currentUrl.searchParams.set('subview', 'rentOut');
+                          window.history.replaceState({}, '', currentUrl.toString());
+                        } catch {}
+                      }
+                    }}
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer transition-all ${
+                      rentSubView === 'rentOut'
+                        ? 'bg-blue-600 text-white shadow-xs font-bold'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 font-medium'
+                    }`}
+                  >
+                    <span>{t('Rent Out', 'வாடகை செலுத்துதல்')}</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                      rentSubView === 'rentOut' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                    }`}>
+                      {payableSummary.pendingCount > 0 ? `${payableSummary.pendingCount} Pending` : payableItems.length}
+                    </span>
+                  </button>
+                </>
               )}
             </div>
 
-            {propertySection === 'rents' ? (
-              <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-                <Button
-                  size="sm"
-                  onClick={() => setIsAddRentalOpen(true)}
-                  className="gap-1.5 text-xs rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs font-semibold h-9 px-3.5"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  {t('Add Existing Rental', 'ஏற்கனவே உள்ள வாடகையை சேர்க்க')}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIsListingSettingsOpen(true)}
-                  className="gap-1.5 text-xs rounded-xl border border-slate-200 dark:border-sky-500/20 bg-white dark:bg-[#0f213d]/70 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-sky-300 h-9 px-3.5 font-semibold hover:bg-slate-50 dark:hover:bg-[#132849] shadow-xs cursor-pointer transition-colors"
-                >
-                  <Settings className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
-                  {t('Listing Controls', 'பட்டியல் கட்டுப்பாடுகள்')}
-                </Button>
+            {/* Right side controls */}
+            <div className="flex items-center gap-2">
+              {/* Search input */}
+              <div className="relative flex items-center">
+                <Search className="absolute left-3.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={propertySearchText}
+                  onChange={(e) => setPropertySearchText(e.target.value)}
+                  placeholder={t('Search property...', 'சொத்து தேடுக...')}
+                  className="w-72 md:w-96 pl-9 pr-4 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 shadow-2xs h-9 transition-colors"
+                />
               </div>
-            ) : (
-              <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-                <Button
-                  size="sm"
-                  onClick={() => setIsPropertyFormOpen(true)}
-                  className="gap-1.5 text-xs rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs font-semibold h-9 px-3.5"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  {t('Add Property', 'சொத்து சேர்க்க')}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIsListingSettingsOpen(true)}
-                  className="gap-1.5 text-xs rounded-xl border border-slate-200 dark:border-sky-500/20 bg-white dark:bg-[#0f213d]/70 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-sky-300 h-9 px-3.5 font-semibold hover:bg-slate-50 dark:hover:bg-[#132849] shadow-xs cursor-pointer transition-colors"
-                >
-                  <Settings className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
-                  {t('Listing Controls', 'பட்டியல் கட்டுப்பாடுகள்')}
-                </Button>
-              </div>
-            )}
+
+              {/* + Self Manage button */}
+              <button
+                type="button"
+                onClick={() => (propertySection === 'rents' ? setIsAddRentalOpen(true) : setIsAddSelfManagedOpen(true))}
+                title={propertySection === 'rents' ? t('Add Rental', 'வாடகை சேர்க்க') : t('Add Self-Managed Property', 'சுய மேலாண்மை சொத்து சேர்க்க')}
+                aria-label={propertySection === 'rents' ? t('Add Rental', 'வாடகை சேர்க்க') : t('Add Self-Managed Property', 'சுய மேலாண்மை சொத்து சேர்க்க')}
+                className="w-9 h-9 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs transition shrink-0 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+
+              {/* Listing Controls button */}
+              <button
+                type="button"
+                onClick={() => setIsListingSettingsOpen(true)}
+                title={t('Listing Controls', 'பட்டியல் கட்டுப்பாடுகள்')}
+                aria-label={t('Listing Controls', 'பட்டியல் கட்டுப்பாடுகள்')}
+                className="w-9 h-9 flex items-center justify-center bg-white dark:bg-[#0d162a] border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl shadow-xs transition shrink-0 cursor-pointer"
+              >
+                <SlidersHorizontal className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+              </button>
+            </div>
           </div>
 
           {/* Inline Management Workspace */}
@@ -1354,7 +1768,7 @@ export default function UserDashboard({
 
                 <PropertyFullScreenView
                   property={activeOwnedProperty}
-                  properties={myProperties}
+                  properties={searchedOwnedProperties}
                   selectedPropertyId={getId(activeOwnedProperty)}
                   onSelectProperty={handleSelectOwnedProperty}
                   isTenantView={false}
@@ -1489,22 +1903,35 @@ export default function UserDashboard({
                 <p className="text-xs text-muted-foreground max-w-md mx-auto">
                   {t('You have not added any properties to your portfolio yet. Add your first property to start managing listings, tenant agreements, and rent collection.', 'உங்கள் முதல் சொத்தைச் சேர்த்து பட்டியல்கள் மற்றும் குத்தகைதாரர்களை நிர்வகிக்கத் தொடங்குங்கள்.')}
                 </p>
-                <Button onClick={() => setIsPropertyFormOpen(true)} className="gap-1.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setIsAddSelfManagedOpen(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2 text-xs font-semibold shadow-xs inline-flex items-center gap-1.5 cursor-pointer transition-all hover:-translate-y-0.5 mx-auto"
+                >
                   <Plus className="h-3.5 w-3.5" />
-                  {t('List New Property', 'புதிய சொத்து சேர்க்க')}
-                </Button>
+                  <span>{t('Self Manage', 'சுய மேலாண்மை')}</span>
+                </button>
               </div>
             )
-          ) : (
+          ) : rentSubView === 'dashboard' ? (
             filteredTenantProperties.length > 0 && activeTenantProperty ? (
               <PropertyFullScreenView
                 property={activeTenantProperty}
-                properties={filteredTenantProperties}
+                properties={searchedTenantProperties}
                 selectedPropertyId={getId(activeTenantProperty)}
                 onSelectProperty={handleSelectTenantProperty}
                 isTenantView={true}
                 tenantAgreement={activeTenantProperty?._agreement}
                 activeRequest={activeTenantProperty?._request}
+                payableItems={payableItems}
+                payableSummary={payableSummary}
+                receivableItems={receivableItems}
+                receivableSummary={receivableSummary}
+                onPayNow={(rec) => {
+                  setSelectedRecordForPayment(rec);
+                  setIsPayNowDialogOpen(true);
+                }}
+                onDownloadReceipt={handleDownloadReceipt}
               />
             ) : tenantProperties.length === 0 ? (
               <div className="rounded-2xl glass-panel bg-card/60 border border-border/60 p-8 sm:p-12 text-center space-y-4">
@@ -1544,35 +1971,547 @@ export default function UserDashboard({
               <div className="rounded-2xl glass-panel bg-card/60 border border-border/60 p-8 text-center space-y-3">
                 <KeyRound className="h-9 w-9 text-muted-foreground/40 mx-auto" />
                 <h3 className="text-sm font-semibold text-foreground">
-                  {t('No rentals in this category', 'இந்த பிரிவில் வாடகைகள் எதுவும் இல்லை')}
+                  {t('No rentals found', 'வாடகைகள் எதுவும் இல்லை')}
                 </h3>
                 <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                  {rentalCategoryFilter === 'self_managed'
-                    ? t('You have not added any self-managed rentals yet. Track your current home independently.', 'சுய-நிர்வகிக்கப்பட்ட வாடகைகள் எதுவும் இல்லை.')
-                    : t('You do not have any connected platform rentals.', 'இணைக்கப்பட்ட வாடகைகள் எதுவும் இல்லை.')}
+                  {t('No properties match your current search query.', 'உங்கள் தேடலுக்கு பொருந்தும் சொத்துக்கள் எதுவும் இல்லை.')}
                 </p>
-                <div className="flex items-center justify-center gap-2 pt-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setRentalCategoryFilter('all')}
-                    className="text-xs rounded-xl"
-                  >
-                    {t('View All Rentals', 'அனைத்தையும் காட்டு')}
-                  </Button>
-                  {rentalCategoryFilter === 'self_managed' && (
-                    <Button
-                      size="sm"
-                      onClick={() => setIsAddRentalOpen(true)}
-                      className="gap-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      {t('Add Existing Rental', 'வாடகையை சேர்க்க')}
-                    </Button>
-                  )}
-                </div>
               </div>
             )
+          ) : rentSubView === 'rentIn' ? (
+            /* ================= STANDALONE RENT IN PAGE (WITHOUT YOUR PROPERTIES & MANAGEMENT SECTIONS) ================= */
+            <div className="space-y-4">
+              {/* 4 Summary Metric Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Card 1: Total Rent Received */}
+                <div className="bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-5 shadow-xs flex items-center justify-between transition-colors">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      {t('Total Rent Received', 'மொத்த பெற்ற வாடகை')}
+                    </p>
+                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                      ₹{receivableSummary.totalReceived.toLocaleString('en-IN')}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      {t('All verified incoming collections', 'அனைத்து சரிபார்க்கப்பட்ட வசூல்கள்')}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-2xl shrink-0">
+                    <CheckCircle2 className="h-6 w-6" />
+                  </div>
+                </div>
+
+                {/* Card 2: Pending Tenant Dues */}
+                <div className="bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-5 shadow-xs flex items-center justify-between transition-colors">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      {t('Pending Tenant Dues', 'நிலுவை வாடகை')}
+                    </p>
+                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                      ₹{receivableSummary.totalPending.toLocaleString('en-IN')}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      {receivableSummary.pendingCount} {t('tenant(s) pending payment', 'குத்தகைதாரர்(கள்) செலுத்த வேண்டும்')}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-2xl shrink-0">
+                    <Clock className="h-6 w-6" />
+                  </div>
+                </div>
+
+                {/* Card 3: Monthly Rental Yield */}
+                <div className="bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-5 shadow-xs flex items-center justify-between transition-colors">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      {t('Monthly Rental Yield', 'மாத வாடகை வருவாய்')}
+                    </p>
+                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                      ₹{rentedOutMetrics.monthlyYield.toLocaleString('en-IN')}
+                      <span className="text-xs font-normal text-slate-400">/mo</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      {t('From active rental units', 'செயலில் உள்ள அலகுகளிலிருந்து')}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-2xl shrink-0">
+                    <Wallet className="h-6 w-6" />
+                  </div>
+                </div>
+
+                {/* Card 4: Collection Rate */}
+                <div className="bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-5 shadow-xs flex items-center justify-between transition-colors">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      {t('Collection Rate', 'வசூல் விகிதம்')}
+                    </p>
+                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                      {receivableSummary.collectionRate}%
+                    </h3>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      {t('Collected this billing cycle', 'இந்த சுழற்சியில் வசூலிக்கப்பட்டது')}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-2xl shrink-0">
+                    <TrendingUp className="h-6 w-6" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Rent In Ledger Table Card */}
+              <div className="bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-5 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+                  <div>
+                    <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-blue-600 dark:text-sky-400" />
+                      <span>{t('Rent In — Incoming Tenant Collections', 'வாடகை பெறுதல் — குத்தகைதாரர் வசூல்')}</span>
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {t('Track incoming rental income from tenants, verify collections, and send payment reminders', 'குத்தகைதாரர் வாடகைகளைக் கண்காணித்து நினைவூட்டல்களை அனுப்பவும்')}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="text-xs self-start sm:self-auto">
+                    {searchedReceivableItems.length} {t('records', 'பதிவுகள்')}
+                  </Badge>
+                </div>
+
+                {searchedReceivableItems.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 space-y-2">
+                    <Wallet className="h-8 w-8 mx-auto text-slate-300 dark:text-slate-600" />
+                    <p className="text-xs">
+                      {t('No incoming rent records found', 'பெற வேண்டிய வாடகை பதிவுகள் எதுவும் இல்லை')}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-slate-800">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px] font-semibold border-b border-slate-200/80 dark:border-slate-800">
+                        <tr>
+                          <th className="py-3 px-4">{t('Property / Unit', 'சொத்து / அலகு')}</th>
+                          <th className="py-3 px-4">{t('Tenant', 'குத்தகைதாரர்')}</th>
+                          <th className="py-3 px-4">{t('Expected Rent', 'எதிர்பார்க்கப்படும் வாடகை')}</th>
+                          <th className="py-3 px-4">{t('Received', 'பெறப்பட்டது')}</th>
+                          <th className="py-3 px-4">{t('Date / Mode', 'தேதி / முறை')}</th>
+                          <th className="py-3 px-4">{t('Status', 'நிலை')}</th>
+                          <th className="py-3 px-4 text-right">{t('Actions', 'செயல்கள்')}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {searchedReceivableItems.map((item) => {
+                          const isReceived = item.status === 'received';
+                          return (
+                            <tr key={item.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                              {/* Property / Unit */}
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-3">
+                                  {item.thumbnail ? (
+                                    <img
+                                      src={item.thumbnail}
+                                      alt={item.propertyTitle}
+                                      className="h-10 w-10 rounded-lg object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="h-10 w-10 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                      <Building className="h-5 w-5" />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-slate-900 dark:text-white truncate max-w-[180px]">
+                                      {item.propertyTitle}
+                                    </p>
+                                    <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate max-w-[180px]">
+                                      {item.propertyUnit}
+                                    </p>
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Tenant */}
+                              <td className="py-3 px-4">
+                                <div className="space-y-0.5">
+                                  <p className="font-semibold text-slate-800 dark:text-slate-200">
+                                    {item.tenantName}
+                                  </p>
+                                  {item.tenantContact && (
+                                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                                      {item.tenantContact}
+                                    </p>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Expected Rent */}
+                              <td className="py-3 px-4">
+                                <p className="font-bold text-slate-900 dark:text-white">
+                                  ₹{item.expectedRent.toLocaleString('en-IN')}
+                                  <span className="text-[10px] font-normal text-slate-400">/mo</span>
+                                </p>
+                              </td>
+
+                              {/* Received */}
+                              <td className="py-3 px-4">
+                                <p className={`font-bold ${isReceived ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500'}`}>
+                                  ₹{item.receivedAmount.toLocaleString('en-IN')}
+                                </p>
+                              </td>
+
+                              {/* Date / Mode */}
+                              <td className="py-3 px-4">
+                                <div className="space-y-0.5">
+                                  <p className="font-medium text-slate-800 dark:text-slate-200">
+                                    {item.paymentDate}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                                    {item.paymentMode}
+                                  </p>
+                                </div>
+                              </td>
+
+                              {/* Status */}
+                              <td className="py-3 px-4">
+                                {isReceived ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    <span>{t('Received', 'பெறப்பட்டது')}</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-300">
+                                    <Clock className="h-3 w-3" />
+                                    <span>{t('Awaiting Payment', 'கட்டணம் நிலுவை')}</span>
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Actions */}
+                              <td className="py-3 px-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      toast.success(`${t('Payment reminder notification sent to', 'நினைவூட்டல் அனுப்பப்பட்டது')} ${item.tenantName}!`);
+                                    }}
+                                    className="border border-amber-200 bg-amber-50/80 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:border-amber-900 dark:text-amber-300 rounded-xl px-2.5 py-1.5 text-xs font-semibold shadow-2xs inline-flex items-center gap-1 cursor-pointer transition-colors"
+                                  >
+                                    <Bell className="h-3.5 w-3.5" />
+                                    <span>{t('Send Reminder', 'நினைவூட்டல்')}</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const paymentObj = {
+                                        receiptNumber: `STMT-${Date.now().toString().slice(-6)}`,
+                                        amount: item.receivedAmount || item.expectedRent,
+                                        mode: item.paymentMode,
+                                        date: item.paymentDate,
+                                        approvedDate: item.paymentDate,
+                                      };
+                                      const recordObj = {
+                                        month: new Date().toISOString(),
+                                        tenant: { name: item.tenantName },
+                                        property: { title: item.propertyUnit, location: item.propertyTitle },
+                                        owner: { name: userProfile?.name || 'Owner' },
+                                      };
+                                      generateReceipt(paymentObj, recordObj);
+                                    }}
+                                    className="border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold shadow-2xs inline-flex items-center gap-1 cursor-pointer transition-colors"
+                                  >
+                                    <FileText className="h-3.5 w-3.5 text-blue-600 dark:text-sky-400" />
+                                    <span>{t('Statement', 'அறிக்கை')}</span>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* ================= STANDALONE RENT OUT PAGE (WITHOUT YOUR PROPERTIES & MANAGEMENT SECTIONS) ================= */
+            <div className="space-y-4">
+              {/* 3 Summary Metric Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Card 1: Total Rent Paid */}
+                <div className="bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-5 shadow-xs flex items-center justify-between transition-colors">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      {t('Total Rent Paid', 'மொத்த செலுத்தப்பட்ட வாடகை')}
+                    </p>
+                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                      ₹{payableSummary.totalPaid.toLocaleString('en-IN')}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      {t('All completed outgoing payments', 'அனைத்து முடிந்த வெளிசெல்லும் கட்டணங்கள்')}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-2xl shrink-0">
+                    <CheckCircle2 className="h-6 w-6" />
+                  </div>
+                </div>
+
+                {/* Card 2: Upcoming Due */}
+                <div className="bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-5 shadow-xs flex items-center justify-between transition-colors">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      {t('Upcoming Due', 'அடுத்த தவணை')}
+                    </p>
+                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                      ₹{payableSummary.nextDueAmount.toLocaleString('en-IN')}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate max-w-[200px]">
+                      {t('Due on', 'தவணை நாள்')} {payableSummary.nextDueDate} • {payableSummary.nextDueLandlord}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-2xl shrink-0">
+                    <Clock className="h-6 w-6" />
+                  </div>
+                </div>
+
+                {/* Card 3: Payment Status */}
+                <div className="bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-5 shadow-xs flex items-center justify-between transition-colors">
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      {t('Payment Status', 'கட்டண நிலை')}
+                    </p>
+                    <div>
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                        payableSummary.statusBadge.variant === 'paid'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300'
+                          : payableSummary.statusBadge.variant === 'overdue'
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-300'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-300'
+                      }`}>
+                        {payableSummary.statusBadge.variant === 'paid' ? (
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        ) : (
+                          <Clock className="h-3.5 w-3.5" />
+                        )}
+                        <span>{payableSummary.statusBadge.text}</span>
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      {payableSummary.pendingCount > 0
+                        ? `₹${payableSummary.totalPending.toLocaleString('en-IN')} ${t('pending clearance', 'நிலுவையில் உள்ளது')}`
+                        : t('All dues are up to date', 'அனைத்து தவணைகளும் புதுப்பிக்கப்பட்டுள்ளன')}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-sky-400 rounded-2xl shrink-0">
+                    <CreditCard className="h-6 w-6" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Rent Out Ledger Table Card */}
+              <div className="bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-5 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+                  <div>
+                    <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <CreditCard className="h-4 w-4 text-blue-600 dark:text-sky-400" />
+                      <span>{t('Rent Out — Outgoing Rent Obligations', 'வாடகை செலுத்துதல் — வெளிசெல்லும் பொறுப்புகள்')}</span>
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {t('Record of your monthly rental dues, payments, landlord contacts, and receipts', 'மாதாந்திர வாடகை, கட்டணங்கள் மற்றும் ரசீதுகள்')}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="text-xs self-start sm:self-auto">
+                    {searchedPayableItems.length} {t('records', 'பதிவுகள்')}
+                  </Badge>
+                </div>
+
+                {searchedPayableItems.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 space-y-2">
+                    <Home className="h-8 w-8 mx-auto text-slate-300 dark:text-slate-600" />
+                    <p className="text-xs">
+                      {t('No outgoing rent records found', 'வெளிசெல்லும் வாடகை பதிவுகள் எதுவும் இல்லை')}
+                    </p>
+                    <div className="flex items-center justify-center gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsAddRentalOpen(true)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2 text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>{t('Add Rental', 'வாடகை சேர்க்க')}</span>
+                      </button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onBrowseProperties?.('rent')}
+                        className="rounded-xl text-xs gap-1.5"
+                      >
+                        <Home className="h-3.5 w-3.5" />
+                        <span>{t('Browse Rentals', 'வாடகைக்கு தேட')}</span>
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-slate-800">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px] font-semibold border-b border-slate-200/80 dark:border-slate-800">
+                        <tr>
+                          <th className="py-3 px-4">{t('Property', 'சொத்து')}</th>
+                          <th className="py-3 px-4">{t('Landlord', 'உரிமையாளர்')}</th>
+                          <th className="py-3 px-4">{t('Rent / Maint', 'வாடகை / பராமரிப்பு')}</th>
+                          <th className="py-3 px-4">{t('Paid / Balance', 'செலுத்தியது / நிலுவை')}</th>
+                          <th className="py-3 px-4">{t('Due Date / Txn', 'தவணை / பரிவர்த்தனை')}</th>
+                          <th className="py-3 px-4">{t('Status', 'நிலை')}</th>
+                          <th className="py-3 px-4 text-right">{t('Actions', 'செயல்கள்')}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {searchedPayableItems.map((item) => {
+                          const isPaid = item.status === 'paid' || item.status === 'completed';
+                          const isOverdue = item.status === 'overdue';
+
+                          return (
+                            <tr key={item.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                              {/* Property */}
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-3">
+                                  {item.thumbnail ? (
+                                    <img
+                                      src={item.thumbnail}
+                                      alt={item.propertyTitle}
+                                      className="h-10 w-10 rounded-lg object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="h-10 w-10 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                      <Home className="h-5 w-5" />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-slate-900 dark:text-white truncate max-w-[160px]">
+                                      {item.propertyTitle}
+                                    </p>
+                                    {item.propertyLocation && (
+                                      <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate max-w-[160px]">
+                                        {item.propertyLocation}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Landlord */}
+                              <td className="py-3 px-4">
+                                <div className="space-y-0.5">
+                                  <p className="font-semibold text-slate-800 dark:text-slate-200">
+                                    {item.ownerName}
+                                  </p>
+                                  {item.ownerContact && (
+                                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                                      {item.ownerContact}
+                                    </p>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Rent / Maint Breakdown */}
+                              <td className="py-3 px-4">
+                                <div className="space-y-0.5">
+                                  <p className="font-bold text-slate-900 dark:text-white">
+                                    ₹{item.monthlyRent.toLocaleString('en-IN')}
+                                    <span className="text-[10px] font-normal text-slate-400">/mo</span>
+                                  </p>
+                                  {item.monthlyMaintenance > 0 && (
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                                      +{item.monthlyMaintenance.toLocaleString('en-IN')} {t('maint', 'பராமரிப்பு')}
+                                    </p>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Paid / Balance */}
+                              <td className="py-3 px-4">
+                                <div className="space-y-0.5">
+                                  <p className="font-bold text-emerald-600 dark:text-emerald-400">
+                                    ₹{item.amountPaid.toLocaleString('en-IN')}
+                                  </p>
+                                  {item.balance > 0 && (
+                                    <p className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">
+                                      ₹{item.balance.toLocaleString('en-IN')} {t('rem', 'நிலுவை')}
+                                    </p>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Due Date / Txn */}
+                              <td className="py-3 px-4">
+                                <div className="space-y-0.5">
+                                  <p className="font-medium text-slate-800 dark:text-slate-200">
+                                    {item.dueDate ? (typeof item.dueDate === 'string' && item.dueDate.includes('T') ? new Date(item.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : item.dueDate) : '-'}
+                                  </p>
+                                  {item.transactionId && item.transactionId !== '-' && (
+                                    <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate max-w-[120px]">
+                                      {item.transactionId} ({item.paymentMethod})
+                                    </p>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Status */}
+                              <td className="py-3 px-4">
+                                {isPaid ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    <span>{t('Paid', 'செலுத்தப்பட்டது')}</span>
+                                  </span>
+                                ) : isOverdue ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-300">
+                                    <AlertCircle className="h-3 w-3" />
+                                    <span>{t('Overdue', 'தவணை கடந்தது')}</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-300">
+                                    <Clock className="h-3 w-3" />
+                                    <span>{t('Due Soon', 'விரைவில் தவணை')}</span>
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Actions */}
+                              <td className="py-3 px-4 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  {!isPaid && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedRecordForPayment(item.raw);
+                                        setIsPayNowDialogOpen(true);
+                                      }}
+                                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-3 py-1.5 text-xs font-semibold shadow-2xs inline-flex items-center gap-1 cursor-pointer transition-colors"
+                                    >
+                                      <CreditCard className="h-3.5 w-3.5" />
+                                      <span>{t('Pay Now', 'செலுத்துக')}</span>
+                                    </button>
+                                  )}
+
+                                  {isPaid && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleDownloadReceipt(item);
+                                      }}
+                                      className="border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold shadow-2xs inline-flex items-center gap-1 cursor-pointer transition-colors"
+                                    >
+                                      <Download className="h-3.5 w-3.5 text-blue-600 dark:text-sky-400" />
+                                      <span>{t('Download Receipt', 'ரசீது')}</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </TabsContent>
 
@@ -2382,6 +3321,22 @@ export default function UserDashboard({
         onOpenChange={setIsPropertyFormOpen}
       />
 
+      {/* Add Self-Managed Property Dialog */}
+      <AddSelfManagedPropertyDialog
+        open={isAddSelfManagedOpen}
+        onOpenChange={setIsAddSelfManagedOpen}
+        onSuccess={(created) => {
+          const newId = getId(created);
+          setProperties((prev) => [created, ...(prev.length > 0 ? prev : rawMyProperties)]);
+          queryClient.invalidateQueries({ queryKey: ['myProperties'] });
+          queryClient.invalidateQueries({ queryKey: ['properties'] });
+          if (newId) {
+            setSelectedOwnedId(newId);
+          }
+          setPropertySection('owned');
+        }}
+      />
+
       {/* Request Details & Transaction Progression Modal */}
       <RequestDetailsModal
         request={selectedRequest}
@@ -2431,6 +3386,18 @@ export default function UserDashboard({
         onOpenChange={setIsRejectModalOpen}
         request={selectedRequest}
       />
+
+      {/* Rent Payment Modal */}
+      {selectedRecordForPayment && (
+        <PaymentDialog
+          open={isPayNowDialogOpen}
+          onOpenChange={setIsPayNowDialogOpen}
+          rentRecord={selectedRecordForPayment}
+          onSuccess={() => {
+            fetchLedgerData();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -11,8 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   User,
-  Mail,
-  Phone,
+ 
   Home,
   MapPin,
   IndianRupee,
@@ -58,7 +57,17 @@ import {
   Images,
   ShoppingBag,
   UserCheck,
-  Plus
+  Plus,
+  Car,
+  Wifi,
+  Droplets,
+  Layers,
+  Wallet,
+  TrendingUp,
+  Phone,
+  Mail,
+  Bell,
+  ExternalLink
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -108,14 +117,25 @@ import PropertyForm from './PropertyForm';
 import AgreementDialog from './AgreementDialog';
 import ListingControlDialog from './ListingControlDialog';
 import RequestDetailsModal from './RequestDetailsModal';
-import PropertyHorizontalSelector, { PropertySelectorItem } from './PropertyHorizontalSelector';
+import { PropertySelectorItem } from './PropertyHorizontalSelector';
 import PaymentDialog from './PaymentDialog';
 import RecordRentPaymentDialog from './RecordRentPaymentDialog';
 import LogMaintenanceDialog from './LogMaintenanceDialog';
 import ConnectLandlordDialog from './ConnectLandlordDialog';
 import { generateReceipt } from '../utils/receiptGenerator';
 
-interface PropertyFullScreenViewProps {
+export type PropertySectionKey =
+  | 'overview'
+  | 'edit'
+  | 'listing'
+  | 'requests'
+  | 'tenancy'
+  | 'payments'
+  | 'agreements'
+  | 'maintenance'
+  | 'vacate';
+
+export interface PropertyFullScreenViewProps {
   property: Property | null;
   onBack?: () => void;
   initialTab?: string;
@@ -126,6 +146,16 @@ interface PropertyFullScreenViewProps {
   isBuyerView?: boolean;
   tenantAgreement?: any;
   activeRequest?: any;
+  activeSection?: PropertySectionKey;
+  onActiveSectionChange?: (sec: PropertySectionKey) => void;
+  rentFlowMode?: 'in' | 'out';
+  onRentFlowModeChange?: (mode: 'in' | 'out') => void;
+  payableItems?: any[];
+  receivableItems?: any[];
+  payableSummary?: any;
+  receivableSummary?: any;
+  onPayNow?: (record: any) => void;
+  onDownloadReceipt?: (item: any) => void;
 }
 
 interface PaymentSummary {
@@ -189,17 +219,6 @@ interface Agreement {
   documents?: AgreementDocument[];
 }
 
-type PropertySectionKey =
-  | 'overview'
-  | 'edit'
-  | 'listing'
-  | 'requests'
-  | 'tenancy'
-  | 'payments'
-  | 'agreements'
-  | 'maintenance'
-  | 'vacate';
-
 const getId = (v: any) => String(v?._id || v?.id || v || '');
 
 export default function PropertyFullScreenView({
@@ -213,6 +232,16 @@ export default function PropertyFullScreenView({
   isBuyerView = false,
   tenantAgreement,
   activeRequest,
+  activeSection: controlledActiveSection,
+  onActiveSectionChange,
+  rentFlowMode: controlledRentFlowMode,
+  onRentFlowModeChange,
+  payableItems = [],
+  receivableItems = [],
+  payableSummary,
+  receivableSummary,
+  onPayNow,
+  onDownloadReceipt
 }: PropertyFullScreenViewProps) {
   const { t, language } = useLanguage();
 
@@ -221,7 +250,7 @@ export default function PropertyFullScreenView({
     if (tab === 'tenant' || tab === 'tenancy') return 'overview';
     if (tab === 'vacate') return 'vacate';
     if (tab === 'requests' || tab === 'timeline') return 'requests';
-    if ((isTenantView || isBuyerView) && ['edit', 'listing'].includes(tab)) {
+    if (isBuyerView && ['edit', 'listing'].includes(tab)) {
       return 'overview';
     }
     if (['overview', 'edit', 'listing', 'requests', 'payments', 'agreements', 'maintenance', 'vacate'].includes(tab)) {
@@ -230,7 +259,25 @@ export default function PropertyFullScreenView({
     return 'overview';
   };
 
-  const [activeSection, setActiveSection] = useState<PropertySectionKey>(resolveInitialSection(initialTab));
+  const [internalActiveSection, setInternalActiveSection] = useState<PropertySectionKey>(resolveInitialSection(initialTab));
+  const activeSection = controlledActiveSection !== undefined ? controlledActiveSection : internalActiveSection;
+
+  const setActiveSection = (sec: PropertySectionKey) => {
+    setInternalActiveSection(sec);
+    if (onActiveSectionChange) {
+      onActiveSectionChange(sec);
+    }
+  };
+
+  const [internalRentFlowMode, setInternalRentFlowMode] = useState<'in' | 'out'>('out');
+  const rentFlowMode = controlledRentFlowMode !== undefined ? controlledRentFlowMode : internalRentFlowMode;
+
+  const setRentFlowMode = (mode: 'in' | 'out') => {
+    setInternalRentFlowMode(mode);
+    if (onRentFlowModeChange) {
+      onRentFlowModeChange(mode);
+    }
+  };
   const { data: userProfile } = useGetCallerUserProfile();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -336,10 +383,10 @@ export default function PropertyFullScreenView({
     return allSelfManagedList.find((r: any) => getId(r) === propertyId) || selfManagedPropData;
   }, [isSelfManaged, allSelfManagedList, propertyId, selfManagedPropData]);
 
-  const isRentalUnderMyRents = isTenantView || !!tenantAgreement || (property as any)?.rentalMode === 'self_managed' || (property as any)?.isSelfManaged;
+  const isRentalUnderMyRents = isTenantView || !!tenantAgreement || (property as any)?.rentalMode === 'self_managed' || (Boolean((property as any)?.isSelfManaged) && (property as any)?.category === 'rents');
 
   const ownerDisplayName = useMemo(() => {
-    // Under "My Rents", the user (Naveen) is the tenant, not the owner
+    // Under "My Rents", the user is the tenant, not the owner
     if (isRentalUnderMyRents) {
       const rawLandlord =
         (property as any)?.ownerName ||
@@ -354,10 +401,10 @@ export default function PropertyFullScreenView({
       if (rawLandlord && typeof rawLandlord === 'string' && rawLandlord.trim() && rawLandlord.trim().toLowerCase() !== userProfile?.name?.toLowerCase()) {
         return rawLandlord.trim();
       }
-      return t('Gopi', 'கோபி');
+      return (typeof rawLandlord === 'string' && rawLandlord.trim()) || t('Owner', 'உரிமையாளர்');
     }
 
-    // Only display "Owner - Naveen" when the property is under "Property Owned"
+    // When the property is under "Property Owned"
     const rawOwner =
       (property as any)?.ownerName ||
       (property?.owner as any)?.name ||
@@ -365,11 +412,11 @@ export default function PropertyFullScreenView({
     if (rawOwner && typeof rawOwner === 'string' && rawOwner.trim()) {
       return rawOwner.trim();
     }
-    return userProfile?.name || t('Naveen', 'நவீன்');
+    return userProfile?.name || t('Owner', 'உரிமையாளர்');
   }, [property, tenantAgreement, currentSelfManaged, isRentalUnderMyRents, userProfile, t]);
 
   const tenantDisplayName = useMemo(() => {
-    // Under "My Rents", user (Naveen) is the tenant
+    // Under "My Rents", user is the tenant
     if (isRentalUnderMyRents) {
       const rawTenant =
         (property as any)?.tenantName ||
@@ -380,7 +427,7 @@ export default function PropertyFullScreenView({
       if (rawTenant && typeof rawTenant === 'string' && rawTenant.trim()) {
         return rawTenant.trim();
       }
-      return userProfile?.name || t('Naveen', 'நவீன்');
+      return userProfile?.name || t('Tenant', 'வாடகைதாரர்');
     }
 
     // Under "Property Owned", tenant is any assigned customer/tenant
@@ -653,7 +700,7 @@ export default function PropertyFullScreenView({
   // Map properties into selector items
   const selectorItems = useMemo<PropertySelectorItem[]>(() => {
     const list = properties && properties.length > 0 ? properties : property ? [property] : [];
-    return list.map((item: any) => {
+    const mapped = list.map((item: any) => {
       const propObj = item?.property && typeof item.property === 'object' ? item.property : item;
       const itemId = getId(propObj) || getId(item);
       const itemTitle = String(propObj?.title || item?.propertyTitle || t('Untitled Property', 'சொத்து')).trim();
@@ -734,9 +781,38 @@ export default function PropertyFullScreenView({
         raw: item,
       };
     });
+
+    return mapped;
   }, [properties, property, isTenantView, isBuyerView, allOwnerRequests, t]);
 
   const currentActiveId = getId(property) || selectedPropertyId || (selectorItems.length > 0 ? selectorItems[0].id : null);
+
+  const carouselImages = useMemo(() => {
+    if (Array.isArray(property?.images) && property.images.length > 0) {
+      return property.images.filter(Boolean);
+    }
+    return [];
+  }, [property?.images]);
+
+  const parsedAmenitiesList = useMemo(() => {
+    const raw = property?.amenities || (property as any)?.property?.amenities;
+    let list: string[] = [];
+    if (Array.isArray(raw)) {
+      list = raw.filter((a: any) => typeof a === 'string' && a.trim().length > 0);
+    } else if (typeof raw === 'string' && raw.trim().length > 0) {
+      list = raw.split(/[,\s]+/).filter(Boolean);
+    }
+    return list;
+  }, [property?.amenities]);
+
+  const getAmenityIcon = (name: string) => {
+    const s = name.toLowerCase();
+    if (s.includes('park') || s.includes('car') || s.includes('garage')) return Car;
+    if (s.includes('wifi') || s.includes('wi-fi') || s.includes('internet')) return Wifi;
+    if (s.includes('water')) return Droplets;
+    if (s.includes('security') || s.includes('guard')) return ShieldCheck;
+    return Sparkles;
+  };
 
   // Speech Recognition for reporting maintenance
   const voiceModeRef = useRef<'issue' | 'description' | null>(null);
@@ -875,12 +951,12 @@ export default function PropertyFullScreenView({
     }
   }, [initialTab]);
 
-  // Ensure activeSection resets to overview if tenant/buyer view is active and section is owner-only
+  // Ensure activeSection resets to overview if buyer view is active and section is owner-only
   useEffect(() => {
-    if ((isTenantView || isBuyerView) && ['edit', 'listing'].includes(activeSection)) {
+    if (isBuyerView && ['edit', 'listing'].includes(activeSection)) {
       setActiveSection('overview');
     }
-  }, [isTenantView, isBuyerView, activeSection]);
+  }, [isBuyerView, activeSection]);
 
   useEffect(() => {
     if (!property || !property.tenant) {
@@ -1441,7 +1517,7 @@ export default function PropertyFullScreenView({
 
   // Responsive Navigation Item Config - omit owner-only sections in tenant/buyer view
   const allNavItems: { key: PropertySectionKey; label: string; icon: any; badge?: number; ownerOnly?: boolean; hidden?: boolean }[] = [
-    { key: 'overview', label: t(`${displayTitle}`, `${displayTitle}`), icon: Home },
+    { key: 'overview', label: t('Overview', 'கண்ணோட்டம்'), icon: Home },
     { key: 'edit', label: t('Edit Details', 'திருத்து'), icon: Edit, ownerOnly: true },
     { key: 'listing', label: t('Listing', 'பட்டியல்'), icon: Globe, ownerOnly: true },
     {
@@ -1485,12 +1561,41 @@ export default function PropertyFullScreenView({
   const navItems = useMemo(() => {
     return allNavItems.filter((item) => {
       if (item.hidden) return false;
-      if (isTenantView || isBuyerView) {
+      if (isBuyerView) {
         return !item.ownerOnly;
       }
       return true;
     });
-  }, [isTenantView, isBuyerView, allNavItems]);
+  }, [isBuyerView, allNavItems]);
+
+  const depositValue = useMemo(() => {
+    const raw =
+      (property as any)?.securityDeposit ??
+      (property as any)?.deposit ??
+      (currentSelfManaged as any)?.securityDeposit ??
+      tenantAgreement?.securityDeposit;
+    if (raw !== undefined && raw !== null && Number(raw) > 0) {
+      return `₹${Number(raw).toLocaleString('en-IN')}`;
+    }
+    if (property.price && Number(property.price) > 0) {
+      return `₹${Number(Number(property.price) * (Number(property.price) <= 25000 ? 3 : 2)).toLocaleString('en-IN')}`;
+    }
+    return '-';
+  }, [property, currentSelfManaged, tenantAgreement]);
+
+  const maintenanceValue = useMemo(() => {
+    const raw =
+      (property as any)?.monthlyMaintenance ??
+      (property as any)?.maintenance ??
+      (currentSelfManaged as any)?.maintenance;
+    if (raw !== undefined && raw !== null && Number(raw) > 0) {
+      return `₹${Number(raw).toLocaleString('en-IN')}/mo`;
+    }
+    if (typeof raw === 'string' && raw.trim() && raw.toLowerCase() !== 'included') {
+      return raw;
+    }
+    return t('Included', 'சேர்க்கப்பட்டுள்ளது');
+  }, [property, currentSelfManaged, t]);
 
   return (
     <>
@@ -1539,25 +1644,113 @@ export default function PropertyFullScreenView({
           </div>
         </div>
 
-        {/* 6. Main Dashboard Layout: Three-column desktop layout matching reference */}
-        <div className={`grid grid-cols-1 ${
-          activeSection === 'overview'
-            ? 'lg:grid-cols-[240px_minmax(0,1.15fr)_minmax(0,1fr)] items-stretch'
-            : 'lg:grid-cols-[240px_minmax(0,1fr)] items-start'
-        } gap-4 sm:gap-5 w-full`}>
-          {/* 6.1 Desktop Left Sidebar Navigation (240px clean white management panel) */}
-          <aside className={`hidden lg:flex flex-col justify-between h-full w-[240px] shrink-0 p-2.5 rounded-2xl bg-white dark:bg-[#0a1628]/85 dark:backdrop-blur-xl border border-slate-200/80 dark:border-sky-500/20 shadow-xs dark:shadow-xl dark:shadow-black/40 z-20 ${
-            activeSection === 'overview' ? '' : 'self-start sticky top-[72px]'
-          }`}>
-            {/* Top Navigation Group */}
-            <div className="space-y-1 w-full">
-              <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center justify-between">
-                <span>{t('MANAGEMENT SECTIONS', 'நிர்வாகப் பிரிவுகள்')}</span>
-                <span className="text-[10px] font-semibold text-slate-400">
-                  {navItems.findIndex(i => i.key === activeSection) + 1} / {navItems.length}
-                </span>
+        {/* 6. Main Workspace Responsive Layout with Synchronized Heights */}
+        <div className="w-full pt-3 grid grid-cols-1 lg:grid-cols-[240px_210px_1fr] gap-5 lg:h-[465px] lg:max-h-[465px] items-stretch">
+          {/* A. LEFT COLUMN: "Your Properties" (240px Sidebar) */}
+          <div className="w-full h-full flex flex-col justify-between overflow-hidden bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-3 shadow-xs">
+            <div className="flex flex-col min-h-0 flex-1">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                  {t('Your Properties', 'உங்கள் சொத்துகள்')} ({selectorItems.length})
+                </h3>
+                <button
+                  type="button"
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                  title="Filter"
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                </button>
               </div>
-              {navItems.filter(item => item.key !== 'vacate').map((item) => {
+
+              {/* Vertical list of selectable property cards with internal scroll (Fixed 4 cards) */}
+              <div className="max-h-[370px] overflow-y-auto pr-1 space-y-2.5 pt-2.5 min-h-0 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+                {selectorItems.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-slate-400">
+                    {t('No properties found', 'சொத்துக்கள் எதுவும் இல்லை')}
+                  </div>
+                ) : (
+                  selectorItems.map((item) => {
+                    const isSelected = item.id === currentActiveId;
+                    const thumbImg = item.images?.[0];
+                    const city = item.location?.split(',')?.[0]?.trim() || item.location || '';
+
+                    let statusLabel = item.statusText || 'Active';
+                    let statusClass = 'bg-[#dcfce7] text-[#15803d]';
+                    if (item.statusVariant === 'occupied' || statusLabel.toLowerCase().includes('occupied')) {
+                      statusLabel = 'Occupied';
+                      statusClass = 'bg-[#dcfce7] text-[#15803d]';
+                    } else if (item.statusVariant === 'active' || statusLabel.toLowerCase().includes('rent') || statusLabel.toLowerCase().includes('lease')) {
+                      statusLabel = 'Rented';
+                      statusClass = 'bg-[#dcfce7] text-[#15803d]';
+                    } else if (item.statusVariant === 'private' || statusLabel.toLowerCase().includes('vacant') || statusLabel.toLowerCase().includes('private')) {
+                      statusLabel = 'Vacant';
+                      statusClass = 'bg-[#ffedd5] text-[#c2410c]';
+                    }
+
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          if (onSelectProperty) {
+                            onSelectProperty(item.raw);
+                          }
+                        }}
+                        className={`w-full text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-2 border-blue-500 bg-[#f0f7ff] dark:bg-blue-950/20 rounded-2xl p-2.5 flex items-center gap-2.5 shadow-2xs'
+                            : 'border border-slate-200/80 hover:border-blue-200 bg-white dark:bg-slate-900/50 dark:border-slate-800/80 rounded-2xl p-2.5 flex items-center gap-2.5'
+                        }`}
+                      >
+                        {thumbImg ? (
+                          <img
+                            src={thumbImg}
+                            alt={item.title}
+                            className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-100 dark:border-slate-800"
+                          />
+                        ) : (
+                          <div className="w-14 h-14 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-800 text-slate-400">
+                            <Home className="h-6 w-6" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1 space-y-0.5">
+                          <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                            {item.title}
+                          </h4>
+                          {city && (
+                            <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                              <MapPin className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                              <span className="truncate">{city}</span>
+                            </div>
+                          )}
+                          <div className="pt-0.5 flex items-center gap-1.5 flex-wrap">
+                            <span className={`inline-flex text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${statusClass}`}>
+                              {statusLabel}
+                            </span>
+                            {Boolean(item.raw?.isSelfManaged || (item.raw as any)?.property?.isSelfManaged || (item.raw as any)?.rentalMode === 'self_managed') && (
+                              <span className="bg-indigo-50 text-indigo-700 border border-indigo-200/60 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800 text-[10px] font-semibold px-2 py-0.5 rounded-md truncate">
+                                {t('Self-Managed', 'சுய-நிர்வகிக்கப்பட்டது')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* B. MIDDLE COLUMN: "MANAGEMENT SECTIONS" (210px Sidebar) */}
+          <div className="w-full h-full flex flex-col justify-between overflow-hidden bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-3 shadow-xs">
+            {/* Top sections */}
+            <div className="space-y-1 overflow-y-auto pr-0.5">
+              <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                {t('MANAGEMENT SECTIONS', 'நிர்வாகப் பிரிவுகள்')}
+              </div>
+
+              {navItems.filter((item) => item.key !== 'vacate').map((item) => {
                 const isActive = activeSection === item.key;
                 const Icon = item.icon;
                 return (
@@ -1565,18 +1758,22 @@ export default function PropertyFullScreenView({
                     key={item.key}
                     type="button"
                     onClick={() => setActiveSection(item.key)}
-                    className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between text-xs font-medium transition-all duration-150 cursor-pointer h-10 ${isActive
-                      ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-[#0f213d]/80'
-                      }`}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                      isActive
+                        ? 'bg-blue-600 text-white font-semibold shadow-xs'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 font-medium'
+                    }`}
                   >
                     <div className="flex items-center gap-2.5 truncate">
-                      <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
+                      <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
                       <span className="truncate">{item.label}</span>
                     </div>
                     {item.badge != null && item.badge > 0 && (
-                      <span className={`h-4.5 min-w-4.5 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${isActive ? 'bg-white text-blue-600' : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
-                        }`}>
+                      <span
+                        className={`h-4 min-w-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                          isActive ? 'bg-white text-blue-600' : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
+                        }`}
+                      >
                         {item.badge}
                       </span>
                     )}
@@ -1585,9 +1782,9 @@ export default function PropertyFullScreenView({
               })}
             </div>
 
-            {/* Bottom Action Group anchored to bottom */}
-            <div className="mt-auto pt-2 space-y-1 w-full">
-              {navItems.filter(item => item.key === 'vacate').map((item) => {
+            {/* Bottom sections: Vacate + Delete Property */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1 shrink-0">
+              {navItems.filter((item) => item.key === 'vacate').map((item) => {
                 const isActive = activeSection === item.key;
                 const Icon = item.icon;
                 return (
@@ -1595,594 +1792,548 @@ export default function PropertyFullScreenView({
                     key={item.key}
                     type="button"
                     onClick={() => setActiveSection(item.key)}
-                    className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between text-xs font-medium transition-all duration-150 cursor-pointer h-10 ${isActive
-                      ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-[#0f213d]/80'
-                      }`}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-2.5 transition-colors cursor-pointer ${
+                      isActive
+                        ? 'bg-blue-600 text-white font-semibold shadow-xs'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 font-medium'
+                    }`}
                   >
-                    <div className="flex items-center gap-2.5 truncate">
-                      <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
-                      <span className="truncate">{item.label}</span>
-                    </div>
-                    {item.badge != null && item.badge > 0 && (
-                      <span className={`h-4.5 min-w-4.5 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${isActive ? 'bg-white text-blue-600' : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
-                        }`}>
-                        {item.badge}
-                      </span>
-                    )}
+                    <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
+                    <span>{item.label}</span>
                   </button>
                 );
               })}
 
-              {/* Separated Destructive Delete Action */}
               {((!isTenantView && !isBuyerView) || isSelfManaged) && (
-                <>
-                  <div className="my-1 border-t border-slate-100 dark:border-sky-500/20" />
-                  <button
-                    type="button"
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="w-full text-left px-3 py-2 rounded-xl flex items-center gap-2.5 text-xs font-semibold transition-all duration-150 cursor-pointer h-10 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400 border border-red-100 dark:border-red-900/50"
-                  >
-                    <Trash2 className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
-                    <span className="truncate">{isSelfManaged ? t('Delete Rental Record', 'வாடகை பதிவை நீக்கு') : t('Delete Property', 'சொத்தை நீக்கு')}</span>
-                  </button>
-                </>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="w-full text-left px-3.5 py-2.5 bg-[#fef2f2] hover:bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400 rounded-xl text-xs font-semibold flex items-center gap-2.5 cursor-pointer transition-colors"
+                >
+                  <Trash2 className="h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-400" />
+                  <span className="truncate">{isSelfManaged ? t('Delete Rental', 'வாடகையை நீக்கு') : t('Delete Property', 'சொத்தை நீக்கு')}</span>
+                </button>
               )}
             </div>
-          </aside>
+          </div>
 
-          {/* MAIN CONTENT AREA */}
-          {activeSection === 'overview' && (
-            <>
-              {/* 6.2 Center Property Gallery Column */}
-              <div className="min-w-0 flex flex-col gap-3.5 w-full">
-                {/* Compact Property Selector at Top of Center Column */}
-                {selectorItems.length > 0 && (
-                  <div className="w-full">
-                    <PropertyHorizontalSelector
-                      items={selectorItems}
-                      selectedId={currentActiveId}
-                      onSelect={(item) => {
-                        if (onSelectProperty) {
-                          onSelectProperty(item.raw);
-                        }
-                      }}
-                    />
-                  </div>
-                )}
-
-                {/* Main Property Image Gallery */}
-                <div className="border border-slate-200/80 dark:border-sky-500/20 max-h-[400px] shadow-xs dark:shadow-xl dark:shadow-black/40 overflow-hidden bg-slate-900 rounded-2xl group relative w-full aspect-[16/11]">
-                  {hasImages ? (
-                    <div
-                      onClick={() => openLightbox(currentImageIndex)}
-                      className="relative overflow-hidden w-full h-full bg-slate-900 cursor-pointer select-none group"
-                      title={t('Click to open image viewer', 'படத்தொகுப்பைத் திறக்க கிளிக் செய்யவும்')}
-                    >
-                      <img
-                        src={images[currentImageIndex]}
-                        alt={`${displayTitle} - ${currentImageIndex + 1}`}
-                        className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
-                      />
-                      {/* View Gallery Hover Badge */}
-                      <div className="absolute top-3 right-3 bg-black/65 hover:bg-black/85 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md transition-all font-medium">
-                        <Maximize2 className="h-3.5 w-3.5" />
-                        <span>{t('View Gallery', 'படத்தொகுப்பு')}</span>
-                      </div>
-
-                      {/* In-Card Prev/Next Navigation (if multiple images) */}
-                      {images.length > 1 && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={prevImage}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/60 hover:bg-black/85 text-white p-2 transition-all shadow-md hover:scale-110 active:scale-95 cursor-pointer"
-                            aria-label="Previous image"
-                          >
-                            <ChevronLeft className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={nextImage}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 z-10 rounded-full bg-black/60 hover:bg-black/85 text-white p-2 transition-all shadow-md hover:scale-110 active:scale-95 cursor-pointer"
-                            aria-label="Next image"
-                          >
-                            <ChevronRight className="h-4 w-4" />
-                          </button>
-                        </>
+          {/* C. RIGHT COLUMN: PROPERTY MEDIA & SPECIFICATIONS (1fr Workspace) */}
+          <div className="w-full min-w-0 h-full max-h-full flex flex-col overflow-hidden">
+            {activeSection === 'overview' ? (
+              <>
+                {/* Top Detail Header Strip */}
+                <div className="bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-3.5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shrink-0">
+                  {/* Left: Property thumbnail + Title + Location pin */}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-800 overflow-hidden">
+                      {carouselImages[0] ? (
+                        <img src={carouselImages[0]} alt={displayTitle} className="w-full h-full object-cover" />
+                      ) : (
+                        <Home className="h-5 w-5 text-slate-400" />
                       )}
-
-                      {/* Gallery Indicator Dots */}
-                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10 bg-black/40 backdrop-blur-xs px-2.5 py-1 rounded-full select-none">
-                        {(images.length > 0 ? images : [1, 2, 3, 4, 5]).slice(0, 5).map((_, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (images.length > 0) setCurrentImageIndex(idx % images.length);
-                            }}
-                            className={`transition-all rounded-full cursor-pointer ${
-                              idx === (currentImageIndex % (images.length || 1))
-                                ? 'w-6 h-1.5 bg-white shadow-xs'
-                                : 'w-1.5 h-1.5 bg-white/60 hover:bg-white/90'
-                            }`}
-                            aria-label={`Go to slide ${idx + 1}`}
-                          />
-                        ))}
-                      </div>
                     </div>
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/40 gap-2 p-6 bg-muted/30">
-                      <Home className="h-10 w-10 text-muted-foreground/30" />
-                      <span className="text-sm font-medium">{t('No images uploaded', 'படங்கள் எதுவும் இல்லை')}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 6.3 Right Property Information Column */}
-              <div className="min-w-0 flex flex-col gap-3.5 w-full">
-                {/* Card A – Property Summary */}
-                <Card className="border border-slate-200/80 dark:border-sky-500/20 shadow-xs dark:shadow-xl dark:shadow-black/40 bg-white dark:bg-[#0a1628]/85 dark:backdrop-blur-xl rounded-2xl p-3.5 h-auto flex flex-col gap-2 shrink-0">
-                  {/* Title, Location & Contextual Edit Action */}
-                  <div className="flex items-center justify-between gap-2 min-w-0">
-                    <div className="flex items-center gap-2 min-w-0 truncate">
-                      <h3 className="text-base font-bold text-[#0B1736] dark:text-white leading-tight truncate" title={displayTitle}>
-                        {displayTitle}
+                    <div className="min-w-0">
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight truncate">
+                        {displayTitle || t('Untitled Property', 'சொத்து')}
                       </h3>
-                      <span className="text-slate-300 dark:text-slate-600 shrink-0 text-xs">•</span>
-                      <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 truncate">
-                        <MapPin className="h-3 w-3 text-blue-600 shrink-0" />
-                        <span className="truncate max-w-[130px] sm:max-w-[180px]">
-                          {property.showAddress === false && (isTenantView || isBuyerView)
-                            ? t('Location upon request', 'இருப்பிடம் கோரிக்கையின் பேரில்')
-                            : displayLocation}
-                        </span>
-                      </div>
+                      {displayLocation && (
+                        <a
+                          href={property?.googleMapsLink || (property as any)?.mapLink || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(displayLocation)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-sky-400 cursor-pointer group transition-colors"
+                          title={t('Open in Google Maps', 'கூகிள் வரைபடத்தில் திற')}
+                        >
+                          <MapPin className="h-3.5 w-3.5 text-blue-500 shrink-0 group-hover:scale-110 transition-transform" />
+                          <span className="truncate">{displayLocation}</span>
+                          <ExternalLink className="h-2.5 w-2.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+                        </a>
+                      )}
                     </div>
+                  </div>
 
+                  {/* Right: Price pill + Transaction tag + Status tags + Edit button */}
+                  <div className="flex items-center gap-2 flex-wrap shrink-0">
+                    <span className="bg-[#dcfce7] text-[#15803d] dark:bg-emerald-950/60 dark:text-emerald-300 font-bold px-3 py-1.5 rounded-full text-xs tracking-tight">
+                      ₹{Number(property?.price || 0).toLocaleString('en-IN')}{property?.transactionType?.toLowerCase() === 'rent' ? '/mo' : ''}
+                    </span>
+                    <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold px-3 py-1.5 rounded-full capitalize">
+                      {property?.transactionType ? property.transactionType.toLowerCase() : ((property as any)?.transaction || 'Rent')}
+                    </span>
+                    {isTenantView ? (
+                      <span className="bg-emerald-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1 shadow-2xs">
+                        <Check className="h-3.5 w-3.5" />
+                        <span>{t('Rented', 'வாடகைக்கு எடுக்கப்பட்டது')}</span>
+                      </span>
+                    ) : (property?.status || property?.saleStatus) ? (
+                      <span className="bg-emerald-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1 shadow-2xs capitalize">
+                        <Check className="h-3.5 w-3.5" />
+                        <span>
+                          {property?.saleStatus === 'sold'
+                            ? t('Acquired', 'வாங்கப்பட்டது')
+                            : property?.status === 'approved'
+                            ? t('Approved', 'ஒப்புதல் அளிக்கப்பட்டது')
+                            : (property?.saleStatus || property?.status)}
+                        </span>
+                      </span>
+                    ) : null}
+                    <span className="bg-purple-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-2xs">
+                      {isOccupied ? t('Occupied', 'குடியேற்றப்பட்டது') : t('Vacant', 'காலியாக')}
+                    </span>
+                    {Boolean(isSelfManaged || property?.isSelfManaged || (property as any)?.isSelfManaged) && (
+                      <span className="bg-indigo-50 text-indigo-700 border border-indigo-200/60 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800 text-[10px] font-semibold px-2 py-0.5 rounded-md">
+                        {t('Self-Managed', 'சுய-நிர்வகிக்கப்பட்டது')}
+                      </span>
+                    )}
+                    {!isCurrentlyListed && (
+                      <span className="bg-[#ffedd5] text-[#c2410c] dark:bg-amber-950/30 text-xs font-semibold px-3 py-1.5 rounded-full">
+                        {t('Private', 'தனிப்பட்டது')}
+                      </span>
+                    )}
                     {!isTenantView && !isBuyerView && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-6.5 px-2.5 text-[11px] gap-1 border-blue-200 text-blue-600 bg-white hover:bg-blue-50 dark:bg-slate-800 dark:text-blue-300 dark:border-blue-900 shrink-0 rounded-md font-medium shadow-2xs"
+                      <button
+                        type="button"
                         onClick={() => setActiveSection('edit')}
+                        className="h-8 px-3 text-xs font-semibold gap-1.5 border border-blue-200 text-blue-600 bg-white hover:bg-blue-50 dark:bg-slate-800 dark:text-blue-300 dark:border-blue-900 rounded-xl inline-flex items-center cursor-pointer transition-colors shadow-2xs"
                       >
-                        <Edit className="h-3 w-3" />
-                        {t('Edit', 'திருத்து')}
-                      </Button>
+                        <Edit className="h-3.5 w-3.5" />
+                        <span>{t('Edit', 'திருத்து')}</span>
+                      </button>
                     )}
                   </div>
+                </div>
 
-                  {/* Price & Status Tags Row */}
-                  <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                                        {/* Price tag */}
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-xs font-bold tracking-tight shrink-0">
-                      {property.showPrice === false && (isTenantView || isBuyerView) ? (
-                        t('Price upon request', 'விலை கோரிக்கையின் பேரில்')
-                      ) : (
-                        <>
-                          ₹{Number(property.price || 0).toLocaleString('en-IN')}
-                          {property.transactionType?.toLowerCase() === 'rent' && (
-                            <span className="text-[10px] font-normal text-muted-foreground ml-0.5">/mo</span>
-                          )}
-                          {property.showPrice === false && !isTenantView && !isBuyerView && (
-                            <span className="text-[9px] font-normal text-amber-600 dark:text-amber-400 ml-1">
-                              ({t('Hidden', 'மறைக்கப்பட்டது')})
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </span>
-
-                    {/* Transaction Badge */}
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold capitalize shrink-0">
-                      {property.transactionType ? property.transactionType.toLowerCase() : 'purchase'}
-                    </span>
-
-                    {/* Semantic Badges: Acquired (green), Occupied (purple), Private (amber) */}
-                    {isTenantView ? (
-                      isSelfManaged ? (
-                        <>
-                          <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 font-semibold shrink-0 rounded flex items-center gap-1 shadow-2xs">
-                            <KeyRound className="h-2.5 w-2.5" />
-                            {t('Self-Managed', 'சுய-நிர்வகிக்கப்பட்டது')}
-                          </Badge>
-                          <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-950/30 text-[10px] px-2 py-0.5 font-semibold shrink-0 rounded flex items-center gap-1">
-                            <EyeOff className="h-2.5 w-2.5" />
-                            {t('Private', 'தனிப்பட்டது')}
-                          </Badge>
-                        </>
-                      ) : (
-                        <>
-                          <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 font-semibold shrink-0 rounded flex items-center gap-1 shadow-2xs">
-                            <Check className="h-2.5 w-2.5" />
-                            {t('Acquired', 'வாங்கப்பட்டது')}
-                          </Badge>
-                          <Badge className="bg-purple-600 text-white text-[10px] px-2 py-0.5 font-semibold flex items-center gap-1 shrink-0 rounded shadow-2xs">
-                            <Users className="h-2.5 w-2.5" />
-                            {t('Occupied', 'குடியேற்றப்பட்டது')}
-                          </Badge>
-                        </>
-                      )
-                    ) : (
+                {/* Nested Grid (Image & Specifications & Details): grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch */}
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
+                  {/* Left Image Container (md:col-span-7) */}
+                  <div className="md:col-span-7 h-full w-full relative rounded-2xl overflow-hidden group bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 shadow-xs min-h-[360px]">
+                    {carouselImages.length > 0 ? (
                       <>
-                        {isAcquired ? (
-                          <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 font-semibold shrink-0 rounded flex items-center gap-1 shadow-2xs">
-                            <Check className="h-2.5 w-2.5" />
-                            {t('Acquired', 'வாங்கப்பட்டது')}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-muted-foreground text-[10px] px-2 py-0.5 shrink-0 font-medium rounded">
-                            {t('Owned', 'உரிமையாளர்')}
-                          </Badge>
-                        )}
+                        <img
+                          src={carouselImages[currentImageIndex % carouselImages.length]}
+                          alt={displayTitle}
+                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 cursor-pointer"
+                          onClick={() => openLightbox(currentImageIndex)}
+                        />
+                        {/* Counter badge at top-right */}
+                        <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-xs text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow-md z-10">
+                          {(currentImageIndex % carouselImages.length) + 1}/{carouselImages.length}
+                        </div>
 
-                        {isOccupied ? (
-                          <Badge className="bg-purple-600 text-white text-[10px] px-2.5 py-0.5 font-semibold flex items-center gap-1 shrink-0 rounded shadow-2xs">
-                            <Users className="h-2.5 w-2.5" />
-                            {t('Occupied', 'குடியேற்றப்பட்டது')}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-muted-foreground text-[10px] px-2.5 py-0.5 shrink-0 font-medium rounded">
-                            {t('Vacant', 'காலியாக')}
-                          </Badge>
-                        )}
-
-                        {isCurrentlyListed ? (
-                          <Badge className={`text-white text-[10px] px-2.5 py-0.5 font-semibold flex items-center gap-1 shrink-0 rounded shadow-2xs ${
-                            property.transactionType?.toLowerCase() === 'rent' ? 'bg-purple-600' : 'bg-blue-600'
-                          }`}>
-                            <Globe className="h-2.5 w-2.5" />
-                            {property.transactionType?.toLowerCase() === 'rent' ? t('Listed: Rent', 'வாடகைக்கு') : t('Listed: Sale', 'விற்பனைக்கு')}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-950/30 text-[10px] px-2.5 py-0.5 font-semibold flex items-center gap-1 shrink-0 rounded">
-                            <EyeOff className="h-2.5 w-2.5" />
-                            {t('Private', 'தனிப்பட்டது')}
-                          </Badge>
+                        {/* Floating navigation buttons */}
+                        {carouselImages.length > 1 && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCurrentImageIndex((prev) => (prev - 1 + carouselImages.length) % carouselImages.length);
+                              }}
+                              className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-slate-800 flex items-center justify-center transition shadow-md cursor-pointer z-10"
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCurrentImageIndex((prev) => (prev + 1) % carouselImages.length);
+                              }}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-slate-800 flex items-center justify-center transition shadow-md cursor-pointer z-10"
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </button>
+                          </>
                         )}
                       </>
+                    ) : (
+                      <div className="absolute inset-0 w-full h-full min-h-[300px] flex flex-col items-center justify-center text-slate-400 bg-slate-100 dark:bg-slate-900/50 p-6 text-center">
+                        <Images className="h-12 w-12 text-slate-300 dark:text-slate-600 mb-2" />
+                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                          {t('No photos uploaded', 'புகைப்படங்கள் எதுவும் பதிவேற்றப்படவில்லை')}
+                        </p>
+                      </div>
                     )}
                   </div>
-                </Card>
 
-                {/* Card B – Specifications & Details */}
-                {(() => {
-                  const isRental = property.transactionType?.toLowerCase() === 'rent' || isTenantView || isSelfManaged;
-                  const depositValue = (() => {
-                    const raw =
-                      (property as any)?.securityDeposit ??
-                      (property as any)?.deposit ??
-                      (currentSelfManaged as any)?.securityDeposit ??
-                      tenantAgreement?.securityDeposit;
-                    if (raw !== undefined && raw !== null && Number(raw) > 0) {
-                      return `₹${Number(raw).toLocaleString('en-IN')}`;
-                    }
-                    if (property.price && Number(property.price) > 0) {
-                      return `₹${Number(Number(property.price) * (Number(property.price) <= 25000 ? 3 : 2)).toLocaleString('en-IN')}`;
-                    }
-                    return '₹50,000';
-                  })();
-
-                  const maintenanceValue = (() => {
-                    const raw =
-                      (property as any)?.monthlyMaintenance ??
-                      (property as any)?.maintenance ??
-                      (currentSelfManaged as any)?.maintenance;
-                    if (raw !== undefined && raw !== null && Number(raw) > 0) {
-                      return `₹${Number(raw).toLocaleString('en-IN')}/mo`;
-                    }
-                    if (typeof raw === 'string' && raw.trim() && raw.toLowerCase() !== 'included') {
-                      return raw;
-                    }
-                    return t('Included', 'சேர்க்கப்பட்டுள்ளது');
-                  })();
-
-                  const renderSpecBadge = (
-                    id: string,
-                    Icon: React.ElementType,
-                    label: string,
-                    value: React.ReactNode,
-                    capitalize?: boolean
-                  ) => (
-                    <div
-                      key={id}
-                      className="py-1.5 px-3 rounded-lg bg-slate-50/70 dark:bg-[#0f213d]/60 border border-slate-200/80 dark:border-sky-400/20 text-slate-800 dark:text-slate-200 flex items-center gap-2 min-w-0"
-                    >
-                      <Icon className="h-3.5 w-3.5 text-blue-600 dark:text-sky-400 shrink-0" />
-                      <div className="flex items-center gap-1.5 min-w-0 truncate text-xs">
-                        <span className="text-[11px] font-semibold text-gray-500 dark:text-sky-300/80 shrink-0">
-                          {label}
-                        </span>
-                        <span className="text-gray-400 dark:text-sky-400/40 font-normal shrink-0">-</span>
-                        <span className={`font-medium text-gray-800 dark:text-white truncate ${capitalize ? 'capitalize' : ''}`}>
-                          {value}
-                        </span>
-                      </div>
-                    </div>
-                  );
-
-                  return (
-                    <Card className="border border-slate-200/80 dark:border-sky-500/20 shadow-xs dark:shadow-xl dark:shadow-black/40 bg-white dark:bg-[#0a1628]/85 dark:backdrop-blur-xl rounded-2xl p-3.5 sm:p-4 space-y-0 sm:space-y-0">
-                      <div className="flex items-center gap-1.5">
-                        <Building2 className="h-4 w-4 text-blue-600 dark:text-sky-400 shrink-0" />
-                        <h4 className="text-xs sm:text-sm font-bold text-[#0B1736] dark:text-white">
+                  {/* Right "Specifications & Details" Card (md:col-span-5): h-full flex flex-col justify-between */}
+                  <div className="md:col-span-5 h-full flex flex-col justify-between bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-4 shadow-xs">
+                    {/* Top Group: Title + 2-Column Grid Specs */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <SlidersHorizontal className="h-4 w-4 text-blue-600 dark:text-sky-400 shrink-0" />
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">
                           {t('Specifications & Details', 'விவரங்கள் மற்றும் விவரக்குறிப்புகள்')}
                         </h4>
                       </div>
 
-                      {/* Specification Badges in Single-Line Layout */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
-                        {/* 1. Property Type */}
-                        {renderSpecBadge(
-                          'propertyType',
-                          Building2,
-                          t('Property Type', 'சொத்து வகை'),
-                          getPropertyTypeLabel(property.propertyType),
-                          true
-                        )}
-
-                        {/* Rental-specific specifications */}
-                        {isRental ? (
+                      {/* 2-column grid specs */}
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {Boolean(property?.isSelfManaged || (property as any)?.isSelfManaged) ? (
                           <>
-                            {renderSpecBadge('deposit', CreditCard, t('Deposit', 'முன்பணம்'), depositValue)}
-                            {renderSpecBadge('maintenance', Wrench, t('Maintenance', 'பராமரிப்பு'), maintenanceValue)}
-                            {renderSpecBadge(
-                              'preferred',
-                              Users,
-                              t('Preferred', 'விருப்பம்'),
-                              (property as any)?.preferredTenant ||
-                                (property as any)?.preferred ||
-                                (property as any)?.tenantPreference ||
-                                'Family / Bachelors'
+                            {/* Property Type */}
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Home className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  {t('Property Type', 'சொத்து வகை')}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                {getPropertyTypeLabel(property.propertyType) || '-'}
+                              </span>
+                            </div>
+
+                            {/* Total Units / Rooms */}
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Layers className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  {t('Total Units', 'மொத்த அலகுகள்')}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                {property.totalUnits ? `${property.totalUnits} Units` : '1 Unit'}
+                              </span>
+                            </div>
+
+                            {/* Deposit */}
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <IndianRupee className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  {t('Deposit', 'முன்பணம்')}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                {property.securityDeposit ? `₹${Number(property.securityDeposit).toLocaleString('en-IN')}` : depositValue}
+                              </span>
+                            </div>
+
+                            {/* Maintenance Details */}
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Wrench className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  {t('Maintenance', 'பராமரிப்பு')}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                {property.maintenanceDetails || (property.monthlyMaintenance ? `₹${property.monthlyMaintenance.toLocaleString('en-IN')}/mo` : 'Included')}
+                              </span>
+                            </div>
+
+                            {/* Rent Due Date */}
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  {t('Rent Due Date', 'தவணை நாள்')}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                {property.rentDueDate || (property.rentDueDay ? `${property.rentDueDay}th of month` : '5th of month')}
+                              </span>
+                            </div>
+
+                            {/* Property Status */}
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  {t('Status', 'நிலை')}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                {isOccupied ? t('Occupied', 'குடியேற்றப்பட்டது') : t('Vacant', 'காலியாக')}
+                              </span>
+                            </div>
+
+                            {/* Lease Duration */}
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition col-span-2">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Calendar className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  {t('Lease Duration', 'குத்தகை காலம்')}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                {property.leaseStartDate ? new Date(property.leaseStartDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '01 Jan 2025'} - {property.leaseEndDate ? new Date(property.leaseEndDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '31 Dec 2025'}
+                              </span>
+                            </div>
+
+                            {/* Contact Number */}
+                            {Boolean(property.contactNumber || (property as any)?.phone) && (
+                              <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition col-span-2">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <Phone className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                    {t('Management Contact', 'தொடர்பு எண்')}
+                                  </span>
+                                </div>
+                                <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                  {property.contactNumber || (property as any)?.phone}
+                                </span>
+                              </div>
                             )}
-                            {renderSpecBadge(
-                              'available',
-                              Calendar,
-                              t('Available', 'கிடைக்கும் நிலை'),
-                              (property as any)?.availableFrom ||
-                                (property as any)?.availableDate ||
-                                (property as any)?.availability ||
-                                t('Immediate', 'உடனடியாக')
+                          </>
+                        ) : isRentalTransaction || isTenantView || isSelfManaged ? (
+                          <>
+                            {/* Property Type */}
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Home className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  {t('Property Type', 'சொத்து வகை')}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                {getPropertyTypeLabel(property.propertyType) || '-'}
+                              </span>
+                            </div>
+
+                            {/* Deposit */}
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <IndianRupee className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  {t('Deposit', 'முன்பணம்')}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                {depositValue}
+                              </span>
+                            </div>
+
+                            {/* Maintenance */}
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Wrench className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  {t('Maintenance', 'பராமரிப்பு')}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                {maintenanceValue}
+                              </span>
+                            </div>
+
+                            {/* Preferred */}
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Users className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  {t('Preferred', 'விருப்பம்')}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                {(property as any)?.preferredTenant || (property as any)?.preferred || '-'}
+                              </span>
+                            </div>
+
+                            {/* Available */}
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Clock className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  {t('Available', 'கிடைக்கும் நிலை')}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                {(property as any)?.availableFrom || (property as any)?.availability || t('Immediate', 'உடனடியாக')}
+                              </span>
+                            </div>
+
+                            {/* Owner (hidden when owner views their own property) */}
+                            {shouldShowOwnerPill && (
+                              <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <User className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                    {t('Owner', 'உரிமையாளர்')}
+                                  </span>
+                                </div>
+                                <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                  {ownerDisplayName || '-'}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Tenant (shown only in owner dashboard when rented) */}
+                            {shouldShowTenantPill && (
+                              <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <UserCheck className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                    {t('Tenant', 'வாடகைதாரர்')}
+                                  </span>
+                                </div>
+                                <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                  {tenantDisplayName || tenancyStatus || '-'}
+                                </span>
+                              </div>
                             )}
                           </>
                         ) : (
                           <>
-                            {/* Total Area (Only display for purchase/sale properties, hidden for Rent) */}
-                            {property.transactionType?.toLowerCase() !== 'rent' &&
-                              renderSpecBadge(
-                                'totalArea',
-                                Maximize2,
-                                t('Total Area', 'மொத்த பரப்பளவு'),
-                                property.totalArea ? `${property.totalArea.toLocaleString()} sq.ft` : '1,200 sq.ft'
-                              )}
-                            {renderSpecBadge('facing', Compass, t('Facing', 'நோக்கு நிலை'), property.facing || 'South', true)}
-                            {renderSpecBadge(
-                              'ownershipType',
-                              FileText,
-                              t('Ownership Type', 'உரிமை வகை'),
-                              (property as any)?.ownershipType || 'Freehold',
-                              true
-                            )}
+                            {/* Property Type */}
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Home className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  {t('Property Type', 'சொத்து வகை')}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                {getPropertyTypeLabel(property.propertyType) || '-'}
+                              </span>
+                            </div>
+
+                            {/* Total Area */}
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Maximize2 className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  {t('Total Area', 'மொத்த பரப்பளவு')}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                {property.totalArea ? `${Number(property.totalArea).toLocaleString()} sq.ft` : '-'}
+                              </span>
+                            </div>
+
+                            {/* Facing */}
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Compass className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  {t('Facing', 'நோக்கு நிலை')}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0 capitalize">
+                                {property.facing || '-'}
+                              </span>
+                            </div>
+
+                            {/* Ownership Type */}
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <FileText className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  {t('Ownership Type', 'உரிமை வகை')}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0 capitalize">
+                                {(property as any)?.ownershipType || '-'}
+                              </span>
+                            </div>
                           </>
                         )}
-
-                        {/* Owner (Only visible when tenant/buyer views, hidden in owner dashboard) */}
-                        {shouldShowOwnerPill &&
-                          renderSpecBadge('owner', User, t('Owner', 'உரிமையாளர்'), ownerDisplayName)}
-
-                        {/* Tenant / Tenancy (Shown only in Owner Dashboard for rental properties) */}
-                        {shouldShowTenantPill &&
-                          renderSpecBadge(
-                            'tenant',
-                            Users,
-                            tenantDisplayName ? t('Tenant', 'வாடகைதாரர்') : t('Tenancy', 'குத்தகை'),
-                            tenantDisplayName || tenancyStatus
-                          )}
-
-                        {/* Custom Details Added via Listing Controls */}
-                        {Array.isArray(property.customDetails) &&
-                          property.customDetails.map((detail, idx) =>
-                            renderSpecBadge(`custom-${idx}`, Sparkles, detail.key, detail.value)
-                          )}
                       </div>
-
-                  {/* GPS Location Row */}
-                  {property.geoLocation?.latitude && property.geoLocation?.longitude && (
-                    <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground bg-slate-50 dark:bg-[#0f213d]/60 px-3 py-1.5 rounded-xl border border-slate-200/60 dark:border-sky-400/20">
-                      <div className="flex items-center gap-1.5 truncate">
-                        <Compass className="h-3 w-3 text-blue-600 dark:text-sky-400 shrink-0" />
-                        <span className="font-mono truncate text-slate-600 dark:text-slate-300">
-                          GPS: {Number(property.geoLocation.latitude).toFixed(4)}°, {Number(property.geoLocation.longitude).toFixed(4)}°
-                        </span>
-                      </div>
-                      <a
-                        href={`https://maps.google.com/?q=${property.geoLocation.latitude},${property.geoLocation.longitude}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-blue-600 dark:text-sky-400 hover:underline font-semibold text-[11px] shrink-0"
-                      >
-                        {t('Open in Maps', 'வரைபடத்தில்')} ↗
-                      </a>
                     </div>
-                  )}
 
-                  {/* Prominent Self-Managed Rental Disclaimer */}
-                  {isSelfManaged && (
-                    <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs flex items-start gap-2">
-                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                      <p className="text-emerald-800/90 dark:text-emerald-300/90 text-[11px] leading-relaxed">
-                        {t('Private self-managed rental record created by you.', 'உங்கள் தனிப்பட்ட சுய-நிர்வகிக்கப்பட்ட வாடகை பதிவு.')}
+                    {/* Middle Group: Amenities & Features */}
+                    <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+                      <h5 className="text-xs font-bold text-slate-900 dark:text-white">
+                        {t('Amenities & Features', 'வசதிகள்')}
+                      </h5>
+                      {parsedAmenitiesList.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {parsedAmenitiesList.map((amenity, idx) => {
+                            const IconComponent = getAmenityIcon(amenity);
+                            return (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full bg-blue-50/80 dark:bg-blue-950/40 text-blue-600 dark:text-sky-300 border border-blue-200/60 dark:border-blue-800/60 font-medium"
+                              >
+                                <IconComponent className="h-3 w-3 shrink-0 text-blue-600 dark:text-sky-400" />
+                                <span>{amenity}</span>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500 italic">
+                          {t('No amenities specified', 'வசதிகள் எதுவும் குறிப்பிடப்படவில்லை')}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Bottom Group: Description */}
+                    <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 space-y-1">
+                      <h5 className="text-xs font-bold text-slate-900 dark:text-white">
+                        {t('Description', 'விளக்கம்')}
+                      </h5>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap line-clamp-3">
+                        {property.description ||
+                          (property as any)?.property?.description ||
+                          t('No description provided.', 'விளக்கம் எதுவும் வழங்கப்படவில்லை.')}
                       </p>
                     </div>
-                  )}
-
-                  {/* Dedicated Self-Managed Rental Terms if applicable */}
-                  {isSelfManaged && (
-                    <div className="pt-1.5 border-t border-slate-100 dark:border-border/60 space-y-1.5">
-                      <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5 uppercase tracking-wider">
-                        <KeyRound className="h-3.5 w-3.5 text-emerald-600" />
-                        {t('Rental Terms', 'வாடகை விதிமுறைகள்')}
-                      </span>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="p-2 rounded-lg bg-slate-50 dark:bg-muted/30 border border-slate-200/60">
-                          <span className="text-[10px] text-muted-foreground block">{t('Monthly Rent', 'மாத வாடகை')}</span>
-                          <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400">
-                            ₹{Number(currentSelfManaged?.monthlyRent || property.price || 0).toLocaleString('en-IN')}
-                          </span>
-                        </div>
-                        <div className="p-2 rounded-lg bg-slate-50 dark:bg-muted/30 border border-slate-200/60">
-                          <span className="text-[10px] text-muted-foreground block">{t('Security Deposit', 'முன்பணம்')}</span>
-                          <span className="font-bold text-sm text-foreground">
-                            ₹{Number(currentSelfManaged?.securityDeposit || 0).toLocaleString('en-IN')}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Amenities & Features */}
-                  {(property.showAmenities !== false || (!isTenantView && !isBuyerView)) && (() => {
-                    const rawAmenities = property.amenities || (property as any)?.property?.amenities;
-                    const displayAmenities: string[] = (() => {
-                      if (Array.isArray(rawAmenities)) {
-                        return rawAmenities.filter((a: any) => typeof a === 'string' && a.trim().length > 0);
-                      }
-                      if (typeof rawAmenities === 'string' && rawAmenities.trim().length > 0) {
-                        return [rawAmenities.trim()];
-                      }
-                      return [];
-                    })();
-
-                    return (
-                      <div className="pt-1.5 border-t border-slate-100 dark:border-sky-500/20 space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 block">
-                            {t('Amenities & Features', 'வசதிகள்')}
-                          </span>
-                          {property.showAmenities === false && !isTenantView && !isBuyerView && (
-                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                              ({t('Hidden from public', 'பொதுவில் மறைக்கப்பட்டது')})
-                            </span>
-                          )}
-                        </div>
-                        {displayAmenities.length > 0 ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            {displayAmenities.map((amenity: string, i: number) => (
-                              <span
-                                key={i}
-                                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-blue-50/80 dark:bg-[#0f213d]/60 text-blue-700 dark:text-sky-300 border border-blue-200 dark:border-sky-400/20 font-medium"
-                              >
-                                ✓ {amenity}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-[11px] text-muted-foreground italic">
-                            {t('No amenities specified', 'வசதிகள் எதுவும் குறிப்பிடப்படவில்லை')}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                  {/* Description */}
-                  <div className="pt-1.5 border-t border-slate-100 dark:border-sky-500/20 space-y-1">
-                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 block">
-                      {t('Description', 'விளக்கம்')}
-                    </span>
-                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
-                      {property.description ||
-                        (property as any)?.property?.description ||
-                        t('No description available for this property.', 'இந்த சொத்துக்கு விளக்கம் எதுவும் கிடைக்கவில்லை.')}
-                    </p>
                   </div>
-                </Card>
-              );
-            })()}
-              </div>
-            </>
-          )}
-
-          {/* When activeSection !== 'overview': Spans the remaining 2 columns */}
-          {activeSection !== 'overview' && (
-            <div className="min-w-0 w-full space-y-4">
-              {/* Optional Top Property Selector on Non-Overview Management Sections for Quick Switching */}
-              {selectorItems.length > 0 && (
-                <div className="w-full">
-                  <PropertyHorizontalSelector
-                    items={selectorItems}
-                    selectedId={currentActiveId}
-                    onSelect={(item) => {
-                      if (onSelectProperty) {
-                        onSelectProperty(item.raw);
-                      }
-                    }}
-                  />
                 </div>
-              )}
+              </>
+            ) : (
+              <div className="min-w-0 w-full h-full max-h-full flex flex-col overflow-hidden">
+                {/* SECTION 2: EDIT DETAILS */}
+                {activeSection === 'edit' && (
+                  isTenantView ? (
+                    <Card className="border border-blue-100/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md shadow-xs h-full max-h-full flex flex-col overflow-hidden rounded-2xl">
+                      <CardHeader className="pb-2.5 pt-3 px-4 border-b border-border/40 shrink-0">
+                        <CardTitle className="text-base flex items-center justify-between">
+                          <span className="flex items-center gap-2">
+                            <Edit className="h-4 w-4 text-primary" />
+                            {t('Property Specifications', 'சொத்து விவரங்கள்')}
+                          </span>
+                          <Badge variant="outline" className="text-xs font-normal">
+                            {t('Tenant View (Read Only)', 'வாடகைதாரர் பார்வை')}
+                          </Badge>
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          {t('Property specifications and configurations are managed exclusively by the property owner.', 'சொத்து விவரங்கள் உரிமையாளரால் நிர்வகிக்கப்படுகின்றன.')}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-3.5 flex-1 min-h-0 flex flex-col overflow-hidden">
+                        <div className="space-y-4 flex-1 overflow-y-auto pr-2">
+                          <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-3">
+                            <Info className="h-5 w-5 shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+                            <div>
+                              <p className="font-semibold text-sm">{t('Owner-Managed Property', 'உரிமையாளரால் நிர்வகிக்கப்படும் சொத்து')}</p>
+                              <p className="mt-1 leading-relaxed">
+                                {t('As a tenant, you have full visibility of this property and its tenancy records. Modifications to physical specifications, transaction pricing, or listing details must be performed by the registered owner.', 'வாடகைதாரராக, நீங்கள் சொத்து விவரங்களைப் பார்க்கலாம். விவரக்குறிப்புகளில் மாற்றங்கள் உரிமையாளரால் மட்டுமே செய்ய முடியும்.')}
+                              </p>
+                            </div>
+                          </div>
 
-            {/* SECTION 2: EDIT DETAILS */}
-            {activeSection === 'edit' && (
-              <Card className="border border-border/80 shadow-xs">
-                <CardHeader className="pb-3 border-b border-border/40">
-                  <CardTitle className="text-base flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <Edit className="h-4 w-4 text-primary" />
-                      {isTenantView ? t('Property Specifications', 'சொத்து விவரங்கள்') : t('Edit Property Details', 'சொத்து விவரங்களைத் திருத்து')}
-                    </span>
-                    <Badge variant="outline" className="text-xs font-normal">
-                      {isTenantView ? t('Tenant View (Read Only)', 'வாடகைதாரர் பார்வை') : getPropertyTypeLabel(property.propertyType)}
-                    </Badge>
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    {isTenantView
-                      ? t('Property specifications and configurations are managed exclusively by the property owner.', 'சொத்து விவரங்கள் உரிமையாளரால் நிர்வகிக்கப்படுகின்றன.')
-                      : t('Update specifications, pricing, amenities, images, or GPS coordinates.', 'விவரங்கள், விலை, வசதிகள், படங்கள் அல்லது வரைபட இருப்பிடத்தை புதுப்பிக்கவும்.')}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-4">
-                  {isTenantView ? (
-                    <div className="space-y-4">
-                      <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-3">
-                        <Info className="h-5 w-5 shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
-                        <div>
-                          <p className="font-semibold text-sm">{t('Owner-Managed Property', 'உரிமையாளரால் நிர்வகிக்கப்படும் சொத்து')}</p>
-                          <p className="mt-1 leading-relaxed">
-                            {t('As a tenant, you have full visibility of this property and its tenancy records. Modifications to physical specifications, transaction pricing, or listing details must be performed by the registered owner.', 'வாடகைதாரராக, நீங்கள் சொத்து விவரங்களைப் பார்க்கலாம். விவரக்குறிப்புகளில் மாற்றங்கள் உரிமையாளரால் மட்டுமே செய்ய முடியும்.')}
-                          </p>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            <div className="p-3 rounded-xl bg-card border border-border/60">
+                              <span className="text-[10px] text-muted-foreground uppercase font-medium block">{t('Property Type', 'சொத்து வகை')}</span>
+                              <span className="text-sm font-semibold capitalize mt-1 block">{getPropertyTypeLabel(property.propertyType)}</span>
+                            </div>
+                            <div className="p-3 rounded-xl bg-card border border-border/60">
+                              <span className="text-[10px] text-muted-foreground uppercase font-medium block">{t('Total Area', 'மொத்த பரப்பளவு')}</span>
+                              <span className="text-sm font-semibold mt-1 block">{property.totalArea ? `${property.totalArea} sq.ft` : '-'}</span>
+                            </div>
+                            <div className="p-3 rounded-xl bg-card border border-border/60">
+                              <span className="text-[10px] text-muted-foreground uppercase font-medium block">{t('Bedrooms', 'படுக்கையறைகள்')}</span>
+                              <span className="text-sm font-semibold mt-1 block">{property.bedrooms ? `${property.bedrooms} BHK` : '-'}</span>
+                            </div>
+                            <div className="p-3 rounded-xl bg-card border border-border/60">
+                              <span className="text-[10px] text-muted-foreground uppercase font-medium block">{t('Facing', 'நோக்கு நிலை')}</span>
+                              <span className="text-sm font-semibold capitalize mt-1 block">{property.facing || '-'}</span>
+                            </div>
+                            <div className="p-3 rounded-xl bg-card border border-border/60">
+                              <span className="text-[10px] text-muted-foreground uppercase font-medium block">{t('Furnishing', 'தளவாடங்கள்')}</span>
+                              <span className="text-sm font-semibold capitalize mt-1 block">{(property as any).furnishing || (property as any).furnishingStatus || 'Unspecified'}</span>
+                            </div>
+                            <div className="p-3 rounded-xl bg-card border border-border/60">
+                              <span className="text-[10px] text-muted-foreground uppercase font-medium block">{t('Location', 'இடம்')}</span>
+                              <span className="text-sm font-semibold mt-1 block truncate">{displayLocation}</span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        <div className="p-3 rounded-xl bg-card border border-border/60">
-                          <span className="text-[10px] text-muted-foreground uppercase font-medium block">{t('Property Type', 'சொத்து வகை')}</span>
-                          <span className="text-sm font-semibold capitalize mt-1 block">{getPropertyTypeLabel(property.propertyType)}</span>
-                        </div>
-                        <div className="p-3 rounded-xl bg-card border border-border/60">
-                          <span className="text-[10px] text-muted-foreground uppercase font-medium block">{t('Total Area', 'மொத்த பரப்பளவு')}</span>
-                          <span className="text-sm font-semibold mt-1 block">{property.totalArea ? `${property.totalArea} sq.ft` : '-'}</span>
-                        </div>
-                        <div className="p-3 rounded-xl bg-card border border-border/60">
-                          <span className="text-[10px] text-muted-foreground uppercase font-medium block">{t('Bedrooms', 'படுக்கையறைகள்')}</span>
-                          <span className="text-sm font-semibold mt-1 block">{property.bedrooms ? `${property.bedrooms} BHK` : '-'}</span>
-                        </div>
-                        <div className="p-3 rounded-xl bg-card border border-border/60">
-                          <span className="text-[10px] text-muted-foreground uppercase font-medium block">{t('Facing', 'நோக்கு நிலை')}</span>
-                          <span className="text-sm font-semibold capitalize mt-1 block">{property.facing || '-'}</span>
-                        </div>
-                        <div className="p-3 rounded-xl bg-card border border-border/60">
-                          <span className="text-[10px] text-muted-foreground uppercase font-medium block">{t('Furnishing', 'தளவாடங்கள்')}</span>
-                          <span className="text-sm font-semibold capitalize mt-1 block">{(property as any).furnishing || (property as any).furnishingStatus || 'Unspecified'}</span>
-                        </div>
-                        <div className="p-3 rounded-xl bg-card border border-border/60">
-                          <span className="text-[10px] text-muted-foreground uppercase font-medium block">{t('Location', 'இடம்')}</span>
-                          <span className="text-sm font-semibold mt-1 block truncate">{displayLocation}</span>
-                        </div>
-                      </div>
-                    </div>
+                      </CardContent>
+                    </Card>
                   ) : (
                     <PropertyForm
                       inline={true}
@@ -2192,16 +2343,17 @@ export default function PropertyFullScreenView({
                       onSaved={() => {
                         setActiveSection('overview');
                       }}
+                      onCancel={() => {
+                        setActiveSection('overview');
+                      }}
                     />
-                  )}
-                </CardContent>
-              </Card>
-            )}
+                  )
+                )}
 
             {/* SECTION 3: LISTING */}
             {activeSection === 'listing' && (
-              <Card className="border border-border/80 shadow-xs">
-                <CardHeader className="pb-3 border-b border-border/40">
+              <Card className="border border-blue-100/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md shadow-xs h-full max-h-full flex flex-col overflow-hidden rounded-2xl">
+                <CardHeader className="pb-2.5 pt-3 px-4 border-b border-border/40 shrink-0">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Globe className="h-4 w-4 text-primary" />
                     {t('Public Listing & Publishing Controls', 'பொது பட்டியல் மற்றும் வெளியீட்டு கட்டுப்பாடுகள்')}
@@ -2210,7 +2362,7 @@ export default function PropertyFullScreenView({
                     {t('Manage how your property appears in search results for prospective buyers and tenants.', 'சாத்தியமான வாங்குபவர்கள் மற்றும் குத்தகைதாரர்களுக்கான தேடல் முடிவுகளில் உங்கள் சொத்து எவ்வாறு தோன்றும் என்பதை நிர்வகிக்கவும்.')}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="pt-4 space-y-4">
+                <CardContent className="p-3.5 flex-1 min-h-0 overflow-y-auto pr-2 space-y-4">
                   {isTenantView ? (
                     <div className="p-4 rounded-xl border border-muted bg-card/60 space-y-3">
                       <div className="flex items-center gap-2">
@@ -2333,8 +2485,8 @@ export default function PropertyFullScreenView({
 
             {/* SECTION 4: REQUESTS & OFFERS */}
             {activeSection === 'requests' && (
-              <Card className="border border-border/80 shadow-xs">
-                <CardHeader className="pb-3 border-b border-border/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <Card className="border border-blue-100/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md shadow-xs h-full max-h-full flex flex-col overflow-hidden rounded-2xl">
+                <CardHeader className="pb-2.5 pt-3 px-4 border-b border-border/40 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <CardTitle className="text-base flex items-center gap-2">
                       <Inbox className="h-4 w-4 text-primary" />
@@ -2379,7 +2531,7 @@ export default function PropertyFullScreenView({
                     </Button>
                   ) : null}
                 </CardHeader>
-                <CardContent className="pt-4">
+                <CardContent className="p-3.5 flex-1 min-h-0 overflow-y-auto pr-2">
                   {isSelfManaged ? (
                     /* RENDER SELF-MANAGED RENTAL LIFECYCLE & TIMELINE */
                     <div className="space-y-6">
@@ -3284,8 +3436,392 @@ export default function PropertyFullScreenView({
 
             {/* SECTION 6: RENT & PAYMENTS */}
             {activeSection === 'payments' && (
-              <Card className="border border-border/80 shadow-xs">
-                <CardHeader className="pb-3 border-b border-border/40">
+              (isTenantView || payableItems.length > 0 || receivableItems.length > 0) ? (
+                <div className="bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-4 shadow-xs h-full max-h-full flex flex-col overflow-hidden">
+                  {/* 1. Header & Rent In / Rent Out Switcher */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-sky-400 border border-blue-200/60 dark:border-blue-900/40 shrink-0">
+                        <CreditCard className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                          {rentFlowMode === 'in'
+                            ? t('Rent In — Incoming Tenant Collections', 'வாடகை பெறுதல் — குத்தகைதாரர் வசூல்')
+                            : t('Rent Out — Outgoing Rent Obligations', 'வாடகை செலுத்துதல் — வெளிசெல்லும் பொறுப்புகள்')}
+                        </h3>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {rentFlowMode === 'in'
+                            ? t('Track incoming rental income, tenant payment statuses, and collection records', 'குத்தகைதாரர்களிடமிருந்து பெறப்படும் வாடகையைக் கண்காணிக்கவும்')
+                            : t('Track monthly rent payments, upcoming due dates, and payment receipts', 'செலுத்த வேண்டிய வாடகைகள் மற்றும் ரசீதுகளைக் கண்காணிக்கவும்')}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Rent In / Rent Out toggle pills */}
+                    <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl gap-1 shrink-0 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => setRentFlowMode('in')}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                          rentFlowMode === 'in'
+                            ? 'bg-blue-600 text-white shadow-2xs'
+                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                        }`}
+                      >
+                        {t('Rent In', 'வாடகை பெறுதல்')} ({receivableItems?.length || 0})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRentFlowMode('out')}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                          rentFlowMode === 'out'
+                            ? 'bg-blue-600 text-white shadow-2xs'
+                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                        }`}
+                      >
+                        {t('Rent Out', 'வாடகை செலுத்துதல்')} ({payableItems?.length || 0})
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 min-h-0 overflow-y-auto pr-1 pt-3 space-y-4">
+
+                  {/* 2. Metric Summary Cards */}
+                  {rentFlowMode === 'in' ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* Card 1: Total Rent Received */}
+                      <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                            {t('Total Rent Received', 'மொத்த பெற்ற வாடகை')}
+                          </span>
+                          <h4 className="text-lg font-bold text-slate-900 dark:text-white">
+                            ₹{Number(receivableSummary?.totalReceived || 0).toLocaleString('en-IN')}
+                          </h4>
+                          <span className="text-[10px] text-slate-400">
+                            {receivableSummary?.receivedCount || 0} {t('units collected', 'அலகுகள் வசூலிக்கப்பட்டது')}
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 shrink-0">
+                          <CheckCircle2 className="h-5 w-5" />
+                        </div>
+                      </div>
+
+                      {/* Card 2: Pending Tenant Dues */}
+                      <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                            {t('Pending Tenant Dues', 'நிலுவை வாடகை')}
+                          </span>
+                          <h4 className="text-lg font-bold text-slate-900 dark:text-white">
+                            ₹{Number(receivableSummary?.totalPending || 0).toLocaleString('en-IN')}
+                          </h4>
+                          <span className="text-[10px] text-slate-400">
+                            {receivableSummary?.pendingCount || 0} {t('tenant(s) pending', 'குத்தகைதாரர் நிலுவை')}
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 shrink-0">
+                          <Clock className="h-5 w-5" />
+                        </div>
+                      </div>
+
+                      {/* Card 3: Collection Rate */}
+                      <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                            {t('Collection Rate', 'வசூல் விகிதம்')}
+                          </span>
+                          <h4 className="text-lg font-bold text-slate-900 dark:text-white">
+                            {receivableSummary?.collectionRate || 100}%
+                          </h4>
+                          <span className="text-[10px] text-slate-400">
+                            {receivableSummary?.totalUnits || 0} {t('active tenancies', 'செயலில் உள்ள வாடகைகள்')}
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 shrink-0">
+                          <TrendingUp className="h-5 w-5" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* Card 1: Total Rent Paid */}
+                      <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                            {t('Total Rent Paid', 'மொத்த செலுத்திய வாடகை')}
+                          </span>
+                          <h4 className="text-lg font-bold text-slate-900 dark:text-white">
+                            ₹{Number(payableSummary?.totalPaid || 0).toLocaleString('en-IN')}
+                          </h4>
+                          <span className="text-[10px] text-slate-400">
+                            {t('Completed outgoing dues', 'செலுத்தப்பட்ட தவணைகள்')}
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 shrink-0">
+                          <CheckCircle2 className="h-5 w-5" />
+                        </div>
+                      </div>
+
+                      {/* Card 2: Upcoming Due */}
+                      <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                            {t('Upcoming Due', 'அடுத்த தவணை')}
+                          </span>
+                          <h4 className="text-lg font-bold text-slate-900 dark:text-white">
+                            ₹{Number(payableSummary?.nextDueAmount || 0).toLocaleString('en-IN')}
+                          </h4>
+                          <span className="text-[10px] text-slate-400 truncate max-w-[150px] block">
+                            {t('Due on', 'தவணை நாள்')} {payableSummary?.nextDueDate || '-'}
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 shrink-0">
+                          <Clock className="h-5 w-5" />
+                        </div>
+                      </div>
+
+                      {/* Card 3: Payment Status */}
+                      <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/60 flex items-center justify-between">
+                        <div className="space-y-1">
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                            {t('Payment Status', 'கட்டண நிலை')}
+                          </span>
+                          <div>
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                              payableSummary?.statusBadge?.variant === 'paid'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                : payableSummary?.statusBadge?.variant === 'overdue'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-300'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-300'
+                            }`}>
+                              {payableSummary?.statusBadge?.text || t('All Dues Cleared', 'அனைத்தும் செலுத்தப்பட்டது')}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-400">
+                            {payableSummary?.pendingCount > 0
+                              ? `₹${Number(payableSummary?.totalPending || 0).toLocaleString('en-IN')} ${t('pending', 'நிலுவை')}`
+                              : t('0 outstanding payments', 'நிலுவை இல்லை')}
+                          </span>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 shrink-0">
+                          <CreditCard className="h-5 w-5" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. Ledger Table */}
+                  {rentFlowMode === 'in' ? (
+                    /* Rent In Ledger Table */
+                    <div className="space-y-3 pt-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-[11px]">
+                          {t('Incoming Tenant Ledger', 'வரவேண்டிய வாடகை பேரேடு')}
+                        </span>
+                        <span className="text-slate-400 text-[11px]">
+                          {receivableItems.length} {receivableItems.length === 1 ? t('Unit', 'அலகு') : t('Units', 'அலகுகள்')}
+                        </span>
+                      </div>
+
+                      {receivableItems.length === 0 ? (
+                        <div className="py-8 text-center text-xs text-slate-400">
+                          {t('No incoming rental units found', 'வாடகை அலகுகள் எதுவும் இல்லை')}
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800">
+                          <table className="w-full text-left text-xs">
+                            <thead>
+                              <tr className="bg-slate-50/70 dark:bg-slate-900/60 text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800">
+                                <th className="py-2.5 px-3 font-semibold">{t('Tenant / Contact', 'வாடகைதாரர்')}</th>
+                                <th className="py-2.5 px-3 font-semibold">{t('Rental Property', 'வாடகை சொத்து')}</th>
+                                <th className="py-2.5 px-3 font-semibold">{t('Expected Rent', 'எதிர்பார்க்கும் வாடகை')}</th>
+                                <th className="py-2.5 px-3 font-semibold">{t('Received Amount', 'பெற்ற தொகை')}</th>
+                                <th className="py-2.5 px-3 font-semibold">{t('Status', 'நிலை')}</th>
+                                <th className="py-2.5 px-3 font-semibold text-right">{t('Actions', 'செயல்கள்')}</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                              {receivableItems.map((item: any) => {
+                                const isReceived = item.status === 'received';
+                                return (
+                                  <tr key={item.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors">
+                                    <td className="py-3 px-3">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">
+                                          {item.tenantName?.[0] || 'T'}
+                                        </div>
+                                        <div className="min-w-0">
+                                          <p className="font-bold text-slate-900 dark:text-white truncate max-w-[130px]">{item.tenantName}</p>
+                                          <p className="text-[11px] text-slate-400 truncate">{item.tenantContact}</p>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="py-3 px-3">
+                                      <p className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[140px]">{item.propertyTitle}</p>
+                                    </td>
+                                    <td className="py-3 px-3 font-semibold text-slate-700 dark:text-slate-300">
+                                      ₹{Number(item.expectedRent || 0).toLocaleString('en-IN')}
+                                    </td>
+                                    <td className="py-3 px-3 font-bold text-emerald-600 dark:text-emerald-400">
+                                      ₹{Number(item.receivedAmount || 0).toLocaleString('en-IN')}
+                                    </td>
+                                    <td className="py-3 px-3">
+                                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                        isReceived ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                      }`}>
+                                        {isReceived ? t('Received', 'பெறப்பட்டது') : t('Pending', 'நிலுவையில்')}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-3 text-right">
+                                      <button
+                                        type="button"
+                                        onClick={() => toast.success(`${t('Reminder sent to', 'நினைவூட்டல் அனுப்பப்பட்டது')} ${item.tenantName}`)}
+                                        className="px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-amber-200 bg-amber-50/80 hover:bg-amber-100 text-amber-800 cursor-pointer transition-colors"
+                                      >
+                                        {t('Send Reminder', 'நினைவூட்டல்')}
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Rent Out Ledger Table */
+                    <div className="space-y-3 pt-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-[11px]">
+                          {t('Outgoing Rent Obligations', 'வெளிசெல்லும் வாடகை அட்டவணை')}
+                        </span>
+                        <span className="text-slate-400 text-[11px]">
+                          {payableItems.length} {payableItems.length === 1 ? t('Property', 'சொத்து') : t('Properties', 'சொத்துகள்')}
+                        </span>
+                      </div>
+
+                      {payableItems.length === 0 ? (
+                        <div className="py-8 text-center text-xs text-slate-400">
+                          {t('No outgoing rent obligations found', 'வாடகை பொறுப்புகள் எதுவும் இல்லை')}
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800">
+                          <table className="w-full text-left text-xs">
+                            <thead>
+                              <tr className="bg-slate-50/70 dark:bg-slate-900/60 text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800">
+                                <th className="py-2.5 px-3 font-semibold">{t('Rented Property', 'வாடகை சொத்து')}</th>
+                                <th className="py-2.5 px-3 font-semibold">{t('Landlord', 'உரிமையாளர்')}</th>
+                                <th className="py-2.5 px-3 font-semibold">{t('Rent / Maint.', 'வாடகை / பராமரிப்பு')}</th>
+                                <th className="py-2.5 px-3 font-semibold">{t('Paid vs Balance', 'செலுத்தியது / நிலுவை')}</th>
+                                <th className="py-2.5 px-3 font-semibold">{t('Status', 'நிலை')}</th>
+                                <th className="py-2.5 px-3 font-semibold text-right">{t('Actions', 'செயல்கள்')}</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                              {payableItems.map((item: any) => {
+                                const isPaid = item.status === 'paid';
+                                const isOverdue = item.status === 'overdue';
+                                return (
+                                  <tr key={item.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors">
+                                    <td className="py-3 px-3 min-w-[160px]">
+                                      <div className="flex items-center gap-2">
+                                        {item.thumbnail ? (
+                                          <img src={item.thumbnail} alt={item.propertyTitle} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-slate-200" />
+                                        ) : (
+                                          <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 text-slate-400">
+                                            <Home className="h-5 w-5" />
+                                          </div>
+                                        )}
+                                        <div className="min-w-0">
+                                          <p className="font-bold text-slate-900 dark:text-white truncate max-w-[130px]">{item.propertyTitle}</p>
+                                          <p className="text-[11px] text-slate-400 truncate">{item.propertyLocation || 'Chennai'}</p>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="py-3 px-3">
+                                      <p className="font-semibold text-slate-800 dark:text-slate-200">{item.ownerName}</p>
+                                      <p className="text-[11px] text-slate-400">{item.ownerContact}</p>
+                                    </td>
+                                    <td className="py-3 px-3">
+                                      <p className="font-bold text-slate-900 dark:text-white">₹{Number(item.monthlyRent || 0).toLocaleString('en-IN')}</p>
+                                      {item.monthlyMaintenance > 0 && (
+                                        <p className="text-[10px] text-slate-400">+₹{item.monthlyMaintenance} maint</p>
+                                      )}
+                                    </td>
+                                    <td className="py-3 px-3">
+                                      <p className="font-semibold text-emerald-600">₹{Number(item.amountPaid || 0).toLocaleString('en-IN')}</p>
+                                      {item.balance > 0 && (
+                                        <p className="text-[10px] text-rose-500 font-medium">Bal: ₹{item.balance.toLocaleString('en-IN')}</p>
+                                      )}
+                                    </td>
+                                    <td className="py-3 px-3">
+                                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                        isPaid
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                          : isOverdue
+                                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                      }`}>
+                                        {isPaid ? t('Paid', 'செலுத்தப்பட்டது') : isOverdue ? t('Overdue', 'தவணை தாண்டியது') : t('Due Soon', 'விரைவில் செலுத்த வேண்டும்')}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-3 text-right">
+                                      <div className="inline-flex items-center gap-1.5">
+                                        {!isPaid && onPayNow && (
+                                          <button
+                                            type="button"
+                                            onClick={() => onPayNow(item.raw)}
+                                            className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-2xs"
+                                          >
+                                            {t('Pay Now', 'செலுத்துக')}
+                                          </button>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (onDownloadReceipt) {
+                                              onDownloadReceipt(item);
+                                            } else {
+                                              generateReceipt(
+                                                {
+                                                  transactionId: item.transactionId,
+                                                  amount: item.amountPaid || item.monthlyRent,
+                                                  paidAt: item.paymentDate,
+                                                  paymentMethod: item.paymentMethod,
+                                                  status: 'completed',
+                                                },
+                                                {
+                                                  propertyTitle: item.propertyTitle,
+                                                  propertyLocation: item.propertyLocation,
+                                                  owner: { name: item.ownerName },
+                                                }
+                                              );
+                                            }
+                                          }}
+                                          className="p-1.5 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                                          title={t('Download Receipt', 'ரசீது பதிவிறக்கம்')}
+                                        >
+                                          <Download className="h-3.5 w-3.5 text-blue-600 dark:text-sky-400" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  </div>
+                </div>
+              ) : (
+                <Card className="border border-blue-100/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md shadow-xs h-full max-h-full flex flex-col overflow-hidden rounded-2xl">
+                <CardHeader className="pb-2.5 pt-3 px-4 border-b border-border/40 shrink-0">
                   <CardTitle className="text-base flex items-center justify-between">
                     <span className="flex items-center gap-2">
                       <CreditCard className="h-4 w-4 text-primary" />
@@ -3320,7 +3856,7 @@ export default function PropertyFullScreenView({
                       : t('Track payment history, tenant payment verifications, and monthly balances.', 'கட்டண வரலாறு மற்றும் ஒப்புதல்களை நிர்வகிக்கவும்.')}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="pt-4 space-y-4">
+                <CardContent className="p-3.5 flex-1 min-h-0 overflow-y-auto pr-2 space-y-4">
                   {isSelfManaged ? (
                     <div className="space-y-4">
                       {/* Banners: Manual tracking ledger & Online payment unavailable */}
@@ -3691,12 +4227,12 @@ export default function PropertyFullScreenView({
                   )}
                 </CardContent>
               </Card>
-            )}
+            ))}
 
             {/* SECTION 7: AGREEMENTS / DOCUMENTS */}
             {activeSection === 'agreements' && (
-              <Card className="border border-border/80 shadow-xs">
-                <CardHeader className="pb-3 border-b border-border/40">
+              <Card className="border border-blue-100/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md shadow-xs h-full max-h-full flex flex-col overflow-hidden rounded-2xl">
+                <CardHeader className="pb-2.5 pt-3 px-4 border-b border-border/40 shrink-0">
                   <CardTitle className="flex items-center justify-between text-base">
                     <span className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-primary" />
@@ -3711,7 +4247,7 @@ export default function PropertyFullScreenView({
                       : t('Manage legal rental agreements, valid lease terms, and uploaded contracts.', 'குத்தகை ஒப்பந்தங்களை நிர்வகிக்கவும்.')}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="pt-4 space-y-4">
+                <CardContent className="p-3.5 flex-1 min-h-0 overflow-y-auto pr-2 space-y-4">
                   {isSelfManaged ? (
                     <div className="space-y-4">
                       {/* Document Privacy Notice */}
@@ -3927,8 +4463,8 @@ export default function PropertyFullScreenView({
 
             {/* SECTION 8: MAINTENANCE */}
             {activeSection === 'maintenance' && (
-              <Card className="border border-border/80 shadow-xs">
-                <CardHeader className="pb-3 border-b border-border/40">
+              <Card className="border border-blue-100/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md shadow-xs h-full max-h-full flex flex-col overflow-hidden rounded-2xl">
+                <CardHeader className="pb-2.5 pt-3 px-4 border-b border-border/40 shrink-0">
                   <CardTitle className="flex items-center justify-between text-base">
                     <span className="flex items-center gap-2">
                       <Wrench className="h-4 w-4 text-primary" />
@@ -3963,7 +4499,7 @@ export default function PropertyFullScreenView({
                         : t('Review and complete maintenance issues reported for this property.', 'பராமரிப்பு சிக்கல்களை மதிப்பாய்வு செய்து தீர்க்கவும்.')}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="pt-4 space-y-4">
+                <CardContent className="p-3.5 flex-1 min-h-0 overflow-y-auto pr-2 space-y-4">
                   {isSelfManaged ? (
                     <div className="space-y-4">
                       {/* Notice */}
@@ -4271,8 +4807,8 @@ export default function PropertyFullScreenView({
 
             {/* SECTION 9: VACATE */}
             {activeSection === 'vacate' && (
-              <Card className="border border-border/80 shadow-xs">
-                <CardHeader className="pb-3 border-b border-border/40">
+              <Card className="border border-blue-100/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md shadow-xs h-full max-h-full flex flex-col overflow-hidden rounded-2xl">
+                <CardHeader className="pb-2.5 pt-3 px-4 border-b border-border/40 shrink-0">
                   <CardTitle className="flex items-center gap-2 text-base">
                     <LogOut className="h-4 w-4 text-primary" />
                     {isSelfManaged ? t('Move-Out & Vacate Planner', 'வெளியேறும் திட்டமிடல்') : isTenantView ? t('Notice to Vacate & Move-Out', 'வெளியேறும் அறிவிப்பு & நகர்வு') : t('Vacate Requests & Move-Outs', 'வெளியேறும் கோரிக்கைகள்')}
@@ -4285,7 +4821,7 @@ export default function PropertyFullScreenView({
                         : t('Review and manage tenant vacate notices and move-out confirmations.', 'குத்தகைதாரர் வெளியேறும் அறிவிப்புகளை நிர்வகிக்கவும்.')}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="pt-4 space-y-4">
+                <CardContent className="p-3.5 flex-1 min-h-0 overflow-y-auto pr-2 space-y-4">
                   {isSelfManaged ? (
                     <div className="space-y-4">
                       {/* Notice Banner */}
@@ -4608,6 +5144,7 @@ export default function PropertyFullScreenView({
           )}
         </div>
       </div>
+    </div>
 
       {/* Fullscreen Lightbox / Image Viewer Overlay */}
       {isLightboxOpen && hasImages && (

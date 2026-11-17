@@ -15,8 +15,8 @@ interface PropertyInput {
   amenities?: string[];
   status: any;
   images: any[];
-  geoLocatedImage: any;
-  geoLocation: any;
+  geoLocatedImage?: any;
+  geoLocation?: any;
   totalArea?: number;
   cent?: number;
   landDimensions?: any;
@@ -26,6 +26,7 @@ interface PropertyInput {
   monthlyMaintenance?: number;
   reraNumber?: string;
   ownershipType?: string;
+  googleMapsLink?: string;
 }
 
 // User Profile Queries

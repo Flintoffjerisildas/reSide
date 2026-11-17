@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import axios from 'axios';
+import api from '../lib/api';
 
 interface PaymentDialogProps {
     rentRecord: any;
@@ -25,16 +25,12 @@ export default function PaymentDialog({ rentRecord, open, onOpenChange, onSucces
         e.preventDefault();
         setLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            await axios.post('http://localhost:5000/api/payments/submit', {
-                rentRecordId: rentRecord._id,
+            await api.post('/payments/submit', {
+                rentRecordId: rentRecord._id || rentRecord.id,
                 amount: Number(amount),
                 mode,
-                transactionId,
+                transactionId: transactionId || `TXN-${Date.now().toString().slice(-6)}`,
                 screenshot
-                // screenshot: optional, skipped for now or add file upload if needed
-            }, {
-                headers: { 'x-auth-token': token }
             });
             toast.success('Payment submitted successfully! Waiting for owner approval.');
             onSuccess();
@@ -58,7 +54,7 @@ export default function PaymentDialog({ rentRecord, open, onOpenChange, onSucces
                 <form onSubmit={handleSubmit} className="space-y-4 pt-4">
                     <div className="space-y-2">
                         <Label>Rent Amount Due</Label>
-                        <div className="text-2xl font-bold">₹{rentRecord.balance?.toLocaleString()}</div>
+                        <div className="text-2xl font-bold">â‚¹{rentRecord.balance?.toLocaleString()}</div>
                     </div>
 
                     <div className="space-y-2">

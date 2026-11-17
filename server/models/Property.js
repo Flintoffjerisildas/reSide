@@ -35,6 +35,7 @@ const propertySchema = new mongoose.Schema({
   },
   images: [{ type: String }], // Store URLs or base64
   geoLocatedImage: { type: String },
+  googleMapsLink: { type: String, default: '' },
   geoLocation: {
     latitude: { type: Number },
     longitude: { type: Number }
@@ -80,6 +81,15 @@ const propertySchema = new mongoose.Schema({
   showAddress: { type: Boolean, default: true },
   showAmenities: { type: Boolean, default: true },
   acceptOffers: { type: Boolean, default: true },
+  isSelfManaged: { type: Boolean, default: false },
+  category: { type: String, default: 'owned' },
+  totalUnits: { type: Number, default: 1 },
+  rentDueDate: { type: String },
+  rentDueDay: { type: Number, default: 5 },
+  leaseStartDate: { type: Date },
+  leaseEndDate: { type: Date },
+  contactNumber: { type: String },
+  maintenanceDetails: { type: String },
   customDetails: [{
     key: { type: String },
     value: { type: String }

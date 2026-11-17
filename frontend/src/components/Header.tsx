@@ -110,7 +110,7 @@ export default function Header({
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 shadow-2xs transition-colors">
-      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 flex h-14 sm:h-[58px] items-center justify-between gap-4">
+      <div className="w-full px-3 sm:px-5 lg:px-6 flex h-14 sm:h-[58px] items-center justify-between gap-4">
         <div 
           className="flex shrink-0 items-center gap-2.5 text-xl font-bold tracking-tight text-[#0B1736] transition-all hover:text-blue-600 dark:text-white dark:hover:text-blue-300 cursor-pointer"
           onClick={handleHomeNavigation}
@@ -166,7 +166,7 @@ export default function Header({
             <button
               type="button"
               onClick={onDashboardClick}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 text-gray-700 dark:text-slate-200 hover:text-blue-600 text-xs font-medium shadow-sm backdrop-blur-sm cursor-pointer transition-all"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 text-xs font-medium shadow-2xs cursor-pointer transition-all"
             >
               {isDashboardActive ? <Home className="h-3.5 w-3.5" /> : <Grid2X2 className="h-3.5 w-3.5" />}
               <span>{isDashboardActive ? t('Back to Home', 'முகப்புக்கு திரும்பவும்') : t('Go to Dashboard', 'டாஷ்போர்டுக்கு செல்லவும்')}</span>

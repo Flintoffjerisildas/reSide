@@ -23,9 +23,8 @@ import { toast } from 'sonner';
 import { useLanguage } from '../contexts/LanguageContext';
 import ImageUploadSection from './ImageUploadSection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Images, Compass, ChevronDown } from 'lucide-react';
+import { Images, Compass, ChevronDown, MapPin, ExternalLink, Edit } from 'lucide-react';
 import { sqftToCent, centToSqft, formatCent, formatSqft } from '../utils/areaConversion';
-import LocationPickerMap, { LocationCoordinates } from './LocationPickerMap';
 
 interface PropertyFormProps {
   open: boolean;
@@ -33,13 +32,21 @@ interface PropertyFormProps {
   initialData?: Property | null;
   inline?: boolean;
   onSaved?: () => void;
+  onCancel?: () => void;
 }
 
-export default function PropertyForm({ open, onOpenChange, initialData, inline = false, onSaved }: PropertyFormProps) {
+export default function PropertyForm({
+  open,
+  onOpenChange,
+  initialData,
+  inline = false,
+  onSaved,
+  onCancel
+}: PropertyFormProps) {
   const [title, setTitle] = useState('');
   const [propertyType, setPropertyType] = useState('');
   const [location, setLocation] = useState('');
-  const [geoLocation, setGeoLocation] = useState<LocationCoordinates | null>(null);
+  const [googleMapsLink, setGoogleMapsLink] = useState('');
   const [price, setPrice] = useState('');
   const [transactionType, setTransactionType] = useState('purchase');
   const [securityDeposit, setSecurityDeposit] = useState('');
@@ -244,6 +251,7 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
       const pType = initialData.propertyType || '';
       setPropertyType(pType);
       setLocation(initialData.location || '');
+      setGoogleMapsLink(initialData.googleMapsLink || (initialData as any)?.mapLink || '');
       setPrice(initialData.price?.toString() || '');
       const tx = (initialData.transactionType || 'purchase').toLowerCase();
       setTransactionType(tx === 'rent' ? 'rent' : 'purchase');
@@ -279,22 +287,13 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
         setLandDimensions({ ab: '', bc: '', cd: '', da: '' });
       }
 
-      if (initialData.geoLocation && typeof initialData.geoLocation.latitude === 'number' && typeof initialData.geoLocation.longitude === 'number') {
-        setGeoLocation({
-          latitude: Number(initialData.geoLocation.latitude),
-          longitude: Number(initialData.geoLocation.longitude),
-          accuracy: initialData.geoLocation.accuracy !== undefined ? Number(initialData.geoLocation.accuracy) : undefined,
-        });
-      } else {
-        setGeoLocation(null);
-      }
       setIsLandDimensionsExpanded(false);
     } else if ((open || inline) && !initialData) {
       // Reset form for new entry
       setTitle('');
       setPropertyType('');
       setLocation('');
-      setGeoLocation(null);
+      setGoogleMapsLink('');
       setPrice('');
       setTransactionType('purchase');
       setSecurityDeposit('');
@@ -465,7 +464,7 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
             amenities: parseAmenities(amenitiesText),
             description: description.trim() || undefined,
             images: allImages,
-            geoLocation: geoLocation || null,
+            googleMapsLink: location.trim() ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location.trim())}` : undefined,
           }
         });
         toast.success(t('Property updated successfully!', 'சொத்து வெற்றிகரமாக புதுப்பிக்கப்பட்டது!'));
@@ -490,7 +489,7 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
           status: PropertyStatus.pending,
           images: base64NewImages,
           geoLocatedImage: null,
-          geoLocation: geoLocation || null,
+          googleMapsLink: location.trim() ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location.trim())}` : undefined,
         });
         toast.success(
           t(
@@ -504,7 +503,7 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
       setTitle('');
       setPropertyType('');
       setLocation('');
-      setGeoLocation(null);
+      setGoogleMapsLink('');
       setPrice('');
       setTransactionType('purchase');
       setSecurityDeposit('');
@@ -531,6 +530,12 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
   const handleDialogChange = (open: boolean) => {
     onOpenChange(open);
   };
+
+  const effectiveMapsUrl = googleMapsLink.trim()
+    ? googleMapsLink.trim()
+    : location.trim()
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location.trim())}`
+    : '';
 
   const formTabs = (
     <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
@@ -610,15 +615,38 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
             </Select>
           </div>
 
-          {/* Row 2: Property Address / Location & GPS Interactive Map (Full Width) */}
-          <div className="col-span-12">
-            <LocationPickerMap
-              value={geoLocation}
-              onChange={setGeoLocation}
-              address={location}
-              onAddressChange={setLocation}
-              hideMap={transactionType === 'rent'}
-            />
+          {/* Row 2: Property Address / Location with inline View Map button */}
+          <div className="col-span-12 grid gap-1.5">
+            <Label htmlFor="location" className="text-sm font-medium">
+              {t('Property Address / Location', 'சொத்து முகவரி / இடம்')} <span className="text-destructive">*</span>
+            </Label>
+            <div className="relative flex items-center w-full">
+              <MapPin className="absolute left-3 h-4 w-4 text-slate-400 pointer-events-none z-10" />
+              <Input
+                id="location"
+                placeholder={t('Enter property address or city...', 'முகவரி, பகுதி, நகரம்')}
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                className="w-full pl-9 pr-28 h-10 rounded-xl"
+              />
+              <a
+                href={location.trim() ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location.trim())}` : '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => {
+                  if (!location.trim()) e.preventDefault();
+                }}
+                className={`absolute right-1.5 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  location.trim()
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-2xs'
+                    : 'bg-slate-100 text-slate-400 dark:bg-slate-800 cursor-not-allowed pointer-events-none opacity-60'
+                }`}
+                title={location.trim() ? t('Open in Google Maps', 'கூகிள் வரைபடத்தில் திற') : t('Enter address to view map', 'முகவரியை உள்ளிடவும்')}
+              >
+                <span>{t('View Map', 'வரைபடம்')}</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
           </div>
 
           {/* Row 3: Conditional Pricing and Transaction Specific Fields */}
@@ -1015,20 +1043,380 @@ export default function PropertyForm({ open, onOpenChange, initialData, inline =
 
   if (inline) {
     return (
-      <div className="w-full rounded-xl border bg-card/95 p-4 sm:p-6 shadow-xs space-y-4">
-        <div className="space-y-1">
-          <h3 className="text-base sm:text-lg font-semibold tracking-tight">
-            {initialData ? t('Edit Property Details', 'சொத்து விவரங்களைத் திருத்தவும்') : t('Add Property', 'சொத்து சேர்க்கவும்')}
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            {t(
-              'Update your property specifications, dimensions, amenities, and uploaded photos below.',
-              'உங்கள் சொத்து விவரங்கள், பரிமாணங்கள், வசதிகள் மற்றும் புகைப்படங்களை கீழே புதுப்பிக்கவும்.'
-            )}
-          </p>
+      <div className="w-full h-full flex flex-col justify-between bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-4 shadow-xs overflow-hidden">
+        {/* Header row: Edit Property (Left) | Sale / Rent toggle (Center) | Details / Images switcher (Right) */}
+        <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-slate-100 dark:border-slate-800 shrink-0">
+          {/* Left: Edit Property title */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Edit className="h-4 w-4 text-blue-600 dark:text-sky-400 shrink-0" />
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+              {t('Edit Property', 'சொத்தை திருத்தவும்')}
+            </h3>
+          </div>
+
+          {/* Center: Compact segmented pill switcher (Sale | Rent) */}
+          <div className="bg-slate-100 dark:bg-slate-800 p-0.5 rounded-full flex items-center text-xs font-semibold shrink-0">
+            <button
+              type="button"
+              onClick={() => setTransactionType('purchase')}
+              className={`px-3.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${
+                transactionType === 'purchase'
+                  ? 'bg-blue-600 text-white shadow-2xs font-bold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              {t('Sale', 'விற்பனை')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setTransactionType('rent')}
+              className={`px-3.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${
+                transactionType === 'rent'
+                  ? 'bg-blue-600 text-white shadow-2xs font-bold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              {t('Rent', 'வாடகை')}
+            </button>
+          </div>
+
+          {/* Right: Compact segmented pill switcher (Details | Images (1/20)) */}
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-lg text-xs shrink-0">
+            <button
+              type="button"
+              onClick={() => setCurrentTab('details')}
+              className={`px-3 py-1 rounded-md font-semibold transition cursor-pointer ${
+                currentTab === 'details'
+                  ? 'bg-white dark:bg-slate-900/60 text-blue-600 dark:text-sky-400 shadow-2xs font-bold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              {t('Details', 'விவரங்கள்')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentTab('images')}
+              className={`px-3 py-1 rounded-md font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                currentTab === 'images'
+                  ? 'bg-white dark:bg-slate-900/60 text-blue-600 dark:text-sky-400 shadow-2xs font-bold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Images className="w-3.5 h-3.5" />
+              <span>{t('Images', 'படங்கள்')}</span>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">({images.length}/20)</span>
+            </button>
+          </div>
         </div>
-        {formTabs}
-        {actionButtons}
+
+        {/* Middle Body Container */}
+        <div className="flex-1 min-h-0 flex flex-col justify-between py-2.5">
+          {currentTab === 'details' ? (
+            <div className="flex-1 flex flex-col justify-between space-y-2 min-h-0 overflow-y-auto pr-1">
+              {/* Row 1: Title (col-span-5), Property Type (col-span-4), Property Facing (col-span-3) */}
+              <div className="grid grid-cols-12 gap-3 shrink-0">
+                <div className="col-span-12 sm:col-span-5 grid gap-0.5">
+                  <Label htmlFor="inline-title" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                    {t('Title', 'தலைப்பு')} <span className="text-rose-500">*</span>
+                  </Label>
+                  <Input
+                    id="inline-title"
+                    placeholder={t('e.g., 2BHK Apartment', 'எ.கா., 2BHK அபார்ட்மெண்ட்')}
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="py-1 px-3 text-xs h-8 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors"
+                  />
+                </div>
+
+                <div className="col-span-12 sm:col-span-4 grid gap-0.5">
+                  <Label htmlFor="inline-type" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                    {t('Property Type', 'சொத்து வகை')} <span className="text-rose-500">*</span>
+                  </Label>
+                  <Select value={propertyType} onValueChange={handlePropertyTypeChange}>
+                    <SelectTrigger id="inline-type" className="w-full py-1 px-3 text-xs h-8 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors">
+                      <SelectValue placeholder={t('Select type', 'வகையை தேர்ந்தெடுக்கவும்')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="flat">{t('Apartment / Flat', 'அபார்ட்மென்ட் / பிளாட்')}</SelectItem>
+                      <SelectItem value="house">{t('House', 'வீடு')}</SelectItem>
+                      <SelectItem value="villa">{t('Villa', 'வில்லா')}</SelectItem>
+                      <SelectItem value="pg">{t('PG / Hostel', 'பி.ஜி / விடுதி')}</SelectItem>
+                      <SelectItem value="land">{t('Land / Plot', 'நிலம் / மனை')}</SelectItem>
+                      <SelectItem value="commercial">{t('Commercial', 'வணிக இடம்')}</SelectItem>
+                      <SelectItem value="farmhouse">{t('Farm House', 'பண்ணை வீடு')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="col-span-12 sm:col-span-3 grid gap-0.5">
+                  <Label htmlFor="inline-facing" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                    {t('Property Facing', 'சொத்து திசை')} <span className="text-rose-500">*</span>
+                  </Label>
+                  <Select value={facing} onValueChange={setFacing}>
+                    <SelectTrigger id="inline-facing" className="w-full py-1 px-3 text-xs h-8 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors">
+                      <SelectValue placeholder={t('Select facing', 'திசையைத் தேர்ந்தெடுக்கவும்')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="North">{t('North', 'வடக்கு')}</SelectItem>
+                      <SelectItem value="South">{t('South', 'தெற்கு')}</SelectItem>
+                      <SelectItem value="East">{t('East', 'கிழக்கு')}</SelectItem>
+                      <SelectItem value="West">{t('West', 'மேற்கு')}</SelectItem>
+                      <SelectItem value="North-East">{t('North-East', 'வடகிழக்கு')}</SelectItem>
+                      <SelectItem value="North-West">{t('North-West', 'வடமேற்கு')}</SelectItem>
+                      <SelectItem value="South-East">{t('South-East', 'தென்கிழக்கு')}</SelectItem>
+                      <SelectItem value="South-West">{t('South-West', 'தென்மேற்கு')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Row 2: Rent/Price (col-span-3), Location with View Map (col-span-6), Deposit/Ownership (col-span-3) */}
+              <div className="grid grid-cols-12 gap-3 shrink-0">
+                {/* 1. Rent (₹) / Expected Price (₹) */}
+                <div className="col-span-12 sm:col-span-3 grid gap-0.5">
+                  <Label htmlFor="inline-price" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate">
+                    {transactionType === 'rent' ? (
+                      <>{t('Rent (₹)', 'வாடகை (₹)')} <span className="text-rose-500">*</span></>
+                    ) : (
+                      <>{t('Expected Price (₹)', 'விற்பனை விலை (₹)')} <span className="text-rose-500">*</span></>
+                    )}
+                  </Label>
+                  <Input
+                    id="inline-price"
+                    type="number"
+                    placeholder={transactionType === 'rent' ? 'e.g., 20000' : 'e.g., 8500000'}
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    className="py-1 px-3 text-xs h-8 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors"
+                  />
+                </div>
+
+                {/* 2. Property Address / Location (with View Map) */}
+                <div className="col-span-12 sm:col-span-6 grid gap-0.5">
+                  <Label htmlFor="inline-location" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                    {t('Property Address / Location', 'சொத்து முகவரி / இடம்')} <span className="text-rose-500">*</span>
+                  </Label>
+                  <div className="relative flex items-center w-full h-9 rounded-full border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 px-3 focus-within:ring-1 focus-within:ring-blue-500/30 focus-within:border-blue-500 transition-colors">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mr-2 pointer-events-none" />
+                    <input
+                      id="inline-location"
+                      type="text"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder={t('Enter property address or city...', 'சொத்து முகவரி அல்லது நகரத்தை உள்ளிடவும்...')}
+                      className="flex-1 min-w-0 bg-transparent border-none text-xs text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none pr-2"
+                    />
+                    <a
+                      href={location.trim() ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location.trim())}` : '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => {
+                        if (!location.trim()) e.preventDefault();
+                      }}
+                      className={`shrink-0 inline-flex items-center gap-1 h-6 px-3 rounded-full text-[11px] font-semibold transition ${
+                        location.trim()
+                          ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-2xs cursor-pointer'
+                          : 'bg-slate-100 text-slate-400 dark:bg-slate-800 cursor-not-allowed pointer-events-none opacity-60'
+                      }`}
+                      title={location.trim() ? t('Open in Google Maps', 'கூகிள் வரைபடத்தில் திற') : t('Enter address to view map', 'முகவரியை உள்ளிடவும்')}
+                    >
+                      <span>{t('View Map', 'வரைபடம்')}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+
+                {/* 3. Deposit (₹) / Ownership */}
+                <div className="col-span-12 sm:col-span-3 grid gap-0.5">
+                  {transactionType === 'rent' ? (
+                    <>
+                      <Label htmlFor="inline-deposit" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate">
+                        {t('Deposit (₹)', 'முன்பணம் (₹)')} <span className="text-rose-500">*</span>
+                      </Label>
+                      <Input
+                        id="inline-deposit"
+                        type="number"
+                        placeholder="e.g., 100000"
+                        value={securityDeposit}
+                        onChange={(e) => setSecurityDeposit(e.target.value)}
+                        className="py-1 px-3 text-xs h-8 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Label htmlFor="inline-ownership" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate">
+                        {t('Ownership', 'உரிமை')}
+                      </Label>
+                      <Select value={ownershipType} onValueChange={setOwnershipType}>
+                        <SelectTrigger id="inline-ownership" className="w-full py-1 px-3 text-xs h-8 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors">
+                          <SelectValue placeholder={t('Select', 'தேர்வு')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Freehold">{t('Freehold', 'சுய உரிமை')}</SelectItem>
+                          <SelectItem value="Leasehold">{t('Leasehold', 'குத்தகை உரிமை')}</SelectItem>
+                          <SelectItem value="Power of Attorney">{t('Power of Attorney', 'GPA')}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Row 3: Maintenance/RERA, Area, Cent, Bedrooms (4 columns) */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
+                {/* 1. Maint. (₹) / RERA / Patta */}
+                <div className="grid gap-0.5">
+                  {transactionType === 'rent' ? (
+                    <>
+                      <Label htmlFor="inline-maint" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate">
+                        {t('Maint. (₹)', 'பராமரிப்பு (₹)')}
+                      </Label>
+                      <Input
+                        id="inline-maint"
+                        type="number"
+                        placeholder="e.g., 2000"
+                        value={monthlyMaintenance}
+                        onChange={(e) => setMonthlyMaintenance(e.target.value)}
+                        className="py-1 px-3 text-xs h-8 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Label htmlFor="inline-rera" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate">
+                        {t('RERA / Patta', 'RERA / பட்டா')}
+                      </Label>
+                      <Input
+                        id="inline-rera"
+                        placeholder="TN/01/2023"
+                        value={reraNumber}
+                        onChange={(e) => setReraNumber(e.target.value)}
+                        className="py-1 px-3 text-xs h-8 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors"
+                      />
+                    </>
+                  )}
+                </div>
+
+                {/* 2. Area (sq ft) */}
+                <div className="grid gap-0.5">
+                  <Label htmlFor="inline-area" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate">
+                    {t('Area (sq ft)', 'பரப்பு (sq ft)')} <span className="text-rose-500">*</span>
+                  </Label>
+                  <Input
+                    id="inline-area"
+                    type="number"
+                    placeholder="e.g., 1200"
+                    value={totalArea}
+                    onChange={handleAreaChange}
+                    className="py-1 px-3 text-xs h-8 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors"
+                  />
+                </div>
+
+                {/* 3. Cent */}
+                <div className="grid gap-0.5">
+                  <Label htmlFor="inline-cent" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate">
+                    {t('Cent', 'சென்ட்')}
+                  </Label>
+                  <Input
+                    id="inline-cent"
+                    type="number"
+                    step="any"
+                    placeholder="e.g., 2.75"
+                    value={cent}
+                    onChange={handleCentChange}
+                    className="py-1 px-3 text-xs h-8 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors"
+                  />
+                </div>
+
+                {/* 4. Bedrooms */}
+                <div className="grid gap-0.5">
+                  <Label htmlFor="inline-bedrooms" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate">
+                    {t('Bedrooms', 'படுக்கையறை')} {!['land', 'commercial'].includes(propertyType.toLowerCase()) && <span className="text-rose-500">*</span>}
+                  </Label>
+                  <Input
+                    id="inline-bedrooms"
+                    type="number"
+                    placeholder="e.g., 3"
+                    value={bedrooms}
+                    onChange={(e) => setBedrooms(e.target.value)}
+                    disabled={['land', 'commercial'].includes(propertyType.toLowerCase())}
+                    className="py-1 px-3 text-xs h-8 rounded-lg disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Row 4: Amenities (col-span-4) + Description (col-span-8) */}
+              <div className="grid grid-cols-12 gap-3 flex-1 min-h-0 items-stretch">
+                <div className="col-span-12 sm:col-span-4 flex flex-col gap-0.5">
+                  <Label htmlFor="inline-amenities" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                    {t('Amenities', 'வசதிகள்')}
+                  </Label>
+                  <Textarea
+                    id="inline-amenities"
+                    rows={2}
+                    placeholder={t('e.g., Parking, Lift, Security, Gym, Power Backup', 'எ.கா., பார்க்கிங், லிப்ட், பாதுகாப்பு...')}
+                    value={amenitiesText}
+                    onChange={(e) => setAmenitiesText(e.target.value)}
+                    className="rounded-xl py-1.5 px-3 text-xs leading-relaxed resize-none flex-1 min-h-[56px] focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors"
+                  />
+                </div>
+
+                <div className="col-span-12 sm:col-span-8 flex flex-col gap-0.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="inline-description" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                      {t('Description', 'விவரம்')}
+                    </Label>
+                    <button
+                      type="button"
+                      onClick={handleGenerateDescription}
+                      className="text-[10px] font-semibold text-blue-600 hover:text-blue-700 dark:text-sky-400 cursor-pointer inline-flex items-center gap-1"
+                    >
+                      <span>✨ {t('AI Generate', 'விவரம் உருவாக்கு')}</span>
+                    </button>
+                  </div>
+                  <Textarea
+                    id="inline-description"
+                    rows={2}
+                    placeholder={t('Detailed property description, landmarks, terms...', 'சொத்து விவரம், அடையாளங்கள், விதிமுறைகள்...')}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="rounded-xl py-1.5 px-3 text-xs leading-relaxed resize-none flex-1 min-h-[56px] focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="w-full h-full min-h-0 flex flex-col">
+              <ImageUploadSection images={images} onImagesChange={setImages} compactSplit={true} />
+            </div>
+          )}
+        </div>
+
+        {/* Pinned Action Buttons Footer */}
+        <div className="shrink-0 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (onCancel) onCancel();
+              else onSaved?.();
+            }}
+            className="h-8 px-3 text-xs font-semibold rounded-lg cursor-pointer"
+          >
+            {t('Cancel', 'ரத்து செய்')}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleSubmit}
+            disabled={addPropertyMutation.isPending || updatePropertyMutation.isPending}
+            className="h-8 px-3.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-xs"
+          >
+            {addPropertyMutation.isPending || updatePropertyMutation.isPending
+              ? (initialData ? t('Saving...', 'சேமிக்கிறது...') : t('Adding...', 'சேர்க்கிறது...'))
+              : (initialData ? t('Save Changes', 'மாற்றங்களைச் சேமிக்கவும்') : t('Add Property', 'சேர்க்கவும்'))}
+          </Button>
+        </div>
       </div>
     );
   }
