@@ -127,13 +127,16 @@ router.post('/submit', auth, async (req, res) => {
     }
 });
 
-// 3. Owner: Approve Payment
+// 3. Owner & Admin: Approve Payment
 router.put('/:id/approve', auth, async (req, res) => {
     try {
         const payment = await Payment.findById(req.params.id);
         if (!payment) return res.status(404).json({ msg: 'Payment not found' });
 
-        if (payment.owner.toString() !== req.user.id) {
+        const currentUser = await User.findById(req.user?.id).select('role');
+        const isAdmin = currentUser?.role === 'admin';
+
+        if (payment.owner && payment.owner.toString() !== req.user.id && !isAdmin) {
             return res.status(401).json({ msg: 'Not authorized' });
         }
 
@@ -173,14 +176,17 @@ router.put('/:id/approve', auth, async (req, res) => {
     }
 });
 
-// 4. Owner: Reject Payment
+// 4. Owner & Admin: Reject Payment
 router.put('/:id/reject', auth, async (req, res) => {
     try {
         const { reason } = req.body;
         const payment = await Payment.findById(req.params.id);
         if (!payment) return res.status(404).json({ msg: 'Payment not found' });
 
-        if (payment.owner.toString() !== req.user.id) {
+        const currentUser = await User.findById(req.user?.id).select('role');
+        const isAdmin = currentUser?.role === 'admin';
+
+        if (payment.owner && payment.owner.toString() !== req.user.id && !isAdmin) {
             return res.status(401).json({ msg: 'Not authorized' });
         }
 
@@ -277,14 +283,17 @@ router.get('/tenant/records', auth, async (req, res) => {
             .populate('tenant', 'name email')
             .sort({ month: -1 });
 
-        // For each record, find payments?
-        // Could attach payments.
-        const recordsWithPayments = await Promise.all(records.map(async (record) => {
-            const payments = await Payment.find({ rentRecord: record._id });
-            return { ...record.toObject(), payments };
-        }));
+        const validRecords = [];
+        for (const record of records) {
+            if (record && record.property && record.property._id) {
+                const payments = await Payment.find({ rentRecord: record._id });
+                validRecords.push({ ...record.toObject(), payments });
+            } else if (record && record._id) {
+                await RentRecord.deleteOne({ _id: record._id });
+            }
+        }
 
-        res.json(recordsWithPayments);
+        res.json(validRecords);
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server Error');

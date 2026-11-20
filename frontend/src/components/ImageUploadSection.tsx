@@ -140,12 +140,12 @@ export default function ImageUploadSection({ images, onImagesChange, compactSpli
           className="hidden"
         />
 
-        <div className="grid grid-cols-12 gap-4 items-stretch h-full min-h-0 flex-1">
-          {/* Left Column (col-span-12 md:col-span-8) — Image Gallery Area */}
-          <div className="col-span-12 md:col-span-8 h-full flex flex-col min-h-0">
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_250px] gap-3 py-2 items-stretch h-full">
+          {/* Left Column — Image Gallery Area */}
+          <div className="h-full flex flex-col min-h-0 min-w-0">
             {images.length > 0 ? (
               <div className="h-full w-full rounded-xl border border-slate-200/70 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 p-2.5 overflow-y-auto">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 auto-rows-[120px]">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 auto-rows-[120px]">
                   {images.map((img, index) => {
                     let previewUrl = '';
                     if (typeof img === 'string') {
@@ -210,20 +210,20 @@ export default function ImageUploadSection({ images, onImagesChange, compactSpli
             )}
           </div>
 
-          {/* Right Column (col-span-12 md:col-span-4) — Guidelines & Upload Controls on the RIGHT */}
-          <div className="col-span-12 md:col-span-4 h-full flex flex-col min-h-0">
-            <div className="h-full flex flex-col justify-between bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-3.5 shadow-2xs">
+          {/* Right Column (250px) — Guidelines & Upload Controls on the RIGHT */}
+          <div className="h-full flex flex-col min-h-0 w-full lg:w-[250px]">
+            <div className="h-full flex flex-col justify-between bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-3 shadow-2xs">
               <div className="space-y-2">
-                <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/70 dark:border-slate-700/70">
-                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/70 dark:border-slate-700/70 gap-1.5">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
                     {t('Property Images', 'சொத்து படங்கள்')} ({images.length}/20)
                   </h4>
-                  <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded">
+                  <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded shrink-0 whitespace-nowrap">
                     {20 - images.length} {t('left', 'மீதம்')}
                   </span>
                 </div>
 
-                <ul className="text-[11px] text-slate-600 dark:text-slate-300 space-y-1.5 list-disc pl-4 leading-relaxed">
+                <ul className="text-[11px] text-slate-600 dark:text-slate-300 space-y-1.5 list-disc pl-3.5 leading-snug">
                   <li>{t('Upload up to 20 images of your property', 'உங்கள் சொத்தின் 20 படங்கள் வரை பதிவேற்றவும்')}</li>
                   <li>{t('Supported formats: JPEG, PNG, WebP', 'ஆதரிக்கப்படும் வடிவங்கள்: JPEG, PNG, WebP')}</li>
                   <li>{t('Maximum file size: 10MB per image', 'அதிகபட்ச கோப்பு அளவு: ஒரு படத்திற்கு 10MB')}</li>

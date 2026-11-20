@@ -7,18 +7,35 @@ const Agreement = require('../models/Agreement');
 const MaintenanceRequest = require('../models/MaintenanceRequest');
 const VacateRequest = require('../models/VacateRequest');
 const Payment = require('../models/Payment');
+const RentRecord = require('../models/RentRecord');
+const mongoose = require('mongoose');
 const auth = require('../middleware/auth');
 
 // Cascade deletion helper to remove orphaned requests, notifications, and contracts
 async function cascadeDeleteProperty(propertyId) {
+  const pIdStr = String(propertyId);
+  const filterList = [pIdStr];
+  if (mongoose.Types.ObjectId.isValid(pIdStr)) {
+    filterList.push(new mongoose.Types.ObjectId(pIdStr));
+  }
+  const propMatch = { $in: filterList };
+
   await Promise.allSettled([
     Property.findByIdAndDelete(propertyId),
-    Request.deleteMany({ property: propertyId }),
-    Notification.deleteMany({ property: propertyId }),
-    Agreement.deleteMany({ property: propertyId }),
-    MaintenanceRequest.deleteMany({ property: propertyId }),
-    VacateRequest.deleteMany({ property: propertyId }),
-    Payment.deleteMany({ property: propertyId })
+    Request.deleteMany({ $or: [{ property: propMatch }, { propertyId: propMatch }] }),
+    Notification.deleteMany({ $or: [{ property: propMatch }, { propertyId: propMatch }] }),
+    Agreement.deleteMany({
+      $or: [
+        { property: propMatch },
+        { propertyId: propMatch },
+        { canonicalPropertyId: propMatch },
+        { rentalId: propMatch }
+      ]
+    }),
+    MaintenanceRequest.deleteMany({ $or: [{ property: propMatch }, { propertyId: propMatch }] }),
+    VacateRequest.deleteMany({ $or: [{ property: propMatch }, { propertyId: propMatch }] }),
+    Payment.deleteMany({ $or: [{ property: propMatch }, { propertyId: propMatch }] }),
+    RentRecord.deleteMany({ $or: [{ property: propMatch }, { propertyId: propMatch }] })
   ]);
 }
 
@@ -596,6 +613,27 @@ router.put('/admin/:id', auth, auth.requireAdmin, async (req, res) => {
     res.json(property);
   } catch (err) {
     console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const property = await Property.findById(req.params.id);
+    if (!property) return res.status(404).json({ msg: 'Property not found' });
+
+    const isOwner = property.owner && property.owner.toString() === req.user.id;
+    const currentUser = await User.findById(req.user.id).select('role');
+    const isAdmin = currentUser?.role === 'admin';
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ msg: 'Not authorized to delete this property' });
+    }
+
+    await cascadeDeleteProperty(property._id);
+    res.json({ msg: 'Property and associated records removed' });
+  } catch (err) {
+    console.error('Error deleting property:', err.message);
     res.status(500).send('Server Error');
   }
 });

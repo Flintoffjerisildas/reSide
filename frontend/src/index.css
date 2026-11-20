@@ -711,3 +711,46 @@
     }
 }
 
+/* Elevate toast notification container above all modals, dialogs, and backdrops */
+#global-toast-portal,
+#global-toast-portal [data-sonner-toaster],
+[data-sonner-toaster],
+.toaster {
+    z-index: 999999 !important;
+    position: fixed !important;
+}
+
+#global-toast-portal [data-sonner-toast],
+[data-sonner-toaster] [data-sonner-toast],
+.toaster [data-sonner-toast] {
+    z-index: 999999 !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border-left: 4px solid #f43f5e !important;
+    border-top: 1px solid #e2e8f0 !important;
+    border-right: 1px solid #e2e8f0 !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25) !important;
+    opacity: 1 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    font-weight: 500 !important;
+    pointer-events: auto !important;
+}
+
+.dark #global-toast-portal [data-sonner-toast],
+.dark [data-sonner-toaster] [data-sonner-toast],
+.dark .toaster [data-sonner-toast] {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+    border-left: 4px solid #f43f5e !important;
+    border-top: 1px solid #334155 !important;
+    border-right: 1px solid #334155 !important;
+    border-bottom: 1px solid #334155 !important;
+    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.6) !important;
+    opacity: 1 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+

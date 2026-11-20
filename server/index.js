@@ -1,20 +1,39 @@
 const express = require('express');
+const http = require('http');
+const path = require('path');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const multer = require('multer');
 const FormData = require('form-data');
 const axios = require('axios');
+const { Server } = require('socket.io');
 const User = require('./models/User');
+const Property = require('./models/Property');
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true,
+  },
+  maxHttpBufferSize: 50 * 1024 * 1024,
+});
+
+app.set('io', io);
+
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '50mb' })); // Allow large payloads for images
+app.use(express.json({ limit: '50mb' })); // Allow large payloads for images & documents (exceeds 15mb)
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -111,6 +130,44 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/resideai'
     } catch (err) {
       console.error('Failed to migrate property listingStatus:', err?.message || err);
     }
+
+    // Automated cleanup of orphaned records referencing deleted properties
+    try {
+      const allProps = await Property.find({}).select('_id').lean();
+      const validPropIdStrs = new Set(allProps.map(p => String(p._id)));
+      
+      const Request = require('./models/Request');
+      const Agreement = require('./models/Agreement');
+      const RentRecord = require('./models/RentRecord');
+      const MaintenanceRequest = require('./models/MaintenanceRequest');
+      const Payment = require('./models/Payment');
+
+      const allReqs = await Request.find({}).select('_id property propertyId').lean();
+      for (const r of allReqs) {
+        const pid = String(r.property || r.propertyId || '');
+        if (!pid || !validPropIdStrs.has(pid)) {
+          await Request.deleteOne({ _id: r._id });
+        }
+      }
+
+      const allAgrs = await Agreement.find({}).select('_id property propertyId canonicalPropertyId').lean();
+      for (const a of allAgrs) {
+        const pid = String(a.property || a.propertyId || a.canonicalPropertyId || '');
+        if (!pid || !validPropIdStrs.has(pid)) {
+          await Agreement.deleteOne({ _id: a._id });
+        }
+      }
+
+      const allRRs = await RentRecord.find({}).select('_id property propertyId').lean();
+      for (const rr of allRRs) {
+        const pid = String(rr.property || rr.propertyId || '');
+        if (!pid || !validPropIdStrs.has(pid)) {
+          await RentRecord.deleteOne({ _id: rr._id });
+        }
+      }
+    } catch (err) {
+      console.error('Failed to cleanup orphaned records on startup:', err?.message || err);
+    }
   })
   .catch(err => console.log('MongoDB connection error:', err));
 
@@ -126,40 +183,47 @@ const visitRoutes = require('./routes/visits');
 const auth = require('./middleware/auth');
 const Agreement = require('./models/Agreement');
 
-// Direct agreement document upload endpoint to avoid routing issues
-app.put('/api/agreements/:id/documents', auth, async (req, res) => {
-  try {
-    const { name, data } = req.body;
-    if (!name || !data) {
-      return res.status(400).json({ msg: 'Name and data are required' });
+// Socket.IO Real-time Synchronization
+const { upsertAgreementDocument, verifyAgreementDocument } = require('./services/agreementService');
+
+io.on('connection', (socket) => {
+  console.log('Socket.IO client connected:', socket.id);
+
+  socket.on('agreement:upload', async (data, callback) => {
+    try {
+      const savedAgreement = await upsertAgreementDocument({
+        targetId: data?.propertyId || data?.targetId || data?.id || data?._id,
+        body: data,
+        io,
+      });
+      if (typeof callback === 'function') callback({ success: true, agreement: savedAgreement });
+    } catch (err) {
+      console.error('Socket agreement:upload error:', err);
+      if (typeof callback === 'function') callback({ success: false, error: err?.message || 'Upload failed' });
     }
+  });
 
-    const agreement = await Agreement.findById(req.params.id);
-    if (!agreement) {
-      return res.status(404).json({ msg: 'Agreement not found' });
+  socket.on('agreement:verify', async (data, callback) => {
+    try {
+      const savedAgreement = await verifyAgreementDocument({
+        targetId: data?.agreementId || data?.id || data?.propertyId || data?.targetId,
+        propertyId: data?.propertyId,
+        status: data?.status || 'APPROVED',
+        ownerNote: data?.ownerNote || data?.ownerMessage || data?.note,
+        reviewedAt: data?.reviewedAt,
+        body: data,
+        io,
+      });
+      if (typeof callback === 'function') callback({ success: true, agreement: savedAgreement });
+    } catch (err) {
+      console.error('Socket agreement:verify error:', err);
+      if (typeof callback === 'function') callback({ success: false, error: err?.message || 'Verify failed' });
     }
+  });
 
-    if (agreement.tenant.toString() !== req.user.id) {
-      return res.status(401).json({ msg: 'Not authorized' });
-    }
-
-    if (!Array.isArray(agreement.documents)) {
-      agreement.documents = [];
-    }
-
-    agreement.documents.push({
-      name,
-      data,
-      uploadedAt: new Date()
-    });
-
-    await agreement.save();
-
-    res.json(agreement);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
-  }
+  socket.on('disconnect', () => {
+    console.log('Socket.IO client disconnected:', socket.id);
+  });
 });
 
 app.post('/api/voice-to-text', upload.single('audio'), async (req, res) => {
@@ -288,7 +352,7 @@ app.get('/', (req, res) => {
   res.send('ReSideAI API is running');
 });
 
-const server = app.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
 

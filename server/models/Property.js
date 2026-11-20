@@ -66,6 +66,9 @@ const propertySchema = new mongoose.Schema({
   }],
   currentTenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   currentAgreementId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agreement', default: null },
+  agreementDocument: { type: String, default: '' },
+  signedAgreementUrl: { type: String, default: '' },
+  agreementFile: { type: String, default: '' },
   listingStatus: {
     type: String,
     enum: ['listed', 'unlisted', 'unavailable'],

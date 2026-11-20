@@ -287,7 +287,16 @@ router.get('/owner', auth, async (req, res) => {
       .populate('agreement')
       .populate('property')
       .sort({ createdAt: -1 });
-    res.json(requests);
+
+    const validRequests = [];
+    for (const r of requests) {
+      if (r && r.property && r.property._id) {
+        validRequests.push(r);
+      } else if (r && r._id) {
+        await Request.deleteOne({ _id: r._id });
+      }
+    }
+    res.json(validRequests);
   } catch (err) {
     console.error('Error fetching owner requests:', err.message);
     res.status(500).send('Server Error');
@@ -302,7 +311,16 @@ router.get('/tenant', auth, async (req, res) => {
       .populate('agreement')
       .populate('property')
       .sort({ createdAt: -1 });
-    res.json(requests);
+
+    const validRequests = [];
+    for (const r of requests) {
+      if (r && r.property && r.property._id) {
+        validRequests.push(r);
+      } else if (r && r._id) {
+        await Request.deleteOne({ _id: r._id });
+      }
+    }
+    res.json(validRequests);
   } catch (err) {
     console.error('Error fetching tenant requests:', err.message);
     res.status(500).send('Server Error');

@@ -18,13 +18,21 @@ const notificationSchema = new mongoose.Schema({
       'payment_rejected',
       'transaction_completed',
       'request_cancelled',
-      'ownership_transferred'
+      'ownership_transferred',
+      'agreement_uploaded',
+      'agreement_verified',
+      'agreement_synced',
+      'AGREEMENT_UPLOADED',
+      'AGREEMENT_VERIFIED',
+      'AGREEMENT_SYNCED'
     ],
     required: true
   },
   title: { type: String, required: true },
   message: { type: String, required: true },
   property: { type: mongoose.Schema.Types.ObjectId, ref: 'Property' },
+  propertyId: { type: String, index: true },
+  propertyTitle: { type: String },
   request: { type: mongoose.Schema.Types.ObjectId, ref: 'Request' },
   transactionType: { type: String, enum: ['rent', 'buy'], default: 'rent' },
   actionUrl: { type: String },

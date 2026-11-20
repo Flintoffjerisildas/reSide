@@ -327,20 +327,20 @@ export default function PropertyForm({
     const isNoBedrooms = ['land', 'commercial'].includes(propertyType.toLowerCase());
 
     if (!title.trim() || !propertyType || !location.trim() || !price || !transactionType || !totalArea || (!isNoBedrooms && !bedrooms) || !facing) {
-      toast.error(t('Please fill all required fields', 'அனைத்து அவசியமான புலங்களையும் நிரப்பவும்'));
+      toast.error(t('Please fill all required fields', 'அனைத்து அவசியமான புலங்களையும் நிரப்பவும்'), { id: 'required-fields-error' });
       return;
     }
 
     if (transactionType === 'rent') {
       const depositNum = parseFloat(securityDeposit);
       if (!securityDeposit.trim() || isNaN(depositNum) || depositNum < 0) {
-        toast.error(t('Please enter a valid Security Deposit / Advance amount', 'சரியான முன்பணம் / வைப்புத் தொகையை உள்ளிடவும்'));
+        toast.error(t('Please enter a valid Security Deposit / Advance amount', 'சரியான முன்பணம் / வைப்புத் தொகையை உள்ளிடவும்'), { id: 'required-fields-error' });
         return;
       }
       if (monthlyMaintenance.trim() !== '') {
         const maintNum = parseFloat(monthlyMaintenance);
         if (isNaN(maintNum) || maintNum < 0) {
-          toast.error(t('Please enter a valid maintenance amount', 'சரியான பராமரிப்புத் தொகையை உள்ளிடவும்'));
+          toast.error(t('Please enter a valid maintenance amount', 'சரியான பராமரிப்புத் தொகையை உள்ளிடவும்'), { id: 'required-fields-error' });
           return;
         }
       }
@@ -351,27 +351,28 @@ export default function PropertyForm({
         t(
           'Please upload at least one image',
           'குறைந்தது ஒரு படத்தையாவது பதிவேற்றவும்'
-        )
+        ),
+        { id: 'required-fields-error' }
       );
       return;
     }
 
     const priceNum = parseFloat(price);
     if (isNaN(priceNum) || priceNum <= 0) {
-      toast.error(t('Please enter a valid price', 'சரியான விலையை உள்ளிடவும்'));
+      toast.error(t('Please enter a valid price', 'சரியான விலையை உள்ளிடவும்'), { id: 'required-fields-error' });
       return;
     }
 
     const totalAreaNum = parseFloat(totalArea);
     if (isNaN(totalAreaNum) || totalAreaNum <= 0) {
-      toast.error(t('Please enter a valid total area', 'சரியான மொத்த பரப்பளவைக் குறிப்பிடவும்'));
+      toast.error(t('Please enter a valid total area', 'சரியான மொத்த பரப்பளவைக் குறிப்பிடவும்'), { id: 'required-fields-error' });
       return;
     }
 
     if (cent.trim() !== '') {
       const centNum = parseFloat(cent);
       if (isNaN(centNum) || centNum <= 0) {
-        toast.error(t('Please enter a valid cent area', 'சரியான சென்ட் பரப்பளவை உள்ளிடவும்'));
+        toast.error(t('Please enter a valid cent area', 'சரியான சென்ட் பரப்பளவை உள்ளிடவும்'), { id: 'required-fields-error' });
         return;
       }
     }

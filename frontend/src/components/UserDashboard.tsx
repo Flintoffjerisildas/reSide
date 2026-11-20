@@ -68,6 +68,7 @@ import {
 } from 'lucide-react';
 import OwnerDashboard from './OwnerDashboard';
 import CustomerDashboard from './CustomerDashboard';
+import ProfileSettingsView from './ProfileSettingsView';
 import PropertyFullScreenView, { PropertySectionKey } from './PropertyFullScreenView';
 import PropertyForm from './PropertyForm';
 import AddSelfManagedPropertyDialog from './AddSelfManagedPropertyDialog';
@@ -111,7 +112,7 @@ export default function UserDashboard({
 }: UserDashboardProps) {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
-  const { data: userProfile } = useGetCallerUserProfile();
+  const { data: userProfile, refetch: refetchUserProfile } = useGetCallerUserProfile();
   const { data: rawMyProperties = [] } = useGetMyProperties();
   const { data: allPublicProperties = [] } = useGetAllProperties();
   const [properties, setProperties] = useState<Property[]>([]);
@@ -230,6 +231,7 @@ export default function UserDashboard({
   const [selectedOwnedId, setSelectedOwnedId] = useState<string | null>(null);
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
+  const [propertySectionTab, setPropertySectionTab] = useState<PropertySectionKey>('overview');
   const [isAddRentalOpen, setIsAddRentalOpen] = useState(false);
   const [isListingSettingsOpen, setIsListingSettingsOpen] = useState(false);
   const [rentalCategoryFilter, setRentalCategoryFilter] = useState<'all' | 'connected' | 'self_managed'>('all');
@@ -243,13 +245,18 @@ export default function UserDashboard({
     (tenantAgreements || []).forEach((ag: any) => {
       if (!ag) return;
       const propObj = ag.property && typeof ag.property === 'object' ? ag.property : {};
-      const rawPropId = (typeof ag.property === 'string' ? ag.property : null) || propObj._id || propObj.id || ag._id;
-      if (rawPropId) seenPropertyIds.add(String(rawPropId));
+      const rawPropId = (typeof ag.property === 'string' ? ag.property : null) || propObj._id || propObj.id || ag.propertyId;
+      if (!rawPropId) return;
 
       const matchedProp = (allPublicProperties || []).find((p: any) => String(p._id || p.id) === String(rawPropId)) ||
                           (myProperties || []).find((p: any) => String(p._id || p.id) === String(rawPropId)) || {};
 
-      const propTitle = propObj.title || matchedProp.title || ag.propertyTitle || ag.title || t('Rental Property', 'வாடகை சொத்து');
+      const propTitle = propObj.title || matchedProp.title;
+      // If the property has been deleted from the database (no title and no property in active lists), do not display
+      if (!propTitle) return;
+
+      seenPropertyIds.add(String(rawPropId));
+
       const propLoc = propObj.location || propObj.address || matchedProp.location || matchedProp.address || ag.propertyLocation || ag.location || t('Rental Location', 'வாடகை இடம்');
       const propPrice = ag.rentAmount || propObj.price || matchedProp.price || 0;
       const propAmenities = (propObj.amenities && propObj.amenities.length > 0) ? propObj.amenities : (matchedProp.amenities || []);
@@ -275,16 +282,22 @@ export default function UserDashboard({
     // 2. Pending or active rental requests not yet finalized into active agreements
     (tenantRequests || []).forEach((req: any) => {
       if (!req || req.type !== 'rent') return;
-      const propObj = req.property && typeof req.property === 'object' ? req.property : {};
-      const rawPropId = (typeof req.property === 'string' ? req.property : null) || propObj._id || propObj.id || req._id;
-      if (!rawPropId || seenPropertyIds.has(String(rawPropId))) return;
+      // If the property was deleted from DB (req.property is null or undefined), do not show
+      if (!req.property) return;
 
-      seenPropertyIds.add(String(rawPropId));
+      const propObj = typeof req.property === 'object' ? req.property : {};
+      const rawPropId = (typeof req.property === 'string' ? req.property : null) || propObj._id || propObj.id;
+      if (!rawPropId || seenPropertyIds.has(String(rawPropId))) return;
 
       const matchedProp = (allPublicProperties || []).find((p: any) => String(p._id || p.id) === String(rawPropId)) ||
                           (myProperties || []).find((p: any) => String(p._id || p.id) === String(rawPropId)) || {};
 
-      const propTitle = propObj.title || matchedProp.title || t('Rental Application', 'வாடகை விண்ணப்பம்');
+      const propTitle = propObj.title || matchedProp.title;
+      // Never synthesize a dummy phantom property if the property was removed from the database
+      if (!propTitle) return;
+
+      seenPropertyIds.add(String(rawPropId));
+
       const propLoc = propObj.location || propObj.address || matchedProp.location || matchedProp.address || '';
       const propPrice = req.agreedAmount || req.offerAmount || propObj.price || matchedProp.price || 0;
       const propAmenities = (propObj.amenities && propObj.amenities.length > 0) ? propObj.amenities : (matchedProp.amenities || []);
@@ -452,6 +465,7 @@ export default function UserDashboard({
       const id = rec._id || rec.id;
       const propObj = rec.property && typeof rec.property === 'object' ? rec.property : {};
       const propId = getId(propObj) || getId(rec.property);
+      if (!propObj.title && !rec.propertyTitle) return;
       if (propId) seenPropertyIds.add(String(propId));
 
       const o = rec.owner && typeof rec.owner === 'object' ? rec.owner : {};
@@ -639,6 +653,7 @@ export default function UserDashboard({
     (ownerAgreements || []).forEach((agr: any) => {
       if (agr.status === 'closed' || agr.status === 'terminated') return;
       const prop = agr.property && typeof agr.property === 'object' ? agr.property : {};
+      if (!prop.title) return;
       const propId = String(getId(prop) || getId(agr.property) || agr._id);
       seenPropertyIds.add(propId);
 
@@ -1117,6 +1132,39 @@ export default function UserDashboard({
     if (!notif.read) {
       markReadMutation.mutate(notif._id);
     }
+
+    const notifType = String(notif.type || '').toUpperCase();
+    const isAgreementNotif =
+      notifType === 'AGREEMENT_UPLOADED' ||
+      notifType === 'AGREEMENT_VERIFIED' ||
+      notifType === 'AGREEMENT_SYNCED' ||
+      notifType.includes('AGREEMENT') ||
+      notif.title?.toLowerCase().includes('agreement') ||
+      notif.message?.toLowerCase().includes('agreement');
+
+    if (isAgreementNotif) {
+      const rawProp = notif.property;
+      const targetPropId =
+        getId(rawProp) ||
+        notif.propertyId ||
+        getId(notif.request?.property) ||
+        (myProperties || []).find((p: any) =>
+          p.title && (notif.propertyTitle || notif.title || notif.message)?.includes(p.title)
+        )?._id;
+
+      setMainTab('properties');
+      const isOwnerProp = (myProperties || []).some((p: any) => getId(p) === String(targetPropId));
+      if (isOwnerProp || propertySection === 'owned') {
+        setPropertySection('owned');
+        if (targetPropId) setSelectedOwnedId(String(targetPropId));
+      } else {
+        setPropertySection('rents');
+        if (targetPropId) setSelectedTenantId(String(targetPropId));
+      }
+      setPropertySectionTab('agreements');
+      return;
+    }
+
     if (notif.request) {
       const fullRequest = (ownerRequests as any[]).concat(tenantRequests as any[]).find((r: any) => r._id === (notif.request._id || notif.request));
       const targetReq = fullRequest || (typeof notif.request === 'object' ? notif.request : null);
@@ -1544,6 +1592,7 @@ export default function UserDashboard({
                 onClick={() => {
                   handleSwitchSection('rents');
                   setRentSubView('dashboard');
+                  setRentsActiveSection('overview');
                   setDetailedViewProperty(null);
                 }}
                 className={`rounded-full px-4 py-1.5 font-semibold text-xs inline-flex items-center gap-2 cursor-pointer transition-all ${
@@ -1577,6 +1626,7 @@ export default function UserDashboard({
                     onClick={() => {
                       setRentSubView('rentIn');
                       setRentFlowMode('in');
+                      setRentsActiveSection('overview');
                       setDetailedViewProperty(null);
                       if (typeof window !== 'undefined') {
                         try {
@@ -1608,6 +1658,7 @@ export default function UserDashboard({
                     onClick={() => {
                       setRentSubView('rentOut');
                       setRentFlowMode('out');
+                      setRentsActiveSection('overview');
                       setDetailedViewProperty(null);
                       if (typeof window !== 'undefined') {
                         try {
@@ -1772,6 +1823,11 @@ export default function UserDashboard({
                   selectedPropertyId={getId(activeOwnedProperty)}
                   onSelectProperty={handleSelectOwnedProperty}
                   isTenantView={false}
+                  isMyRentsView={false}
+                  activeSubTab="Property Owned"
+                  initialTab={propertySectionTab}
+                  activeSection={propertySectionTab}
+                  onActiveSectionChange={setPropertySectionTab}
                 />
               </div>
             ) : pendingPurchaseRequests.length > 0 ? (
@@ -1921,8 +1977,13 @@ export default function UserDashboard({
                 selectedPropertyId={getId(activeTenantProperty)}
                 onSelectProperty={handleSelectTenantProperty}
                 isTenantView={true}
+                isMyRentsView={true}
+                activeSubTab="My Rents"
                 tenantAgreement={activeTenantProperty?._agreement}
                 activeRequest={activeTenantProperty?._request}
+                initialTab={propertySectionTab}
+                activeSection={propertySectionTab}
+                onActiveSectionChange={setPropertySectionTab}
                 payableItems={payableItems}
                 payableSummary={payableSummary}
                 receivableItems={receivableItems}
@@ -3246,10 +3307,10 @@ export default function UserDashboard({
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{notif.message}</p>
-                        {notif.property?.title && (
+                        {(notif.property?.title || notif.propertyTitle) && (
                           <span className="inline-flex items-center gap-1 text-[11px] text-primary font-medium mt-1">
                             <Home className="w-3 h-3" />
-                            {notif.property.title}
+                            {notif.property?.title || notif.propertyTitle}
                           </span>
                         )}
                       </div>
@@ -3306,11 +3367,10 @@ export default function UserDashboard({
         </TabsContent>
 
         {/* Tab 9: Settings */}
-        <TabsContent value="settings" className="mt-0">
-          <OwnerDashboard
-            initialTab="settings"
-            hideHeaderActions={true}
-            onBrowseProperties={onBrowseProperties}
+        <TabsContent value="settings" className="mt-4">
+          <ProfileSettingsView
+            userProfile={userProfile}
+            refetchUserProfile={refetchUserProfile}
           />
         </TabsContent>
       </Tabs>

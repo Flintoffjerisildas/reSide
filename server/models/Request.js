@@ -35,6 +35,9 @@ const requestSchema = new mongoose.Schema({
   terms: { type: String }, // Agreed transaction/closing terms
   termsConfirmedByBuyer: { type: Boolean, default: false },
   termsConfirmedByOwner: { type: Boolean, default: false },
+  agreementDocument: { type: String, default: '' },
+  signedAgreementUrl: { type: String, default: '' },
+  agreementFile: { type: String, default: '' },
   rejectionReason: { type: String },
   cancelledReason: { type: String },
   paymentDetails: {
