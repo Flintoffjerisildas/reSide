@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,7 +64,8 @@ import {
   Building2,
   Users,
   Phone,
-  Mail
+  Mail,
+  Filter
 } from 'lucide-react';
 import OwnerDashboard from './OwnerDashboard';
 import CustomerDashboard from './CustomerDashboard';
@@ -178,6 +179,110 @@ export default function UserDashboard({
   const unreadNotifications = notifications.filter((n: any) => !n.isRead && !n.read);
   const unreadCount = notifications.length > 0 ? unreadNotifications.length : 0;
 
+  type NotificationFilter = 'all' | 'unread' | 'read' | 'agreements' | 'payments' | 'requests';
+  const [notifFilter, setNotifFilter] = useState<NotificationFilter>('all');
+  const [isNotifFilterOpen, setIsNotifFilterOpen] = useState(false);
+  const notifFilterRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notifFilterRef.current && !notifFilterRef.current.contains(event.target as Node)) {
+        setIsNotifFilterOpen(false);
+      }
+    };
+    if (isNotifFilterOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isNotifFilterOpen]);
+
+  const readCount = useMemo(() => {
+    return notifications.filter((n: any) => Boolean(n.read || n.isRead)).length;
+  }, [notifications]);
+
+  const agreementsCount = useMemo(() => {
+    return notifications.filter((n: any) => {
+      const t = String(n.type || '').toUpperCase();
+      return (
+        t.includes('AGREEMENT') ||
+        n.title?.toLowerCase().includes('agreement') ||
+        n.message?.toLowerCase().includes('agreement')
+      );
+    }).length;
+  }, [notifications]);
+
+  const paymentsCount = useMemo(() => {
+    return notifications.filter((n: any) => {
+      const t = String(n.type || '').toLowerCase();
+      return (
+        t.includes('payment') ||
+        t.includes('counter') ||
+        n.title?.toLowerCase().includes('payment') ||
+        n.message?.toLowerCase().includes('payment')
+      );
+    }).length;
+  }, [notifications]);
+
+  const requestsCount = useMemo(() => {
+    return notifications.filter((n: any) => {
+      const t = String(n.type || '').toLowerCase();
+      return (
+        t.includes('request') ||
+        t.includes('offer') ||
+        t.includes('accept') ||
+        t.includes('reject') ||
+        n.title?.toLowerCase().includes('request') ||
+        n.title?.toLowerCase().includes('offer')
+      );
+    }).length;
+  }, [notifications]);
+
+  const filteredNotifications = useMemo(() => {
+    if (notifFilter === 'unread') {
+      return notifications.filter((n: any) => !n.read && !n.isRead);
+    }
+    if (notifFilter === 'read') {
+      return notifications.filter((n: any) => Boolean(n.read || n.isRead));
+    }
+    if (notifFilter === 'agreements') {
+      return notifications.filter((n: any) => {
+        const t = String(n.type || '').toUpperCase();
+        return (
+          t.includes('AGREEMENT') ||
+          n.title?.toLowerCase().includes('agreement') ||
+          n.message?.toLowerCase().includes('agreement')
+        );
+      });
+    }
+    if (notifFilter === 'payments') {
+      return notifications.filter((n: any) => {
+        const t = String(n.type || '').toLowerCase();
+        return (
+          t.includes('payment') ||
+          t.includes('counter') ||
+          n.title?.toLowerCase().includes('payment') ||
+          n.message?.toLowerCase().includes('payment')
+        );
+      });
+    }
+    if (notifFilter === 'requests') {
+      return notifications.filter((n: any) => {
+        const t = String(n.type || '').toLowerCase();
+        return (
+          t.includes('request') ||
+          t.includes('offer') ||
+          t.includes('accept') ||
+          t.includes('reject') ||
+          n.title?.toLowerCase().includes('request') ||
+          n.title?.toLowerCase().includes('offer')
+        );
+      });
+    }
+    return notifications;
+  }, [notifications, notifFilter]);
+
   const getInitialSection = (): 'owned' | 'rents' => {
     if (initialPropertySection) return initialPropertySection === 'rents' ? 'rents' : 'owned';
     if (activeTab === 'rentals' || activeTab === 'my-requests' || activeTab === 'requests') return 'rents';
@@ -189,7 +294,7 @@ export default function UserDashboard({
         const sec = urlParams.get('section');
         if (sec === 'rents' || sec === 'owned') return sec;
         if (sec === 'rentIn' || sec === 'rentOut') return 'rents';
-      } catch {}
+      } catch { }
     }
     return 'owned';
   };
@@ -202,7 +307,7 @@ export default function UserDashboard({
         const sub = urlParams.get('subview');
         if (sub === 'rentIn' || sec === 'rentIn') return 'rentIn';
         if (sub === 'rentOut' || sec === 'rentOut') return 'rentOut';
-      } catch {}
+      } catch { }
     }
     return 'dashboard';
   };
@@ -249,7 +354,7 @@ export default function UserDashboard({
       if (!rawPropId) return;
 
       const matchedProp = (allPublicProperties || []).find((p: any) => String(p._id || p.id) === String(rawPropId)) ||
-                          (myProperties || []).find((p: any) => String(p._id || p.id) === String(rawPropId)) || {};
+        (myProperties || []).find((p: any) => String(p._id || p.id) === String(rawPropId)) || {};
 
       const propTitle = propObj.title || matchedProp.title;
       // If the property has been deleted from the database (no title and no property in active lists), do not display
@@ -290,7 +395,7 @@ export default function UserDashboard({
       if (!rawPropId || seenPropertyIds.has(String(rawPropId))) return;
 
       const matchedProp = (allPublicProperties || []).find((p: any) => String(p._id || p.id) === String(rawPropId)) ||
-                          (myProperties || []).find((p: any) => String(p._id || p.id) === String(rawPropId)) || {};
+        (myProperties || []).find((p: any) => String(p._id || p.id) === String(rawPropId)) || {};
 
       const propTitle = propObj.title || matchedProp.title;
       // Never synthesize a dummy phantom property if the property was removed from the database
@@ -572,8 +677,8 @@ export default function UserDashboard({
       statusBadge: pendingItems.length === 0
         ? { text: t('All Dues Cleared', 'அனைத்தும் செலுத்தப்பட்டது'), variant: 'paid' }
         : pendingItems.some(it => it.status === 'overdue')
-        ? { text: t('Overdue Payment', 'காலாவதியான கட்டணம்'), variant: 'overdue' }
-        : { text: `${pendingItems.length} ${t('Payment Pending', 'கட்டணம் நிலுவையில்')}`, variant: 'pending' },
+          ? { text: t('Overdue Payment', 'காலாவதியான கட்டணம்'), variant: 'overdue' }
+          : { text: `${pendingItems.length} ${t('Payment Pending', 'கட்டணம் நிலுவையில்')}`, variant: 'pending' },
     };
   }, [payableItems, t]);
 
@@ -666,7 +771,7 @@ export default function UserDashboard({
       try {
         if (agr.startDate) startFormatted = new Date(agr.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
         if (agr.endDate) endFormatted = new Date(agr.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-      } catch {}
+      } catch { }
 
       list.push({
         id: propId,
@@ -746,8 +851,8 @@ export default function UserDashboard({
     const collectedAmount = ownerRentSummary?.totalCollected != null
       ? Number(ownerRentSummary.totalCollected)
       : receivableSummary.totalReceived > 0
-      ? receivableSummary.totalReceived
-      : monthlyYield;
+        ? receivableSummary.totalReceived
+        : monthlyYield;
 
     const collectedPercent = monthlyYield > 0 ? Math.min(100, Math.round((collectedAmount / monthlyYield) * 100)) : 100;
     const pendingAmount = receivableSummary.totalPending || Math.max(0, monthlyYield - collectedAmount);
@@ -838,7 +943,7 @@ export default function UserDashboard({
         const currentUrl = new URL(window.location.href);
         currentUrl.searchParams.set('section', 'owned');
         window.history.replaceState({}, '', currentUrl.toString());
-      } catch {}
+      } catch { }
     }
   };
 
@@ -850,7 +955,7 @@ export default function UserDashboard({
         const currentUrl = new URL(window.location.href);
         currentUrl.searchParams.set('section', 'rents');
         window.history.replaceState({}, '', currentUrl.toString());
-      } catch {}
+      } catch { }
     }
   };
 
@@ -870,7 +975,7 @@ export default function UserDashboard({
         currentUrl.searchParams.set('section', section);
         currentUrl.searchParams.delete('subview');
         window.history.replaceState({}, '', currentUrl.toString());
-      } catch {}
+      } catch { }
     }
     if (section === 'owned') {
       const targetId = selectedOwnedId || (myProperties[0] ? getId(myProperties[0]) : null);
@@ -1282,10 +1387,10 @@ export default function UserDashboard({
         </div>
 
         {/* Container 2: Primary Navigation Tabs (Unified white container, equal-width tabs, blue pill active highlight) */}
-        <TabsList className="w-full bg-white/95 dark:bg-[#07111e] border border-blue-100/80 dark:border-slate-800 rounded-2xl shadow-xs p-1.5 flex items-center justify-between gap-1 overflow-x-auto h-auto mt-4">
+        <TabsList className="w-full bg-white/95 dark:bg-[#07111e] border border-blue-100/80 dark:border-slate-600/75 rounded-2xl shadow-xs p-1.5 flex items-center justify-between gap-1 overflow-x-auto h-auto mt-4">
           <TabsTrigger
             value="overview"
-            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white cursor-pointer"
+            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-200 hover:dark:text-white cursor-pointer"
           >
             <LayoutGrid className="h-4 w-4" />
             <span>{t('Overview', 'கண்ணோட்டம்')}</span>
@@ -1293,7 +1398,7 @@ export default function UserDashboard({
 
           <TabsTrigger
             value="properties"
-            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white cursor-pointer"
+            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-200 hover:dark:text-white cursor-pointer"
           >
             <Building className="h-4 w-4" />
             <span>{t('My Properties', 'என் சொத்துக்கள்')}</span>
@@ -1309,7 +1414,7 @@ export default function UserDashboard({
 
           <TabsTrigger
             value="notifications"
-            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white cursor-pointer"
+            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-200 hover:dark:text-white cursor-pointer"
           >
             <Bell className="h-4 w-4" />
             <span>{t('Notifications', 'அறிவிப்புகள்')}</span>
@@ -1322,7 +1427,7 @@ export default function UserDashboard({
 
           <TabsTrigger
             value="reports"
-            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white cursor-pointer"
+            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-200 hover:dark:text-white cursor-pointer"
           >
             <FileText className="h-4 w-4" />
             <span>{t('Reports', 'அறிக்கைகள்')}</span>
@@ -1330,7 +1435,7 @@ export default function UserDashboard({
 
           <TabsTrigger
             value="settings"
-            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white cursor-pointer"
+            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-200 hover:dark:text-white cursor-pointer"
           >
             <User className="h-4 w-4" />
             <span>{t('My Profile', 'என் சுயவிவரம்')}</span>
@@ -1451,13 +1556,13 @@ export default function UserDashboard({
                 <p className="text-sm text-muted-foreground">
                   {tenantRequests.length === 0
                     ? t(
-                        'You have not submitted any purchase or rental requests yet. Explore verified listings anytime.',
-                        'நீங்கள் இன்னும் எந்த கொள்முதல் அல்லது வாடகை கோரிக்கையையும் அனுப்பவில்லை.'
-                      )
+                      'You have not submitted any purchase or rental requests yet. Explore verified listings anytime.',
+                      'நீங்கள் இன்னும் எந்த கொள்முதல் அல்லது வாடகை கோரிக்கையையும் அனுப்பவில்லை.'
+                    )
                     : t(
-                        `You have ${tenantRequests.length} active request(s) underway across sale and rental properties.`,
-                        `உங்களிடம் ${tenantRequests.length} செயலில் உள்ள கோரிக்கைகள் உள்ளன.`
-                      )}
+                      `You have ${tenantRequests.length} active request(s) underway across sale and rental properties.`,
+                      `உங்களிடம் ${tenantRequests.length} செயலில் உள்ள கோரிக்கைகள் உள்ளன.`
+                    )}
                 </p>
                 <div className="flex flex-wrap gap-2 pt-2">
                   <Button
@@ -1517,13 +1622,13 @@ export default function UserDashboard({
                 <p className="text-sm text-muted-foreground">
                   {myProperties.length === 0
                     ? t(
-                        'You have not listed any properties yet. Click List Property to add your home, plot, or commercial space.',
-                        'நீங்கள் இதுவரை எந்த சொத்தையும் பட்டியலிடவில்லை. சொத்தை சேர்க்கலாம்.'
-                      )
+                      'You have not listed any properties yet. Click List Property to add your home, plot, or commercial space.',
+                      'நீங்கள் இதுவரை எந்த சொத்தையும் பட்டியலிடவில்லை. சொத்தை சேர்க்கலாம்.'
+                    )
                     : t(
-                        `You have ${myProperties.length} property listing(s) and ${pendingOwnerRequests} pending inquiry/offer(s).`,
-                        `உங்களிடம் ${myProperties.length} சொத்துகள் மற்றும் ${pendingOwnerRequests} நிலுவை சலுகைகள் உள்ளன.`
-                      )}
+                      `You have ${myProperties.length} property listing(s) and ${pendingOwnerRequests} pending inquiry/offer(s).`,
+                      `உங்களிடம் ${myProperties.length} சொத்துகள் மற்றும் ${pendingOwnerRequests} நிலுவை சலுகைகள் உள்ளன.`
+                    )}
                 </p>
                 <div className="flex flex-wrap gap-2 pt-2">
                   <Button size="sm" onClick={() => setIsPropertyFormOpen(true)} className="gap-1.5">
@@ -1559,7 +1664,7 @@ export default function UserDashboard({
         {/* Tab 2: My Properties */}
         <TabsContent value="properties" className="mt-0 space-y-4">
           {/* Sub-Header / Filter Command Bar */}
-          <div className="w-full bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md border border-blue-100/80 dark:border-slate-800/80 rounded-2xl px-4 py-2 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shadow-xs transition-colors mt-3">
+          <div className="w-full bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md border border-blue-100/80 dark:border-slate-600/75 rounded-2xl px-4 py-2 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shadow-xs transition-colors mt-3">
             {/* Left side pills */}
             <div className="flex items-center gap-2 flex-wrap">
               {/* 1. Property Owned */}
@@ -1570,17 +1675,15 @@ export default function UserDashboard({
                   handleSwitchSection('owned');
                   setDetailedViewProperty(null);
                 }}
-                className={`rounded-full px-4 py-1.5 font-semibold text-xs inline-flex items-center gap-2 cursor-pointer transition-all ${
-                  propertySection === 'owned'
-                    ? 'border border-blue-500 text-blue-600 bg-white dark:bg-[#0d162a] shadow-xs font-bold'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 font-medium'
-                }`}
+                className={`rounded-full px-4 py-1.5 font-semibold text-xs inline-flex items-center gap-2 cursor-pointer transition-all ${propertySection === 'owned'
+                  ? 'border border-blue-500 text-blue-600 bg-white dark:bg-[#0d162a] shadow-xs font-bold'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:dark:text-white font-medium'
+                  }`}
               >
                 <KeyRound className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
                 <span>{t('Property Owned', 'சொத்து உரிமையாளர்')}</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                  propertySection === 'owned' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-                }`}>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${propertySection === 'owned' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                  }`}>
                   {myProperties.length}
                 </span>
               </button>
@@ -1595,21 +1698,19 @@ export default function UserDashboard({
                   setRentsActiveSection('overview');
                   setDetailedViewProperty(null);
                 }}
-                className={`rounded-full px-4 py-1.5 font-semibold text-xs inline-flex items-center gap-2 cursor-pointer transition-all ${
-                  propertySection === 'rents' && rentSubView === 'dashboard'
-                    ? 'border border-blue-500 text-blue-600 bg-white dark:bg-[#0d162a] shadow-xs font-bold'
-                    : propertySection === 'rents'
-                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 font-semibold'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 font-medium'
-                }`}
+                className={`rounded-full px-4 py-1.5 font-semibold text-xs inline-flex items-center gap-2 cursor-pointer transition-all ${propertySection === 'rents' && rentSubView === 'dashboard'
+                  ? 'border border-blue-500 text-blue-600 bg-white dark:bg-[#0d162a] shadow-xs font-bold'
+                  : propertySection === 'rents'
+                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:dark:text-white font-semibold'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:dark:text-white font-medium'
+                  }`}
               >
                 <Home className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
                 <span>{t('My Rents', 'எனது வாடகைகள்')}</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                  propertySection === 'rents' && rentSubView === 'dashboard'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300'
-                    : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-                }`}>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${propertySection === 'rents' && rentSubView === 'dashboard'
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300'
+                  : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                  }`}>
                   {tenantProperties.length}
                 </span>
               </button>
@@ -1634,19 +1735,17 @@ export default function UserDashboard({
                           currentUrl.searchParams.set('section', 'rents');
                           currentUrl.searchParams.set('subview', 'rentIn');
                           window.history.replaceState({}, '', currentUrl.toString());
-                        } catch {}
+                        } catch { }
                       }
                     }}
-                    className={`rounded-full px-4 py-1.5 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer transition-all ${
-                      rentSubView === 'rentIn'
-                        ? 'bg-blue-600 text-white shadow-xs font-bold'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 font-medium'
-                    }`}
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer transition-all ${rentSubView === 'rentIn'
+                      ? 'bg-blue-600 text-white shadow-xs font-bold'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:dark:text-white font-medium'
+                      }`}
                   >
                     <span>{t('Rent In', 'வாடகை பெறுதல்')}</span>
-                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                      rentSubView === 'rentIn' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-                    }`}>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${rentSubView === 'rentIn' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                      }`}>
                       {receivableItems.length}
                     </span>
                   </button>
@@ -1666,19 +1765,17 @@ export default function UserDashboard({
                           currentUrl.searchParams.set('section', 'rents');
                           currentUrl.searchParams.set('subview', 'rentOut');
                           window.history.replaceState({}, '', currentUrl.toString());
-                        } catch {}
+                        } catch { }
                       }
                     }}
-                    className={`rounded-full px-4 py-1.5 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer transition-all ${
-                      rentSubView === 'rentOut'
-                        ? 'bg-blue-600 text-white shadow-xs font-bold'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 font-medium'
-                    }`}
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer transition-all ${rentSubView === 'rentOut'
+                      ? 'bg-blue-600 text-white shadow-xs font-bold'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:dark:text-white font-medium'
+                      }`}
                   >
                     <span>{t('Rent Out', 'வாடகை செலுத்துதல்')}</span>
-                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                      rentSubView === 'rentOut' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-                    }`}>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${rentSubView === 'rentOut' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                      }`}>
                       {payableSummary.pendingCount > 0 ? `${payableSummary.pendingCount} Pending` : payableItems.length}
                     </span>
                   </button>
@@ -1807,8 +1904,8 @@ export default function UserDashboard({
                               {isAwaitingVerification
                                 ? t('Update Payment Details', 'கட்டண விவரங்களை மாற்றுக')
                                 : isRejected
-                                ? t('Re-submit Payment', 'மீண்டும் சமர்ப்பி')
-                                : t('Proceed to Payment', 'கட்டணம் செலுத்த தொடரவும்')}
+                                  ? t('Re-submit Payment', 'மீண்டும் சமர்ப்பி')
+                                  : t('Proceed to Payment', 'கட்டணம் செலுத்த தொடரவும்')}
                             </Button>
                           </div>
                         );
@@ -1940,8 +2037,8 @@ export default function UserDashboard({
                               {isAwaitingVerification
                                 ? t('Update Payment Details', 'கட்டண விவரங்களை மாற்றுக')
                                 : isRejected
-                                ? t('Re-submit Payment', 'மீண்டும் சமர்ப்பி')
-                                : t('Proceed to Payment', 'கட்டணம் செலுத்த தொடரவும்')}
+                                  ? t('Re-submit Payment', 'மீண்டும் சமர்ப்பி')
+                                  : t('Proceed to Payment', 'கட்டணம் செலுத்த தொடரவும்')}
                             </Button>
                           </div>
                         </div>
@@ -2338,13 +2435,12 @@ export default function UserDashboard({
                       {t('Payment Status', 'கட்டண நிலை')}
                     </p>
                     <div>
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                        payableSummary.statusBadge.variant === 'paid'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300'
-                          : payableSummary.statusBadge.variant === 'overdue'
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${payableSummary.statusBadge.variant === 'paid'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300'
+                        : payableSummary.statusBadge.variant === 'overdue'
                           ? 'bg-rose-50 text-rose-700 border border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-300'
                           : 'bg-amber-50 text-amber-700 border border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-300'
-                      }`}>
+                        }`}>
                         {payableSummary.statusBadge.variant === 'paid' ? (
                           <CheckCircle2 className="h-3.5 w-3.5" />
                         ) : (
@@ -2596,44 +2692,40 @@ export default function UserDashboard({
                   <button
                     type="button"
                     onClick={() => setSentFilterStatus('all')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      sentFilterStatus === 'all'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
-                    }`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${sentFilterStatus === 'all'
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                      }`}
                   >
                     {t('My Requests', 'என் கோரிக்கைகள்')} ({customerCounts.all})
                   </button>
                   <button
                     type="button"
                     onClick={() => setSentFilterStatus('pending')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      sentFilterStatus === 'pending'
-                        ? 'bg-amber-600 text-white shadow-sm'
-                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
-                    }`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${sentFilterStatus === 'pending'
+                      ? 'bg-amber-600 text-white shadow-sm'
+                      : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                      }`}
                   >
                     {t('Pending Owner Approval', 'உரிமையாளர் ஒப்புதல் நிலுவையில்')} ({customerCounts.pending})
                   </button>
                   <button
                     type="button"
                     onClick={() => setSentFilterStatus('awaiting_payment')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      sentFilterStatus === 'awaiting_payment'
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
-                    }`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${sentFilterStatus === 'awaiting_payment'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                      }`}
                   >
                     {t('Awaiting Payment', 'கட்டணம் நிலுவையில்')} ({customerCounts.awaitingPayment})
                   </button>
                   <button
                     type="button"
                     onClick={() => setSentFilterStatus('completed_rejected')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      sentFilterStatus === 'completed_rejected'
-                        ? 'bg-slate-700 text-white shadow-sm'
-                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
-                    }`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${sentFilterStatus === 'completed_rejected'
+                      ? 'bg-slate-700 text-white shadow-sm'
+                      : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                      }`}
                   >
                     {t('Completed / Rejected', 'முடிந்தவை / நிராகரிக்கப்பட்டவை')} ({customerCounts.completedRejected})
                   </button>
@@ -2643,27 +2735,24 @@ export default function UserDashboard({
                   <button
                     type="button"
                     onClick={() => setSentFilterType('all')}
-                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                      sentFilterType === 'all' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground'
-                    }`}
+                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${sentFilterType === 'all' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground'
+                      }`}
                   >
                     {t('All', 'அனைத்தும்')}
                   </button>
                   <button
                     type="button"
                     onClick={() => setSentFilterType('buy')}
-                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                      sentFilterType === 'buy' ? 'bg-background shadow-xs text-blue-600 font-semibold' : 'text-muted-foreground'
-                    }`}
+                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${sentFilterType === 'buy' ? 'bg-background shadow-xs text-blue-600 font-semibold' : 'text-muted-foreground'
+                      }`}
                   >
                     {t('Buy Offers', 'வாங்க சலுகைகள்')}
                   </button>
                   <button
                     type="button"
                     onClick={() => setSentFilterType('rent')}
-                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                      sentFilterType === 'rent' ? 'bg-background shadow-xs text-emerald-600 font-semibold' : 'text-muted-foreground'
-                    }`}
+                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${sentFilterType === 'rent' ? 'bg-background shadow-xs text-emerald-600 font-semibold' : 'text-muted-foreground'
+                      }`}
                   >
                     {t('Rentals', 'வாடகை')}
                   </button>
@@ -2689,11 +2778,10 @@ export default function UserDashboard({
                       <div className="space-y-1.5 flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span
-                            className={`px-2 py-0.5 text-[11px] rounded-full font-semibold ${
-                              req.type === 'buy'
-                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
-                                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-                            }`}
+                            className={`px-2 py-0.5 text-[11px] rounded-full font-semibold ${req.type === 'buy'
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                              }`}
                           >
                             {req.type === 'buy' ? t('Buy / Purchase Offer', 'வாங்க சலுகை') : t('Rent Application', 'வாடகை கோரிக்கை')}
                           </span>
@@ -2802,44 +2890,40 @@ export default function UserDashboard({
                   <button
                     type="button"
                     onClick={() => setIncomingFilterStatus('all')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      incomingFilterStatus === 'all'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
-                    }`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${incomingFilterStatus === 'all'
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                      }`}
                   >
                     {t('Incoming Requests', 'பெறப்பட்ட கோரிக்கைகள்')} ({ownerCounts.all})
                   </button>
                   <button
                     type="button"
                     onClick={() => setIncomingFilterStatus('pending')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      incomingFilterStatus === 'pending'
-                        ? 'bg-amber-600 text-white shadow-sm'
-                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
-                    }`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${incomingFilterStatus === 'pending'
+                      ? 'bg-amber-600 text-white shadow-sm'
+                      : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                      }`}
                   >
                     {t('Accept / Reject', 'ஏற்க / நிராகரிக்க')} ({ownerCounts.pending})
                   </button>
                   <button
                     type="button"
                     onClick={() => setIncomingFilterStatus('awaiting_payment')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      incomingFilterStatus === 'awaiting_payment'
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
-                    }`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${incomingFilterStatus === 'awaiting_payment'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                      }`}
                   >
                     {t('Accepted / Awaiting Payment', 'ஏற்றுக்கொள்ளப்பட்டது / கட்டணம் நிலுவையில்')} ({ownerCounts.awaitingPayment})
                   </button>
                   <button
                     type="button"
                     onClick={() => setIncomingFilterStatus('completed')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      incomingFilterStatus === 'completed'
-                        ? 'bg-slate-700 text-white shadow-sm'
-                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
-                    }`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${incomingFilterStatus === 'completed'
+                      ? 'bg-slate-700 text-white shadow-sm'
+                      : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                      }`}
                   >
                     {t('Completed Transactions', 'முடிந்த ஒப்பந்தங்கள்')} ({ownerCounts.completed})
                   </button>
@@ -2849,27 +2933,24 @@ export default function UserDashboard({
                   <button
                     type="button"
                     onClick={() => setIncomingFilterType('all')}
-                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                      incomingFilterType === 'all' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground'
-                    }`}
+                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${incomingFilterType === 'all' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground'
+                      }`}
                   >
                     {t('All', 'அனைத்தும்')}
                   </button>
                   <button
                     type="button"
                     onClick={() => setIncomingFilterType('buy')}
-                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                      incomingFilterType === 'buy' ? 'bg-background shadow-xs text-blue-600 font-semibold' : 'text-muted-foreground'
-                    }`}
+                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${incomingFilterType === 'buy' ? 'bg-background shadow-xs text-blue-600 font-semibold' : 'text-muted-foreground'
+                      }`}
                   >
                     {t('Purchase Offers', 'கொள்முதல் சலுகைகள்')}
                   </button>
                   <button
                     type="button"
                     onClick={() => setIncomingFilterType('rent')}
-                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                      incomingFilterType === 'rent' ? 'bg-background shadow-xs text-emerald-600 font-semibold' : 'text-muted-foreground'
-                    }`}
+                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${incomingFilterType === 'rent' ? 'bg-background shadow-xs text-emerald-600 font-semibold' : 'text-muted-foreground'
+                      }`}
                   >
                     {t('Rentals', 'வாடகை')}
                   </button>
@@ -2892,11 +2973,10 @@ export default function UserDashboard({
                       <div className="space-y-1.5 flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span
-                            className={`px-2 py-0.5 text-[11px] rounded-full font-semibold ${
-                              req.type === 'buy'
-                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
-                                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-                            }`}
+                            className={`px-2 py-0.5 text-[11px] rounded-full font-semibold ${req.type === 'buy'
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                              }`}
                           >
                             {req.type === 'buy' ? t('Buy Inquiry / Offer', 'வாங்க சலுகை') : t('Rent Request', 'வாடகை கோரிக்கை')}
                           </span>
@@ -3076,9 +3156,8 @@ export default function UserDashboard({
                                 : t('As Property Owner', 'உரிமையாளராக')}
                             </Badge>
                             <span
-                              className={`px-2 py-0.5 text-[11px] rounded-full font-semibold ${
-                                req.type === 'buy' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
-                              }`}
+                              className={`px-2 py-0.5 text-[11px] rounded-full font-semibold ${req.type === 'buy' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+                                }`}
                             >
                               {req.type === 'buy' ? t('Purchase Closing', 'கொள்முதல்') : t('Rental Lease', 'வாடகை')}
                             </span>
@@ -3125,11 +3204,10 @@ export default function UserDashboard({
                               <span className="text-[10px]">✓ {t('Done', 'முடிந்தது')}</span>
                             </div>
                             <div
-                              className={`p-2 rounded-lg border ${
-                                ['terms_confirmed', 'payment_pending', 'completed'].includes(req.status)
-                                  ? 'bg-emerald-500/10 border-emerald-300 text-emerald-700 dark:text-emerald-300'
-                                  : 'bg-muted/40 border-muted-foreground/20 text-muted-foreground'
-                              }`}
+                              className={`p-2 rounded-lg border ${['terms_confirmed', 'payment_pending', 'completed'].includes(req.status)
+                                ? 'bg-emerald-500/10 border-emerald-300 text-emerald-700 dark:text-emerald-300'
+                                : 'bg-muted/40 border-muted-foreground/20 text-muted-foreground'
+                                }`}
                             >
                               <span className="font-semibold block">2. {t('Terms Confirmed', 'விதிமுறைகள்')}</span>
                               <span className="text-[10px]">
@@ -3139,29 +3217,27 @@ export default function UserDashboard({
                               </span>
                             </div>
                             <div
-                              className={`p-2 rounded-lg border ${
-                                ['payment_pending', 'completed'].includes(req.status)
-                                  ? 'bg-emerald-500/10 border-emerald-300 text-emerald-700 dark:text-emerald-300'
-                                  : req.status === 'terms_confirmed'
+                              className={`p-2 rounded-lg border ${['payment_pending', 'completed'].includes(req.status)
+                                ? 'bg-emerald-500/10 border-emerald-300 text-emerald-700 dark:text-emerald-300'
+                                : req.status === 'terms_confirmed'
                                   ? 'bg-blue-500/10 border-blue-300 text-blue-700 animate-pulse'
                                   : 'bg-muted/40 border-muted-foreground/20 text-muted-foreground'
-                              }`}
+                                }`}
                             >
                               <span className="font-semibold block">3. {t('Payment', 'கட்டணம்')}</span>
                               <span className="text-[10px]">
                                 {req.status === 'completed'
                                   ? `✓ ${t('Verified', 'சரிபார்க்கப்பட்டது')}`
                                   : req.status === 'payment_pending'
-                                  ? t('Under Verification', 'சரிபார்ப்பில்')
-                                  : t('Ready', 'தயார்')}
+                                    ? t('Under Verification', 'சரிபார்ப்பில்')
+                                    : t('Ready', 'தயார்')}
                               </span>
                             </div>
                             <div
-                              className={`p-2 rounded-lg border ${
-                                req.status === 'completed'
-                                  ? 'bg-emerald-600 text-white border-emerald-600 font-semibold'
-                                  : 'bg-muted/40 border-muted-foreground/20 text-muted-foreground'
-                              }`}
+                              className={`p-2 rounded-lg border ${req.status === 'completed'
+                                ? 'bg-emerald-600 text-white border-emerald-600 font-semibold'
+                                : 'bg-muted/40 border-muted-foreground/20 text-muted-foreground'
+                                }`}
                             >
                               <span className="font-semibold block">4. {t('Closed / Sold', 'முடிந்தது')}</span>
                               <span className="text-[10px]">
@@ -3183,30 +3259,28 @@ export default function UserDashboard({
                             </div>
                             {/* Rental Step 3: Deposit / Rent */}
                             <div
-                              className={`p-2 rounded-lg border ${
-                                req.status === 'completed' || req.paymentDetails?.status === 'verified'
-                                  ? 'bg-emerald-500/10 border-emerald-300 text-emerald-700 dark:text-emerald-300'
-                                  : req.status === 'payment_pending'
+                              className={`p-2 rounded-lg border ${req.status === 'completed' || req.paymentDetails?.status === 'verified'
+                                ? 'bg-emerald-500/10 border-emerald-300 text-emerald-700 dark:text-emerald-300'
+                                : req.status === 'payment_pending'
                                   ? 'bg-indigo-500/10 border-indigo-300 text-indigo-700 animate-pulse'
                                   : 'bg-emerald-500/5 border-emerald-200 text-emerald-700 dark:text-emerald-300'
-                              }`}
+                                }`}
                             >
                               <span className="font-semibold block">3. {t('Deposit / Rent', 'முன்பணம் / வாடகை')}</span>
                               <span className="text-[10px]">
                                 {req.status === 'completed' || req.paymentDetails?.status === 'verified'
                                   ? `✓ ${t('Verified', 'சரிபார்க்கப்பட்டது')}`
                                   : req.status === 'payment_pending'
-                                  ? t('Under Verification', 'சரிபார்ப்பில்')
-                                  : `✓ ${t('Billing Active', 'கட்டணம் தொடக்கம்')}`}
+                                    ? t('Under Verification', 'சரிபார்ப்பில்')
+                                    : `✓ ${t('Billing Active', 'கட்டணம் தொடக்கம்')}`}
                               </span>
                             </div>
                             {/* Rental Step 4: Active Tenancy */}
                             <div
-                              className={`p-2 rounded-lg border ${
-                                req.status === 'completed'
-                                  ? 'bg-emerald-600 text-white border-emerald-600 font-semibold'
-                                  : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-400 font-medium'
-                              }`}
+                              className={`p-2 rounded-lg border ${req.status === 'completed'
+                                ? 'bg-emerald-600 text-white border-emerald-600 font-semibold'
+                                : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-400 font-medium'
+                                }`}
                             >
                               <span className="font-semibold block">4. {t('Tenancy Status', 'குத்தகை நிலை')}</span>
                               <span className="text-[10px]">
@@ -3241,17 +3315,162 @@ export default function UserDashboard({
         </TabsContent>
 
         {/* Tab 6: Notifications Hub */}
-        <TabsContent value="notifications" className="space-y-4 mt-0">
-          <Card>
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-lg font-bold flex items-center gap-2">
-                  <Bell className="w-5 h-5 text-indigo-500" />
-                  {t('In-App Action Notifications', 'செயல் அறிவிப்புகள்')}
-                </CardTitle>
-                <CardDescription>
-                  {t('Actionable alerts for offers, counteroffers, terms, and payments.', 'சலுகைகள், எதிர் சலுகைகள் மற்றும் கட்டணங்களுக்கான அறிவிப்புகள்.')}
-                </CardDescription>
+        <TabsContent value="notifications" className="space-y-4 mt-0 w-full">
+          <Card className="w-full border border-slate-200/70 dark:border-slate-600/75 shadow-sm bg-white/90 dark:bg-[#070e1b]/80 backdrop-blur-md rounded-2xl">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3 mb-3 border-b border-slate-200/70 dark:border-slate-600/75">
+              <div className="flex flex-wrap items-center gap-3 min-w-0">
+                {/* Top-Left Corner: Clickable Filter Dropdown */}
+                <div className="relative shrink-0" ref={notifFilterRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsNotifFilterOpen((prev) => !prev)}
+                    title="Filter notifications"
+                    aria-label="Filter notifications"
+                    className="w-9 h-9 inline-flex items-center justify-center rounded-full border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 shadow-sm hover:bg-slate-50 transition-all relative cursor-pointer"
+                  >
+                    <Filter className="w-4 h-4" />
+                    {notifFilter !== 'all' && (
+                      <span className="w-2 h-2 rounded-full bg-blue-600 absolute top-1.5 right-1.5" />
+                    )}
+                  </button>
+
+                  {isNotifFilterOpen && (
+                    <div className="absolute left-0 top-full mt-2 w-60 rounded-2xl border border-slate-200 dark:border-slate-600/75 bg-white dark:bg-slate-900 shadow-2xl p-2 z-50">
+                      {/* Status Options */}
+                      <div className="space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => { setNotifFilter('all'); setIsNotifFilterOpen(false); }}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                            notifFilter === 'all'
+                              ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <span>{t('All Notifications', 'அனைத்து அறிவிப்புகள்')}</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                            notifFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                          }`}>
+                            {notifications.length}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => { setNotifFilter('unread'); setIsNotifFilterOpen(false); }}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                            notifFilter === 'unread'
+                              ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-blue-500" />
+                            <span>{t('Unread', 'படிக்காதவை')}</span>
+                          </span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                            notifFilter === 'unread' ? 'bg-white/20 text-white' : 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300'
+                          }`}>
+                            {unreadCount}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => { setNotifFilter('read'); setIsNotifFilterOpen(false); }}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                            notifFilter === 'read'
+                              ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <span>{t('Read', 'படித்தவை')}</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                            notifFilter === 'read' ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                          }`}>
+                            {readCount}
+                          </span>
+                        </button>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="my-1.5 border-t border-slate-100 dark:border-slate-600/75" />
+
+                      {/* Category Options */}
+                      <div className="space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => { setNotifFilter('agreements'); setIsNotifFilterOpen(false); }}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                            notifFilter === 'agreements'
+                              ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>{t('Agreements', 'ஒப்பந்தங்கள்')}</span>
+                          </span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                            notifFilter === 'agreements' ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                          }`}>
+                            {agreementsCount}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => { setNotifFilter('payments'); setIsNotifFilterOpen(false); }}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                            notifFilter === 'payments'
+                              ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <CreditCard className="w-3.5 h-3.5" />
+                            <span>{t('Payments', 'கட்டணங்கள்')}</span>
+                          </span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                            notifFilter === 'payments' ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                          }`}>
+                            {paymentsCount}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => { setNotifFilter('requests'); setIsNotifFilterOpen(false); }}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                            notifFilter === 'requests'
+                              ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Inbox className="w-3.5 h-3.5" />
+                            <span>{t('Requests & Offers', 'கோரிக்கைகள்')}</span>
+                          </span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                            notifFilter === 'requests' ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                          }`}>
+                            {requestsCount}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="min-w-0">
+                  <CardTitle className="text-lg font-bold flex items-center gap-2">
+                    <Bell className="w-5 h-5 text-indigo-500 shrink-0" />
+                    <span>{t('In-App Action Notifications', 'செயல் அறிவிப்புகள்')}</span>
+                  </CardTitle>
+                  <CardDescription>
+                    {t('Actionable alerts for offers, counteroffers, terms, and payments.', 'சலுகைகள், எதிர் சலுகைகள் மற்றும் கட்டணங்களுக்கான அறிவிப்புகள்.')}
+                  </CardDescription>
+                </div>
               </div>
 
               {unreadCount > 0 && (
@@ -3259,67 +3478,76 @@ export default function UserDashboard({
                   variant="outline"
                   size="sm"
                   onClick={() => markAllReadMutation.mutate()}
-                  className="gap-1.5 text-xs"
+                  className="gap-1.5 text-xs shrink-0 cursor-pointer"
                 >
                   <CheckCheck className="w-3.5 h-3.5 text-primary" />
-                  {t('Mark all as read', 'அனைத்தையும் படித்ததாக குறி')}
+                  <span>{t('Mark all as read', 'அனைத்தையும் படித்ததாக குறி')}</span>
                 </Button>
               )}
             </CardHeader>
             <CardContent>
-              {notifications.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
+              {filteredNotifications.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground pb-16">
                   <Bell className="mx-auto h-12 w-12 text-muted-foreground/20 mb-3" />
-                  <p className="font-medium">{t('No notifications yet.', 'அறிவிப்புகள் எதுவும் இல்லை.')}</p>
+                  <p className="font-medium">
+                    {notifFilter === 'unread'
+                      ? t('No unread notifications.', 'படிக்காத அறிவிப்புகள் எதுவும் இல்லை.')
+                      : t('No notifications match this filter.', 'இந்த வடிகட்டியில் அறிவிப்புகள் எதுவும் இல்லை.')}
+                  </p>
                 </div>
               ) : (
-                <div className="space-y-2.5">
-                  {notifications.map((notif: any) => (
-                    <div
-                      key={notif._id}
-                      onClick={() => handleNotificationClick(notif)}
-                      className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-start gap-3.5 ${
-                        notif.read ? 'bg-card hover:bg-muted/40' : 'bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200 hover:border-indigo-400'
-                      }`}
-                    >
-                      <div className="p-2 rounded-lg bg-primary/10 text-primary flex-shrink-0 mt-0.5">
-                        {notif.type.includes('payment') ? (
-                          <CreditCard className="w-4 h-4" />
-                        ) : notif.type.includes('counter') ? (
-                          <IndianRupee className="w-4 h-4" />
-                        ) : notif.type.includes('accepted') ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        ) : notif.type.includes('rejected') ? (
-                          <XCircle className="w-4 h-4 text-destructive" />
-                        ) : (
-                          <Inbox className="w-4 h-4" />
-                        )}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <h4 className={`text-sm ${notif.read ? 'font-medium' : 'font-bold text-foreground'}`}>
-                            {notif.title}
-                          </h4>
-                          <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                            {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })},{' '}
-                            {new Date(notif.createdAt).toLocaleDateString()}
-                          </span>
+                <div className="space-y-2.5 pb-16 w-full">
+                  {filteredNotifications.map((notif: any) => {
+                    const isUnread = !notif.read && !notif.isRead;
+                    return (
+                      <div
+                        key={notif._id}
+                        onClick={() => handleNotificationClick(notif)}
+                        className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-start gap-3.5 w-full ${
+                          isUnread
+                            ? 'border-l-4 border-l-blue-600 bg-white/95 dark:bg-slate-900/90 dark:backdrop-blur-md border-slate-200/80 dark:border-slate-600/75 shadow-xs hover:border-blue-400'
+                            : 'border-l-4 border-l-transparent bg-white/60 dark:bg-slate-900/75 dark:backdrop-blur-md border-slate-200/50 dark:border-slate-600/75 hover:bg-white/80 dark:hover:bg-slate-800/80'
+                        }`}
+                      >
+                        <div className="p-2 rounded-lg bg-primary/10 text-primary flex-shrink-0 mt-0.5">
+                          {notif.type.includes('payment') ? (
+                            <CreditCard className="w-4 h-4" />
+                          ) : notif.type.includes('counter') ? (
+                            <IndianRupee className="w-4 h-4" />
+                          ) : notif.type.includes('accepted') ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          ) : notif.type.includes('rejected') ? (
+                            <XCircle className="w-4 h-4 text-destructive" />
+                          ) : (
+                            <Inbox className="w-4 h-4" />
+                          )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{notif.message}</p>
-                        {(notif.property?.title || notif.propertyTitle) && (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-primary font-medium mt-1">
-                            <Home className="w-3 h-3" />
-                            {notif.property?.title || notif.propertyTitle}
-                          </span>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className={`text-sm font-semibold text-slate-900 dark:text-white ${isUnread ? 'font-bold' : ''}`}>
+                              {notif.title}
+                            </h4>
+                            <span className="text-[11px] text-slate-500 dark:text-slate-300 flex-shrink-0 font-medium">
+                              {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })},{' '}
+                              {new Date(notif.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-300 mt-0.5 leading-relaxed">{notif.message}</p>
+                          {(notif.property?.title || notif.propertyTitle) && (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-primary font-medium mt-1">
+                              <Home className="w-3 h-3" />
+                              {notif.property?.title || notif.propertyTitle}
+                            </span>
+                          )}
+                        </div>
+
+                        {isUnread && (
+                          <div className="w-2.5 h-2.5 rounded-full bg-blue-600 flex-shrink-0 mt-2" />
                         )}
                       </div>
-
-                      {!notif.read && (
-                        <div className="w-2.5 h-2.5 rounded-full bg-indigo-600 flex-shrink-0 mt-2" />
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

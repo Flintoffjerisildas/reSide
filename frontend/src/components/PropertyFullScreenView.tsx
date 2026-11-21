@@ -2372,7 +2372,7 @@ export default function PropertyFullScreenView({
         {/* 6. Main Workspace Responsive Layout with Synchronized Heights */}
         <div className="w-full pt-3 grid grid-cols-1 lg:grid-cols-[240px_210px_1fr] gap-5 lg:h-[465px] lg:max-h-[465px] items-stretch">
           {/* A. LEFT COLUMN: "Your Properties" (240px Sidebar) */}
-          <div className="w-full h-full flex flex-col justify-between relative bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-3 shadow-xs">
+          <div className="w-full h-full flex flex-col justify-between relative bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-600/75 p-3 shadow-xs">
             {/* Floating Filter & Sort Popover */}
             {isFilterOpen && (
               <div
@@ -2547,18 +2547,18 @@ export default function PropertyFullScreenView({
                         }}
                         className={`w-full text-left transition-all cursor-pointer ${
                           isSelected
-                            ? 'border-2 border-blue-500 bg-[#f0f7ff] dark:bg-blue-950/20 rounded-2xl p-2.5 flex items-center gap-2.5 shadow-2xs'
-                            : 'border border-slate-200/80 hover:border-blue-200 bg-white dark:bg-slate-900/50 dark:border-slate-800/80 rounded-2xl p-2.5 flex items-center gap-2.5'
+                            ? 'border-2 border-blue-500 bg-[#f0f7ff] dark:bg-blue-950/20 dark:border-cyan-400/25 rounded-2xl p-2.5 flex items-center gap-2.5 shadow-2xs'
+                            : 'border border-slate-200/80 hover:border-blue-200 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md dark:border-slate-600/75 rounded-2xl p-2.5 flex items-center gap-2.5'
                         }`}
                       >
                         {thumbImg ? (
                           <img
                             src={thumbImg}
                             alt={item.title}
-                            className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-100 dark:border-slate-800"
+                            className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-100 dark:border-slate-700/80"
                           />
                         ) : (
-                          <div className="w-14 h-14 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-800 text-slate-400">
+                          <div className="w-14 h-14 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-700/80 text-slate-400">
                             <Home className="h-6 w-6" />
                           </div>
                         )}
@@ -2567,7 +2567,7 @@ export default function PropertyFullScreenView({
                             {item.title}
                           </h4>
                           {city && (
-                            <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                            <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-300">
                               <MapPin className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                               <span className="truncate">{city}</span>
                             </div>
@@ -2592,10 +2592,10 @@ export default function PropertyFullScreenView({
           </div>
 
           {/* B. MIDDLE COLUMN: "MANAGEMENT SECTIONS" (210px Sidebar) */}
-          <div className="w-full h-full flex flex-col justify-between overflow-hidden bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-3 shadow-xs">
+          <div className="w-full h-full flex flex-col justify-between overflow-hidden bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-600/75 p-3 shadow-xs">
             {/* Top sections */}
             <div className="space-y-1 overflow-y-auto pr-0.5">
-              <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">
                 {t('MANAGEMENT SECTIONS', 'நிர்வாகப் பிரிவுகள்')}
               </div>
 
@@ -2611,7 +2611,7 @@ export default function PropertyFullScreenView({
                     className={`w-full text-left px-2.5 py-2.5 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
                       isActive
                         ? 'bg-blue-600 text-white font-semibold shadow-xs'
-                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 font-medium'
+                        : 'text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:dark:text-white font-medium'
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -2645,7 +2645,7 @@ export default function PropertyFullScreenView({
                     className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-2.5 transition-colors cursor-pointer ${
                       isActive
                         ? 'bg-blue-600 text-white font-semibold shadow-xs'
-                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 font-medium'
+                        : 'text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:dark:text-white font-medium'
                     }`}
                   >
                     <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
@@ -2672,7 +2672,7 @@ export default function PropertyFullScreenView({
             {activeSection === 'overview' ? (
               <>
                 {/* Top Detail Header Strip */}
-                <div className="bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-3.5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shrink-0">
+                <div className="bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-600/75 p-3.5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shrink-0">
                   {/* Left: Property thumbnail + Title + Location pin */}
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-800 overflow-hidden">
@@ -2772,7 +2772,7 @@ export default function PropertyFullScreenView({
                 {/* Nested Grid (Image & Specifications & Details): grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch */}
                 <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
                   {/* Left Image Container (md:col-span-7) */}
-                  <div className="md:col-span-7 h-full w-full relative rounded-2xl overflow-hidden group bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 shadow-xs min-h-[360px]">
+                  <div className="md:col-span-7 h-full w-full relative rounded-2xl overflow-hidden group bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-600/75 shadow-xs min-h-[360px]">
                     {carouselImages.length > 0 ? (
                       <>
                         <img
@@ -2823,7 +2823,7 @@ export default function PropertyFullScreenView({
                   </div>
 
                   {/* Right "Specifications & Details" Card (md:col-span-5): h-full flex flex-col justify-between */}
-                  <div className="md:col-span-5 h-full flex flex-col justify-between bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-800/80 p-4 shadow-xs">
+                  <div className="md:col-span-5 h-full flex flex-col justify-between bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-600/75 p-4 shadow-xs">
                     {/* Top Group: Title + 2-Column Grid Specs */}
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
@@ -2838,106 +2838,106 @@ export default function PropertyFullScreenView({
                         {Boolean(property?.isSelfManaged || (property as any)?.isSelfManaged) ? (
                           <>
                             {/* Property Type */}
-                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <Home className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                   {t('Property Type', 'சொத்து வகை')}
                                 </span>
                               </div>
-                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                              <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
                                 {getPropertyTypeLabel(property.propertyType) || '-'}
                               </span>
                             </div>
 
                             {/* Total Units / Rooms */}
-                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <Layers className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                   {t('Total Units', 'மொத்த அலகுகள்')}
                                 </span>
                               </div>
-                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                              <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
                                 {property.totalUnits ? `${property.totalUnits} Units` : '1 Unit'}
                               </span>
                             </div>
 
                             {/* Deposit */}
-                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <IndianRupee className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                   {t('Deposit', 'முன்பணம்')}
                                 </span>
                               </div>
-                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                              <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
                                 {property.securityDeposit ? `₹${Number(property.securityDeposit).toLocaleString('en-IN')}` : depositValue}
                               </span>
                             </div>
 
                             {/* Maintenance Details */}
-                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <Wrench className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                   {t('Maintenance', 'பராமரிப்பு')}
                                 </span>
                               </div>
-                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                              <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
                                 {property.maintenanceDetails || (property.monthlyMaintenance ? `₹${property.monthlyMaintenance.toLocaleString('en-IN')}/mo` : 'Included')}
                               </span>
                             </div>
 
                             {/* Rent Due Date */}
-                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                   {t('Rent Due Date', 'தவணை நாள்')}
                                 </span>
                               </div>
-                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                              <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
                                 {property.rentDueDate || (property.rentDueDay ? `${property.rentDueDay}th of month` : '5th of month')}
                               </span>
                             </div>
 
                             {/* Property Status */}
-                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                   {t('Status', 'நிலை')}
                                 </span>
                               </div>
-                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                              <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
                                 {isOccupied ? t('Occupied', 'குடியேற்றப்பட்டது') : t('Vacant', 'காலியாக')}
                               </span>
                             </div>
 
                             {/* Lease Duration */}
-                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition col-span-2">
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition col-span-2">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <Calendar className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                   {t('Lease Duration', 'குத்தகை காலம்')}
                                 </span>
                               </div>
-                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                              <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
                                 {property.leaseStartDate ? new Date(property.leaseStartDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '01 Jan 2025'} - {property.leaseEndDate ? new Date(property.leaseEndDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '31 Dec 2025'}
                               </span>
                             </div>
 
                             {/* Contact Number */}
                             {Boolean(property.contactNumber || (property as any)?.phone) && (
-                              <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition col-span-2">
+                              <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition col-span-2">
                                 <div className="flex items-center gap-1.5 min-w-0">
                                   <Phone className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                     {t('Management Contact', 'தொடர்பு எண்')}
                                   </span>
                                 </div>
-                                <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
                                   {property.contactNumber || (property as any)?.phone}
                                 </span>
                               </div>
@@ -2946,80 +2946,80 @@ export default function PropertyFullScreenView({
                         ) : isRentalTransaction || isTenantView || isSelfManaged ? (
                           <>
                             {/* Property Type */}
-                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <Home className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                   {t('Property Type', 'சொத்து வகை')}
                                 </span>
                               </div>
-                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                              <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
                                 {getPropertyTypeLabel(property.propertyType) || '-'}
                               </span>
                             </div>
 
                             {/* Deposit */}
-                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <IndianRupee className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                   {t('Deposit', 'முன்பணம்')}
                                 </span>
                               </div>
-                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                              <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
                                 {depositValue}
                               </span>
                             </div>
 
                             {/* Maintenance */}
-                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <Wrench className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                   {t('Maintenance', 'பராமரிப்பு')}
                                 </span>
                               </div>
-                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                              <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
                                 {maintenanceValue}
                               </span>
                             </div>
 
                             {/* Preferred */}
-                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <Users className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                   {t('Preferred', 'விருப்பம்')}
                                 </span>
                               </div>
-                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                              <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
                                 {(property as any)?.preferredTenant || (property as any)?.preferred || '-'}
                               </span>
                             </div>
 
                             {/* Available */}
-                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <Clock className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                   {t('Available', 'கிடைக்கும் நிலை')}
                                 </span>
                               </div>
-                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                              <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
                                 {(property as any)?.availableFrom || (property as any)?.availability || t('Immediate', 'உடனடியாக')}
                               </span>
                             </div>
 
                             {/* Owner (hidden when owner views their own property) */}
                             {shouldShowOwnerPill && (
-                              <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                              <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
                                 <div className="flex items-center gap-1.5 min-w-0">
                                   <User className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                     {t('Owner', 'உரிமையாளர்')}
                                   </span>
                                 </div>
-                                <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
                                   {ownerDisplayName || '-'}
                                 </span>
                               </div>
@@ -3027,14 +3027,14 @@ export default function PropertyFullScreenView({
 
                             {/* Tenant (shown only in owner dashboard when rented) */}
                             {shouldShowTenantPill && (
-                              <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                              <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
                                 <div className="flex items-center gap-1.5 min-w-0">
                                   <UserCheck className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                  <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                     {t('Tenant', 'வாடகைதாரர்')}
                                   </span>
                                 </div>
-                                <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                                <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
                                   {tenantDisplayName || tenancyStatus || '-'}
                                 </span>
                               </div>
@@ -3043,53 +3043,53 @@ export default function PropertyFullScreenView({
                         ) : (
                           <>
                             {/* Property Type */}
-                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <Home className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                   {t('Property Type', 'சொத்து வகை')}
                                 </span>
                               </div>
-                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                              <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
                                 {getPropertyTypeLabel(property.propertyType) || '-'}
                               </span>
                             </div>
 
                             {/* Total Area */}
-                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <Maximize2 className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                   {t('Total Area', 'மொத்த பரப்பளவு')}
                                 </span>
                               </div>
-                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0">
+                              <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
                                 {property.totalArea ? `${Number(property.totalArea).toLocaleString()} sq.ft` : '-'}
                               </span>
                             </div>
 
                             {/* Facing */}
-                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <Compass className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                   {t('Facing', 'நோக்கு நிலை')}
                                 </span>
                               </div>
-                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0 capitalize">
+                              <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0 capitalize">
                                 {property.facing || '-'}
                               </span>
                             </div>
 
                             {/* Ownership Type */}
-                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
+                            <div className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1 shadow-2xs hover:border-blue-200 transition">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <FileText className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-300 font-medium truncate">
                                   {t('Ownership Type', 'உரிமை வகை')}
                                 </span>
                               </div>
-                              <span className="text-[11px] font-bold text-slate-900 dark:text-white shrink-0 capitalize">
+                              <span className="text-[11px] font-semibold text-slate-900 dark:text-white shrink-0 capitalize">
                                 {(property as any)?.ownershipType || '-'}
                               </span>
                             </div>
@@ -3099,7 +3099,7 @@ export default function PropertyFullScreenView({
                     </div>
 
                     {/* Middle Group: Amenities & Features */}
-                    <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+                    <div className="pt-2.5 border-t border-slate-100 dark:border-slate-600/75 space-y-1.5">
                       <h5 className="text-xs font-bold text-slate-900 dark:text-white">
                         {t('Amenities & Features', 'வசதிகள்')}
                       </h5>
@@ -3126,7 +3126,7 @@ export default function PropertyFullScreenView({
                     </div>
 
                     {/* Bottom Group: Description */}
-                    <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 space-y-1">
+                    <div className="pt-2.5 border-t border-slate-100 dark:border-slate-600/75 space-y-1">
                       <h5 className="text-xs font-bold text-slate-900 dark:text-white">
                         {t('Description', 'விளக்கம்')}
                       </h5>
@@ -3351,7 +3351,7 @@ export default function PropertyFullScreenView({
 
             {/* SECTION 4: REQUESTS & OFFERS */}
             {activeSection === 'requests' && (
-              <Card className="border border-blue-100/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md shadow-xs h-full max-h-full flex flex-col overflow-hidden rounded-2xl">
+              <Card className="border border-blue-100/80 dark:border-slate-600/75 bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md shadow-xs h-full max-h-full flex flex-col overflow-hidden rounded-2xl">
                 <CardHeader className="pb-2.5 pt-3 px-4 border-b border-border/40 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <CardTitle className="text-base flex items-center gap-2">
@@ -3367,7 +3367,7 @@ export default function PropertyFullScreenView({
                         </Badge>
                       )}
                     </CardTitle>
-                    <CardDescription className="text-xs">
+                    <CardDescription className="text-xs text-slate-500 dark:text-slate-300">
                       {(isTenantView || isBuyerView)
                         ? (isSelfManaged
                             ? t('Track your complete self-managed rental history: agreement terms, payment logs, landlord connection, and move-out plan.', 'வாடகை விதிமுறைகள், கட்டண பதிவு, நிலப்பிரபு இணைப்பு மற்றும் நகர்வு நிலை ஆகியவற்றை கண்காணிக்கவும்.')
@@ -3402,7 +3402,7 @@ export default function PropertyFullScreenView({
                     /* RENDER SELF-MANAGED RENTAL LIFECYCLE & TIMELINE */
                     <div className="space-y-6">
                       {/* Top Property & Lease Terms Banner */}
-                      <div className="border rounded-2xl p-4 sm:p-5 bg-card/70 border-border/70 shadow-2xs space-y-4">
+                      <div className="border rounded-2xl p-4 sm:p-5 bg-card/70 dark:bg-slate-900/75 dark:backdrop-blur-md border-border/70 dark:border-slate-600/75 shadow-2xs space-y-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 pb-3">
                           <div className="flex items-center gap-2 flex-wrap">
                             <Badge className="bg-emerald-600/10 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800 text-xs font-semibold">
@@ -3413,7 +3413,7 @@ export default function PropertyFullScreenView({
                               {getPropertyTypeLabel(currentSelfManaged?.propertyType || property?.propertyType || 'Apartment')}
                             </Badge>
                           </div>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-slate-500 dark:text-slate-300">
                             {t('Started on', 'தொடங்கிய தேதி')}: {currentSelfManaged?.leaseStartDate ? new Date(currentSelfManaged.leaseStartDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : (currentSelfManaged?.createdAt ? new Date(currentSelfManaged.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'Active')}
                           </span>
                         </div>
@@ -3452,7 +3452,7 @@ export default function PropertyFullScreenView({
                               status: currentSelfManaged?.vacate?.noticeGiven ? 'warning' : 'neutral'
                             }
                           ].map((stage) => (
-                            <div key={stage.id} className="flex flex-col items-start gap-1 p-2.5 rounded-xl bg-background/70 border border-border/50 text-xs">
+                            <div key={stage.id} className="flex flex-col items-start gap-1 p-2.5 rounded-xl bg-background/70 dark:bg-slate-900/75 dark:backdrop-blur-md border border-border/50 dark:border-slate-600/75 text-xs">
                               <div className="flex items-center gap-1.5 w-full">
                                 <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${
                                   stage.status === 'done'
@@ -3465,37 +3465,37 @@ export default function PropertyFullScreenView({
                                 }`}>
                                   {stage.status === 'done' ? '✓' : stage.id}
                                 </span>
-                                <span className="font-semibold text-foreground truncate text-[11px]">{stage.title}</span>
+                                <span className="font-semibold text-slate-900 dark:text-white truncate text-[11px]">{stage.title}</span>
                               </div>
-                              <span className="text-[10px] text-muted-foreground ml-6 truncate">{stage.desc}</span>
+                              <span className="text-[10px] text-slate-500 dark:text-slate-300 font-medium ml-6 truncate">{stage.desc}</span>
                             </div>
                           ))}
                         </div>
 
                         {/* Lease Terms Summary */}
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs p-3.5 rounded-xl bg-muted/20 border border-border/40">
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs p-3.5 rounded-xl bg-muted/20 dark:bg-slate-900/75 dark:backdrop-blur-md border border-border/40 dark:border-slate-600/75">
                           <div>
-                            <p className="text-muted-foreground text-[11px]">{t('Monthly Rent', 'மாத வாடகை')}</p>
-                            <p className="font-bold text-foreground text-sm text-emerald-600 dark:text-emerald-400">
+                            <p className="text-slate-500 dark:text-slate-300 font-medium text-[11px]">{t('Monthly Rent', 'மாத வாடகை')}</p>
+                            <p className="font-semibold text-foreground text-sm text-emerald-600 dark:text-emerald-400">
                               ₹{Number(currentSelfManaged?.monthlyRent || property?.price || 0).toLocaleString('en-IN')}
-                              <span className="text-[10px] text-muted-foreground font-normal"> /mo</span>
+                              <span className="text-[10px] text-slate-500 dark:text-slate-300 font-normal"> /mo</span>
                             </p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground text-[11px]">{t('Security Deposit', 'முன்பணம் / வைப்புத்தொகை')}</p>
-                            <p className="font-bold text-foreground text-sm">
+                            <p className="text-slate-500 dark:text-slate-300 font-medium text-[11px]">{t('Security Deposit', 'முன்பணம் / வைப்புத்தொகை')}</p>
+                            <p className="font-semibold text-slate-900 dark:text-white text-sm">
                               ₹{Number(currentSelfManaged?.securityDeposit || 0).toLocaleString('en-IN')}
                             </p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground text-[11px]">{t('Rent Due Day', 'வாடகை கெடு நாள்')}</p>
-                            <p className="font-semibold text-foreground text-sm">
+                            <p className="text-slate-500 dark:text-slate-300 font-medium text-[11px]">{t('Rent Due Day', 'வாடகை கெடு நாள்')}</p>
+                            <p className="font-semibold text-slate-900 dark:text-white text-sm">
                               {currentSelfManaged?.rentDueDay || 5}th {t('of each month', 'ஒவ்வொரு மாதமும்')}
                             </p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground text-[11px]">{t('Landlord Status', 'நிலப்பிரபு நிலை')}</p>
-                            <p className="font-semibold text-foreground text-sm truncate">
+                            <p className="text-slate-500 dark:text-slate-300 font-medium text-[11px]">{t('Landlord Status', 'நிலப்பிரபு நிலை')}</p>
+                            <p className="font-semibold text-slate-900 dark:text-white text-sm truncate">
                               {currentSelfManaged?.landlord?.isConnected
                                 ? (currentSelfManaged?.landlord?.name || t('Connected Landlord', 'இணைக்கப்பட்ட நிலப்பிரபு'))
                                 : (currentSelfManaged?.landlord?.connectionStatus === 'pending'
@@ -3620,7 +3620,7 @@ export default function PropertyFullScreenView({
                     activeTenantRequest ? (
                       <div className="space-y-4">
                         {/* Customer Request / Offer Card */}
-                        <div className="border rounded-2xl p-4 sm:p-5 bg-card/70 border-border/70 shadow-2xs space-y-4">
+                        <div className="border rounded-2xl p-4 sm:p-5 bg-card/70 dark:bg-slate-900/75 dark:backdrop-blur-md border-border/70 dark:border-slate-600/75 shadow-2xs space-y-4">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 pb-3">
                             <div className="flex items-center gap-2 flex-wrap">
                               <Badge variant={(activeTenantRequest.type === 'buy' || isBuyerView) ? 'default' : 'secondary'} className="text-xs font-semibold uppercase">
@@ -3628,7 +3628,7 @@ export default function PropertyFullScreenView({
                               </Badge>
                               {getStatusBadge(activeTenantRequest.status)}
                             </div>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-slate-500 dark:text-slate-300">
                               {t('Submitted on', 'சமர்ப்பிக்கப்பட்டது')}: {new Date(activeTenantRequest.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
                             </span>
                           </div>
@@ -3636,7 +3636,7 @@ export default function PropertyFullScreenView({
                           {/* Visual 5-Stage Step Timeline */}
                           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3">
                             {getTimelineStages(activeTenantRequest).map((stage) => (
-                              <div key={stage.id} className="flex flex-col items-start gap-1 p-2 rounded-xl bg-background/70 border border-border/50 text-xs">
+                              <div key={stage.id} className="flex flex-col items-start gap-1 p-2 rounded-xl bg-background/70 dark:bg-slate-900/75 dark:backdrop-blur-md border border-border/50 dark:border-slate-600/75 text-xs">
                                 <div className="flex items-center gap-1.5 w-full">
                                   <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${stage.status === 'done'
                                     ? 'bg-emerald-600 text-white'
@@ -3650,34 +3650,34 @@ export default function PropertyFullScreenView({
                                     }`}>
                                     {stage.status === 'done' ? '✓' : stage.status === 'failed' ? '✕' : stage.id}
                                   </span>
-                                  <span className="font-semibold text-foreground truncate text-[11px]">{stage.title}</span>
+                                  <span className="font-semibold text-slate-900 dark:text-white truncate text-[11px]">{stage.title}</span>
                                 </div>
-                                <span className="text-[10px] text-muted-foreground ml-6 truncate">{stage.desc}</span>
+                                <span className="text-[10px] text-slate-500 dark:text-slate-300 font-medium ml-6 truncate">{stage.desc}</span>
                               </div>
                             ))}
                           </div>
 
                           {/* Transaction Terms & Offer Details */}
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs p-3.5 rounded-xl bg-muted/20 border border-border/40">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs p-3.5 rounded-xl bg-muted/20 dark:bg-slate-900/75 dark:backdrop-blur-md border border-border/40 dark:border-slate-600/75">
                             <div>
-                              <p className="text-muted-foreground text-[11px]">{t('Your Offered Price', 'நீங்கள் வழங்கிய தொகை')}</p>
-                              <p className="font-bold text-foreground text-sm text-green-600 dark:text-green-400">
+                              <p className="text-slate-500 dark:text-slate-300 font-medium text-[11px]">{t('Your Offered Price', 'நீங்கள் வழங்கிய தொகை')}</p>
+                              <p className="font-semibold text-foreground text-sm text-green-600 dark:text-green-400">
                                 ₹{Number(activeTenantRequest.proposedPrice || activeTenantRequest.offeredPrice || activeTenantRequest.rentAmount || activeTenantRequest.price || 0).toLocaleString()}
-                                {activeTenantRequest.type === 'rent' && <span className="text-[10px] text-muted-foreground font-normal"> /mo</span>}
+                                {activeTenantRequest.type === 'rent' && <span className="text-[10px] text-slate-500 dark:text-slate-300 font-normal"> /mo</span>}
                               </p>
                             </div>
                             <div>
-                              <p className="text-muted-foreground text-[11px]">{t('Agreed Deal Value', 'ஒப்புக்கொள்ளப்பட்ட மதிப்பு')}</p>
-                              <p className="font-bold text-foreground text-sm">
+                              <p className="text-slate-500 dark:text-slate-300 font-medium text-[11px]">{t('Agreed Deal Value', 'ஒப்புக்கொள்ளப்பட்ட மதிப்பு')}</p>
+                              <p className="font-semibold text-slate-900 dark:text-white text-sm">
                                 ₹{Number(activeTenantRequest.agreedAmount || activeTenantRequest.proposedPrice || activeTenantRequest.price || 0).toLocaleString('en-IN')}
                               </p>
                             </div>
                             <div>
-                              <p className="text-muted-foreground text-[11px]">{t('Property Owner / Seller', 'சொத்து உரிமையாளர்')}</p>
-                              <p className="font-semibold text-foreground text-sm">
+                              <p className="text-slate-500 dark:text-slate-300 font-medium text-[11px]">{t('Property Owner / Seller', 'சொத்து உரிமையாளர்')}</p>
+                              <p className="font-semibold text-slate-900 dark:text-white text-sm">
                                 {(property.owner as any)?.name || t('Property Owner', 'உரிமையாளர்')}
                               </p>
-                              <p className="text-muted-foreground text-[11px]">
+                              <p className="text-slate-500 dark:text-slate-300 text-[11px]">
                                 {(property.owner as any)?.email || (property.owner as any)?.phone || '-'}
                               </p>
                             </div>
@@ -3806,7 +3806,7 @@ export default function PropertyFullScreenView({
                       </div>
                     ) : (tenantAgreement || property?.tenant) ? (
                       <div className="space-y-4">
-                        <div className="border rounded-2xl p-4 sm:p-5 bg-card/70 border-border/70 shadow-2xs space-y-4">
+                        <div className="border rounded-2xl p-4 sm:p-5 bg-card/70 dark:bg-slate-900/75 dark:backdrop-blur-md border-border/70 dark:border-slate-600/75 shadow-2xs space-y-4">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 pb-3">
                             <div className="flex items-center gap-2 flex-wrap">
                               <Badge className="bg-emerald-600/10 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800 text-xs font-semibold">
@@ -3817,7 +3817,7 @@ export default function PropertyFullScreenView({
                                 {getPropertyTypeLabel(property?.propertyType || 'Apartment')}
                               </Badge>
                             </div>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-slate-500 dark:text-slate-300">
                               {t('Active since', 'செயலில் உள்ள தேதி')}: {tenantAgreement?.startDate ? new Date(tenantAgreement.startDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : t('Active', 'செயலில்')}
                             </span>
                           </div>
@@ -3831,7 +3831,7 @@ export default function PropertyFullScreenView({
                               { id: 4, title: t('Move-In', 'குடியேற்றம்'), desc: t('Key Handover Done', 'சாவி ஒப்படைக்கப்பட்டது'), status: 'done' },
                               { id: 5, title: t('Lease Period', 'குத்தகை காலம்'), desc: t('Monthly Payments Active', 'வாடகை நிலுவை'), status: 'current' },
                             ].map((stage) => (
-                              <div key={stage.id} className="flex flex-col items-start gap-1 p-2 rounded-xl bg-background/70 border border-border/50 text-xs">
+                              <div key={stage.id} className="flex flex-col items-start gap-1 p-2 rounded-xl bg-background/70 dark:bg-slate-900/75 dark:backdrop-blur-md border border-border/50 dark:border-slate-600/75 text-xs">
                                 <div className="flex items-center gap-1.5 w-full">
                                   <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${
                                     stage.status === 'done'
@@ -3840,25 +3840,25 @@ export default function PropertyFullScreenView({
                                   }`}>
                                     {stage.status === 'done' ? '✓' : stage.id}
                                   </span>
-                                  <span className="font-semibold text-foreground truncate text-[11px]">{stage.title}</span>
+                                  <span className="font-semibold text-slate-900 dark:text-white truncate text-[11px]">{stage.title}</span>
                                 </div>
-                                <span className="text-[10px] text-muted-foreground ml-6 truncate">{stage.desc}</span>
+                                <span className="text-[10px] text-slate-500 dark:text-slate-300 font-medium ml-6 truncate">{stage.desc}</span>
                               </div>
                             ))}
                           </div>
 
                           {/* Tenancy & Payment Details */}
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs p-3.5 rounded-xl bg-muted/20 border border-border/40">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs p-3.5 rounded-xl bg-muted/20 dark:bg-slate-900/75 dark:backdrop-blur-md border border-border/40 dark:border-slate-600/75">
                             <div>
-                              <p className="text-muted-foreground text-[11px]">{t('Monthly Rent', 'மாத வாடகை')}</p>
-                              <p className="font-bold text-foreground text-sm text-emerald-600 dark:text-emerald-400">
+                              <p className="text-slate-500 dark:text-slate-300 font-medium text-[11px]">{t('Monthly Rent', 'மாத வாடகை')}</p>
+                              <p className="font-semibold text-foreground text-sm text-emerald-600 dark:text-emerald-400">
                                 ₹{Number(property?.price || tenantAgreement?.monthlyRent || 0).toLocaleString('en-IN')}
-                                <span className="text-[10px] text-muted-foreground font-normal"> /mo</span>
+                                <span className="text-[10px] text-slate-500 dark:text-slate-300 font-normal"> /mo</span>
                               </p>
                             </div>
                             <div>
-                              <p className="text-muted-foreground text-[11px]">{t('Security Deposit', 'முன்பணம் / வைப்புத்தொகை')}</p>
-                              <p className="font-bold text-foreground text-sm">
+                              <p className="text-slate-500 dark:text-slate-300 font-medium text-[11px]">{t('Security Deposit', 'முன்பணம் / வைப்புத்தொகை')}</p>
+                              <p className="font-semibold text-slate-900 dark:text-white text-sm">
                                 ₹{Number(tenantAgreement?.securityDeposit || (property as any)?.deposit || (property as any)?.securityDeposit || 0).toLocaleString('en-IN')}
                               </p>
                             </div>
@@ -5009,7 +5009,7 @@ export default function PropertyFullScreenView({
                           {paymentDetails.map((payment) => (
                             <div
                               key={payment._id}
-                              className="border rounded-xl p-3 bg-card/60 hover:bg-muted/50 transition-colors"
+                              className="border rounded-xl p-3 bg-card/60 dark:bg-slate-900/75 dark:backdrop-blur-md dark:border-slate-600/75 hover:bg-muted/50 transition-colors"
                             >
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                 <div className="space-y-0.5">
@@ -5029,7 +5029,7 @@ export default function PropertyFullScreenView({
                                       {payment.status}
                                     </Badge>
                                   </div>
-                                  <p className="text-xs text-muted-foreground">
+                                  <p className="text-xs text-slate-500 dark:text-slate-300">
                                     {t('Month', 'மாதம்')}: {new Date(payment.month).toLocaleDateString()} | {t('Due Date', 'கடைசி தேதி')}: {new Date(payment.dueDate).toLocaleDateString()}
                                   </p>
                                 </div>
@@ -5038,7 +5038,7 @@ export default function PropertyFullScreenView({
                           ))}
                         </div>
                       ) : (
-                        <div className="text-center py-6 text-muted-foreground text-xs">
+                        <div className="text-center py-6 text-slate-500 dark:text-slate-300 text-xs">
                           {t('No payment records found for this property.', 'கட்டண பதிவுகள் எதுவும் இல்லை.')}
                         </div>
                       )}
@@ -5049,7 +5049,7 @@ export default function PropertyFullScreenView({
                           {t('Pending Tenant Payment Approvals', 'நிலுவை கட்டண ஒப்புதல்கள்')}
                         </p>
                         {propertyPaymentRequests.length === 0 ? (
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-slate-500 dark:text-slate-300">
                             {t('No pending payment requests for this property.', 'நிலுவையில் உள்ள கட்டண கோரிக்கைகள் இல்லை.')}
                           </p>
                         ) : (
@@ -5057,7 +5057,7 @@ export default function PropertyFullScreenView({
                             {propertyPaymentRequests.map((payment) => (
                               <div
                                 key={payment._id}
-                                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border rounded-xl px-3 py-2 bg-card/60"
+                                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border rounded-xl px-3 py-2 bg-card/60 dark:bg-slate-900/75 dark:backdrop-blur-md dark:border-slate-600/75"
                               >
                                 <div>
                                   <p className="text-xs font-semibold text-foreground">
@@ -5099,7 +5099,7 @@ export default function PropertyFullScreenView({
 
             {/* SECTION 7: AGREEMENTS / DOCUMENTS */}
             {activeSection === 'agreements' && (
-              <Card className="border border-blue-100/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md shadow-xs h-full max-h-full flex flex-col overflow-hidden rounded-2xl">
+              <Card className="border border-blue-100/80 dark:border-slate-600/75 bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md shadow-xs h-full max-h-full flex flex-col overflow-hidden rounded-2xl">
                 <CardHeader className="pb-2.5 pt-3 px-4 border-b border-border/40 shrink-0">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
@@ -5107,7 +5107,7 @@ export default function PropertyFullScreenView({
                         <FileText className="h-4 w-4 text-primary" />
                         {isSelfManaged ? t('Rental Documents & Agreement Records', 'வாடகை ஆவணங்கள் & பதிவுகள்') : isTenantView ? t('My Rental Agreement', 'என் வாடகை ஒப்பந்தம்') : t('Agreements & Contracts', 'ஒப்பந்தங்கள்')}
                       </CardTitle>
-                      <CardDescription className="text-xs">
+                      <CardDescription className="text-xs text-slate-500 dark:text-slate-300">
                         {isSelfManaged
                           ? t('Store your rental agreement, move-in condition reports, and receipts privately.', 'உங்கள் வாடகை ஒப்பந்தம் மற்றும் ஆவணங்களை பாதுகாப்பாக சேமிக்கவும்.')
                           : isTenantView
@@ -5131,7 +5131,7 @@ export default function PropertyFullScreenView({
                             };
                             handleDownloadAgreement(targetAgreement as any);
                           }}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold border border-slate-200/80 dark:border-white/15 bg-white/80 dark:bg-slate-800/80 hover:bg-slate-50 text-slate-700 dark:text-slate-200 shadow-sm transition-all cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold border border-slate-200/80 dark:border-slate-600/75 bg-white/80 dark:bg-slate-800/80 hover:bg-slate-50 text-slate-700 dark:text-slate-200 shadow-sm transition-all cursor-pointer"
                         >
                           <FileText className="h-3.5 w-3.5 text-primary" />
                           <span>{t('Agreement Sample PDF', 'மாதிரி ஒப்பந்த PDF')}</span>
@@ -5293,7 +5293,7 @@ export default function PropertyFullScreenView({
                         return (
                           <div key={agreement._id || agreement.id}>
                             {/* Horizontal 3-Step Agreement Verification Progress Bar */}
-                            <div className="px-3.5 py-2 mb-3 rounded-xl border border-slate-200/70 dark:border-white/10 bg-slate-50/70 dark:bg-slate-900/40 flex items-center justify-between gap-1.5 sm:gap-2 overflow-hidden">
+                            <div className="px-3.5 py-2 mb-3 rounded-xl border border-slate-200/70 dark:border-slate-600/75 bg-slate-50/70 dark:bg-slate-900/75 dark:backdrop-blur-md flex items-center justify-between gap-1.5 sm:gap-2 overflow-hidden">
                               {/* Step 1: Tenant Sent File */}
                               <div className="flex items-center gap-2 min-w-0">
                                 <div className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold transition-all ${
@@ -5417,12 +5417,12 @@ export default function PropertyFullScreenView({
                             </div>
 
                             <div
-                              className="p-3.5 border rounded-xl bg-card/60 hover:bg-muted/50 transition-colors space-y-3"
+                              className="p-3.5 border rounded-xl bg-card/60 dark:bg-slate-900/75 dark:backdrop-blur-md dark:border-slate-600/75 hover:bg-muted/50 transition-colors space-y-3"
                             >
                               <div className="flex justify-between items-start">
                                 <div>
-                                  <h3 className="font-semibold text-sm">{agreement.property?.title || title}</h3>
-                                  <p className="text-xs text-muted-foreground">{agreement.property?.location || loc}</p>
+                                  <h3 className="font-semibold text-sm text-slate-900 dark:text-white">{agreement.property?.title || title}</h3>
+                                  <p className="text-xs text-slate-500 dark:text-slate-300">{agreement.property?.location || loc}</p>
                                 </div>
                                 <Badge
                                   variant={isVerified ? 'default' : isRejected ? 'destructive' : 'secondary'}
@@ -5438,16 +5438,16 @@ export default function PropertyFullScreenView({
 
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
                                 <div>
-                                  <p className="text-muted-foreground">{isTenantView ? t('Landlord', 'உரிமையாளர்') : t('Tenant', 'குத்தகைதாரர்')}</p>
-                                  <p className="font-medium">{isTenantView ? (agreement.owner?.name || agreement.ownerId?.name || t('Owner', 'உரிமையாளர்')) : (agreement.tenant?.name || agreement.tenantName || t('Tenant', 'குத்தகைதாரர்'))}</p>
+                                  <p className="text-slate-500 dark:text-slate-300 font-medium">{isTenantView ? t('Landlord', 'உரிமையாளர்') : t('Tenant', 'குத்தகைதாரர்')}</p>
+                                  <p className="font-semibold text-slate-900 dark:text-white">{isTenantView ? (agreement.owner?.name || agreement.ownerId?.name || t('Owner', 'உரிமையாளர்')) : (agreement.tenant?.name || agreement.tenantName || t('Tenant', 'குத்தகைதாரர்'))}</p>
                                 </div>
                                 <div>
-                                  <p className="text-muted-foreground">{t('Rent Amount', 'வாடகை தொகை')}</p>
-                                  <p className="font-bold text-green-600">₹{Number(agreement.rentAmount || property.price || 0).toLocaleString()}</p>
+                                  <p className="text-slate-500 dark:text-slate-300 font-medium">{t('Rent Amount', 'வாடகை தொகை')}</p>
+                                  <p className="font-semibold text-green-600 dark:text-green-400">₹{Number(agreement.rentAmount || property.price || 0).toLocaleString()}</p>
                                 </div>
                                 <div>
-                                  <p className="text-muted-foreground">{t('Valid Period', 'செல்லுபடியாகும் காலம்')}</p>
-                                  <p className="font-medium text-foreground">
+                                  <p className="text-slate-500 dark:text-slate-300 font-medium">{t('Valid Period', 'செல்லுபடியாகும் காலம்')}</p>
+                                  <p className="font-semibold text-slate-900 dark:text-white">
                                     {agreement.startDate ? new Date(agreement.startDate).toLocaleDateString() : '-'} – {agreement.endDate ? new Date(agreement.endDate).toLocaleDateString() : '-'}
                                   </p>
                                 </div>
@@ -5455,15 +5455,15 @@ export default function PropertyFullScreenView({
 
                               {/* Uploaded Agreement Document Section */}
                             {hasDocument && (
-                              <div className="p-3 rounded-xl border border-blue-200/60 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20 space-y-2.5">
+                              <div className="p-3 rounded-xl border border-blue-200/60 dark:border-slate-600/75 bg-blue-50/50 dark:bg-slate-900/75 dark:backdrop-blur-md space-y-2.5">
                                 <div className="flex items-center justify-between gap-2 flex-wrap">
                                   <div className="flex items-center gap-2.5 min-w-0">
                                     <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 flex items-center justify-center shrink-0">
                                       <FileText className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0">
-                                      <p className="text-xs font-bold text-foreground truncate">{docFileName}</p>
-                                      <p className="text-[10px] text-muted-foreground">
+                                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{docFileName}</p>
+                                      <p className="text-[10px] text-slate-500 dark:text-slate-300">
                                         {t('Uploaded on', 'பதிவேற்றப்பட்டது')}: {agreement.uploadedAt || new Date(agreement.createdAt || Date.now()).toLocaleDateString()}
                                       </p>
                                     </div>
@@ -5754,7 +5754,7 @@ export default function PropertyFullScreenView({
                   ) : isTenantView ? (
                     <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3 px-4 pt-2 pb-3 items-stretch overflow-hidden">
                       {/* LEFT COLUMN: Submitted Service Requests (lg:col-span-7) */}
-                      <div className="lg:col-span-7 h-full min-h-0 flex flex-col justify-between p-3 rounded-xl border border-slate-200/70 dark:border-white/10 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xs shadow-xs">
+                      <div className="lg:col-span-7 h-full min-h-0 flex flex-col justify-between p-3 rounded-xl border border-slate-200/70 dark:border-slate-600/75 bg-white/40 dark:bg-slate-900/75 backdrop-blur-md shadow-xs">
                         <div className="flex items-center justify-between pb-2 border-b border-border/40 shrink-0">
                           <p className="text-xs font-bold text-foreground">
                             {t('Submitted Service Requests', 'சமர்ப்பிக்கப்பட்ட கோரிக்கைகள்')}
@@ -5773,12 +5773,12 @@ export default function PropertyFullScreenView({
                             maintenanceRequests.map((request) => (
                               <div
                                 key={request._id}
-                                className="border rounded-xl p-2.5 bg-card/60 hover:bg-muted/50 transition-colors"
+                                className="border rounded-xl p-2.5 bg-card/60 dark:bg-slate-900/75 dark:backdrop-blur-md dark:border-slate-600/75 hover:bg-muted/50 transition-colors"
                               >
                                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
                                   <div className="flex-1 space-y-1 min-w-0">
                                     <div className="flex items-center gap-2">
-                                      <p className="font-semibold text-xs sm:text-sm truncate">{request.issue}</p>
+                                      <p className="font-semibold text-xs sm:text-sm truncate text-slate-900 dark:text-white">{request.issue}</p>
                                       {request.priority && (
                                         <Badge variant="outline" className="text-[9px] uppercase px-1.5 py-0 shrink-0">
                                           {request.priority}
@@ -5786,9 +5786,9 @@ export default function PropertyFullScreenView({
                                       )}
                                     </div>
                                     {request.description && (
-                                      <p className="text-xs text-muted-foreground line-clamp-2">{request.description}</p>
+                                      <p className="text-xs text-slate-500 dark:text-slate-300 line-clamp-2">{request.description}</p>
                                     )}
-                                    <p className="text-[11px] text-muted-foreground">
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-300">
                                       {request.category || 'General'} • {new Date(request.createdAt).toLocaleDateString()}
                                     </p>
                                   </div>
@@ -5815,7 +5815,7 @@ export default function PropertyFullScreenView({
                       </div>
 
                       {/* RIGHT COLUMN: Report a New Maintenance Issue (lg:col-span-5) */}
-                      <div className="lg:col-span-5 h-full min-h-0 flex flex-col justify-between p-3 rounded-xl border border-slate-200/70 dark:border-white/10 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xs shadow-xs">
+                      <div className="lg:col-span-5 h-full min-h-0 flex flex-col justify-between p-3 rounded-xl border border-slate-200/70 dark:border-slate-600/75 bg-white/40 dark:bg-slate-900/75 backdrop-blur-md shadow-xs">
                         <div className="space-y-2.5 flex-1 min-h-0 flex flex-col">
                           <p className="text-xs font-bold text-foreground flex items-center gap-1.5 shrink-0">
                             <Wrench className="h-3.5 w-3.5 text-primary" />
@@ -5823,7 +5823,7 @@ export default function PropertyFullScreenView({
                           </p>
 
                           <div className="space-y-1 shrink-0">
-                            <label className="text-[11px] font-medium text-muted-foreground">{t('Issue Title', 'சிக்கலின் தலைப்பு')}</label>
+                            <label className="text-[11px] font-medium text-slate-500 dark:text-slate-300">{t('Issue Title', 'சிக்கலின் தலைப்பு')}</label>
                             <div className="relative">
                               <Input
                                 value={tenantMaintenanceIssue}
@@ -5846,7 +5846,7 @@ export default function PropertyFullScreenView({
 
                           <div className="grid grid-cols-2 gap-2.5 shrink-0">
                             <div className="space-y-1">
-                              <label className="text-[11px] font-medium text-muted-foreground">{t('Category', 'வகை')}</label>
+                              <label className="text-[11px] font-medium text-slate-500 dark:text-slate-300">{t('Category', 'வகை')}</label>
                               <select
                                 value={tenantMaintenanceCategory}
                                 onChange={(e) => setTenantMaintenanceCategory(e.target.value as any)}
@@ -5861,7 +5861,7 @@ export default function PropertyFullScreenView({
                               </select>
                             </div>
                             <div className="space-y-1">
-                              <label className="text-[11px] font-medium text-muted-foreground">{t('Priority', 'முன்னுரிமை')}</label>
+                              <label className="text-[11px] font-medium text-slate-500 dark:text-slate-300">{t('Priority', 'முன்னுரிமை')}</label>
                               <select
                                 value={tenantMaintenancePriority}
                                 onChange={(e) => setTenantMaintenancePriority(e.target.value as any)}
@@ -5876,7 +5876,7 @@ export default function PropertyFullScreenView({
                           </div>
 
                           <div className="space-y-0">
-                            <label className="text-[11px] font-medium text-muted-foreground">{t('Description / Details', 'விவரம்')}</label>
+                            <label className="text-[11px] font-medium text-slate-500 dark:text-slate-300">{t('Description / Details', 'விவரம்')}</label>
                             <div className="relative">
                               <Textarea
                                 value={tenantMaintenanceDescription}
@@ -6471,41 +6471,55 @@ export default function PropertyFullScreenView({
       {/* Uploaded Document In-App Preview Dialog */}
       {previewDoc && (
         <Dialog open={!!previewDoc} onOpenChange={(open) => !open && setPreviewDoc(null)}>
-          <DialogContent className="w-full max-w-4xl max-h-[90vh] flex flex-col p-4">
-            <DialogHeader className="pb-2 border-b">
-              <DialogTitle className="flex items-center justify-between text-base">
-                <span className="flex items-center gap-2 truncate">
-                  <FileText className="h-4 w-4 text-primary" />
-                  {previewDoc.name}
-                </span>
+          <DialogContent
+            className="w-[94vw] max-w-6xl sm:max-w-6xl !max-w-6xl h-[90vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 shadow-2xl"
+            style={{ width: '94vw', maxWidth: '1150px', height: '90vh' }}
+            showCloseButton={false}
+          >
+            <div className="flex items-center justify-between gap-4 px-5 py-3.5 border-b shrink-0 bg-background/80 backdrop-blur-sm">
+              <span className="flex items-center gap-2 truncate font-semibold text-sm sm:text-base text-foreground min-w-0">
+                <FileText className="h-4 w-4 text-primary shrink-0" />
+                <span className="truncate">{previewDoc.name}</span>
+              </span>
+              <div className="flex items-center gap-3 shrink-0">
                 <a
                   href={previewDoc.url}
                   download={previewDoc.name}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition shadow-xs"
                 >
                   <Download className="h-3.5 w-3.5" />
-                  {t('Download File', 'பதிவிறக்கு')}
+                  <span>{t('Download File', 'பதிவிறக்கு')}</span>
                 </a>
-              </DialogTitle>
-            </DialogHeader>
-            <div className="flex-1 min-h-[400px] max-h-[70vh] bg-muted/20 rounded-xl overflow-hidden mt-2 flex items-center justify-center">
+                <button
+                  type="button"
+                  onClick={() => setPreviewDoc(null)}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 transition cursor-pointer"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 w-full h-full min-h-0 overflow-auto bg-muted/10 flex items-center justify-center">
               {previewDoc.url.startsWith('data:application/pdf') || previewDoc.url.endsWith('.pdf') ? (
                 <iframe
-                  src={previewDoc.url}
+                  src={previewDoc.url.includes('#') ? previewDoc.url : `${previewDoc.url}#toolbar=1&navpanes=0&view=FitH`}
                   title={previewDoc.name}
-                  className="w-full h-full min-h-[500px] border-0 rounded-lg"
+                  className="w-full h-full border-0 rounded-b-xl"
                 />
               ) : previewDoc.url.startsWith('data:image') || /\.(png|jpg|jpeg|webp)$/i.test(previewDoc.url) ? (
-                <img
-                  src={previewDoc.url}
-                  alt={previewDoc.name}
-                  className="max-h-[65vh] max-w-full object-contain rounded-lg"
-                />
+                <div className="w-full h-full flex items-center justify-center p-4 overflow-auto">
+                  <img
+                    src={previewDoc.url}
+                    alt={previewDoc.name}
+                    className="max-h-full max-w-full object-contain rounded-lg shadow-sm"
+                  />
+                </div>
               ) : (
                 <iframe
-                  src={previewDoc.url}
+                  src={previewDoc.url.includes('#') ? previewDoc.url : `${previewDoc.url}#toolbar=1&navpanes=0&view=FitH`}
                   title={previewDoc.name}
-                  className="w-full h-full min-h-[500px] border-0 rounded-lg"
+                  className="w-full h-full border-0 rounded-b-xl"
                 />
               )}
             </div>

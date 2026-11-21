@@ -122,15 +122,15 @@ export default function RequestPropertyDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <DialogContent className="w-full max-w-lg mx-4 overflow-hidden box-border">
+        <DialogHeader className="w-full max-w-full min-w-0 box-border">
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
             <span>{isBuy ? t('Make a Purchase Offer', 'வாங்க சலுகை அளிக்கவும்') : t('Submit Rental Request', 'வாடகை கோரிக்கை சமர்ப்பிக்கவும்')}</span>
             <Badge variant={isBuy ? 'default' : 'secondary'} className="text-xs">
               {isBuy ? t('Buy / Sale', 'வாங்க') : t('Rent', 'வாடகை')}
             </Badge>
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="w-full max-w-full min-w-0 break-words">
             {isBuy
               ? t(
                   `Send a purchase offer or express interest to the owner of "${displayTitle}"`,
@@ -143,8 +143,8 @@ export default function RequestPropertyDialog({
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4 py-3">
-          <div className="flex items-center gap-3.5 p-3.5 bg-muted/50 rounded-xl border">
+        <div className="space-y-4 py-3 w-full max-w-full min-w-0 box-border">
+          <div className="w-full max-w-full min-w-0 box-border flex items-start sm:items-center gap-3.5 p-3.5 bg-muted/50 rounded-xl border">
             {property.images && property.images.length > 0 ? (
               <img 
                 src={property.images[0]} 
@@ -156,9 +156,9 @@ export default function RequestPropertyDialog({
                 🏠
               </div>
             )}
-            <div className="min-w-0 flex-1">
+            <div className="flex-1 min-w-0">
               <h4 className="font-semibold text-sm truncate">{displayTitle}</h4>
-              <p className="text-xs text-muted-foreground truncate">{displayLocation}</p>
+              <p className="text-xs text-muted-foreground whitespace-normal break-words leading-snug">{displayLocation}</p>
               <p className="text-sm font-semibold text-primary mt-1">
                 {t('Listed Price:', 'பட்டியலிடப்பட்ட விலை:')} ₹{Number(property.price).toLocaleString('en-IN')}
                 <span className="text-[11px] font-normal text-muted-foreground ml-1">
@@ -170,7 +170,7 @@ export default function RequestPropertyDialog({
 
           {/* Offer Amount for Buy */}
           {isBuy && (
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 w-full max-w-full min-w-0 box-border">
               <Label htmlFor="offer-price" className="text-xs font-semibold flex items-center gap-1">
                 <IndianRupee className="w-3.5 h-3.5 text-primary" />
                 {t('Your Offer Amount (₹)', 'உங்கள் சலுகைத் தொகை (₹)')} <span className="text-destructive">*</span>
@@ -181,7 +181,7 @@ export default function RequestPropertyDialog({
                 placeholder={String(property.price)}
                 value={offerPrice}
                 onChange={(e) => setOfferPrice(e.target.value)}
-                className="font-mono text-sm"
+                className="font-mono text-sm w-full max-w-full min-w-0 box-border"
               />
               <p className="text-[11px] text-muted-foreground">
                 {t('You can offer the asking price or propose a counter-amount.', 'பட்டியல் விலையையோ அல்லது உங்கள் சலுகைத் தொகையையோ குறிப்பிடலாம்.')}
@@ -189,7 +189,7 @@ export default function RequestPropertyDialog({
             </div>
           )}
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 w-full max-w-full min-w-0 box-border">
             <Label htmlFor="message" className="text-xs font-semibold">
               {t('Message to Owner (Optional)', 'உரிமையாளருக்கு செய்தி (விரும்பினால்)')}
             </Label>
@@ -208,12 +208,12 @@ export default function RequestPropertyDialog({
               }
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              className="resize-none h-24 text-sm"
+              className="resize-none h-24 text-sm w-full max-w-full min-w-0 box-border"
             />
           </div>
         </div>
 
-        <div className="flex justify-end gap-2.5 pt-1">
+        <div className="flex justify-end gap-2.5 pt-1 w-full max-w-full min-w-0 box-border">
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             {t('Cancel', 'ரத்து செய்')}
           </Button>
