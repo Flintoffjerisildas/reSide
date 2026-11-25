@@ -24,7 +24,9 @@ const notificationSchema = new mongoose.Schema({
       'agreement_synced',
       'AGREEMENT_UPLOADED',
       'AGREEMENT_VERIFIED',
-      'AGREEMENT_SYNCED'
+      'AGREEMENT_SYNCED',
+      'friend_request_received',
+      'friend_request_accepted'
     ],
     required: true
   },

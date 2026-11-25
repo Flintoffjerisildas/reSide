@@ -1,9 +1,12 @@
 const nodemailer = require('nodemailer');
 
 function createTransporter() {
-  const host = process.env.SMTP_HOST || 'smtp.titan.email';
-  const port = Number(process.env.SMTP_PORT) || 587;
-  const user = process.env.SMTP_USER || 'info@krishub.in';
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  let port = Number(process.env.SMTP_PORT) || 587;
+  if (host.includes('gmail.com') && port === 465) {
+    port = 587;
+  }
+  const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
 
   return nodemailer.createTransport({
@@ -14,9 +17,9 @@ function createTransporter() {
       user,
       pass
     },
-    connectionTimeout: 5000,
-    greetingTimeout: 5000,
-    socketTimeout: 5000
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 8000
   });
 }
 
@@ -43,7 +46,7 @@ async function sendOtpEmail(to, otp, purpose) {
   `;
 
   const mailOptions = {
-    from: process.env.MAIL_FROM || 'info@krishub.in',
+    from: process.env.MAIL_FROM || process.env.SMTP_USER || 'no-reply@reside.com',
     to,
     subject,
     html

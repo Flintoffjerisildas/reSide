@@ -49,7 +49,8 @@ import {
   Loader2,
   Megaphone,
   Printer,
-  RefreshCcw
+  RefreshCcw,
+  Filter
 } from 'lucide-react';
 import RentalDetailsDialog from './RentalDetailsDialog';
 import ProfileSettingsView from './ProfileSettingsView';
@@ -429,7 +430,7 @@ export default function CustomerDashboard({
   };
 
   const rawThisMonthRecords = rentRecords.filter((r: any) => isSameMonth(parseDateSafe(r?.month)));
-  
+
   // Deduplicate records by property ID to avoid showing duplicates
   const thisMonthRecords = Object.values(
     rawThisMonthRecords.reduce((acc: any, curr: any) => {
@@ -619,9 +620,117 @@ export default function CustomerDashboard({
     return t('Maintenance Request Report', 'பராமரிப்பு கோரிக்கை அறிக்கை');
   };
 
+  const parseRangeBounds = (fromStr: string, toStr: string) => {
+    const rawFrom = String(fromStr || '').trim().slice(0, 10);
+    const rawTo = String(toStr || '').trim().slice(0, 10);
+    const start = rawFrom ? new Date(`${rawFrom}T00:00:00`).getTime() : -Infinity;
+    const end = rawTo ? new Date(`${rawTo}T23:59:59.999`).getTime() : Infinity;
+    return {
+      startTime: Number.isNaN(start) ? -Infinity : start,
+      endTime: Number.isNaN(end) ? Infinity : end,
+    };
+  };
+
+  const getRecordTime = (record: any) => {
+    const raw =
+      record?.paymentDate ||
+      record?.approvedDate ||
+      record?.paidAt ||
+      record?.dueDate ||
+      record?.month ||
+      record?.requestDate ||
+      record?.resolutionDate ||
+      record?.createdAt ||
+      record?.updatedAt;
+    if (!raw) return NaN;
+    const d = new Date(raw);
+    return d.getTime();
+  };
+
+  const matchesProperty = (record: any, selectedPropId: string) => {
+    if (!selectedPropId || selectedPropId === 'all') return true;
+    const pId = String(record?.propertyId || record?.property?._id || record?.property || '');
+    const pTitle = String(record?.propertyTitle || record?.property?.title || '');
+    return pId === selectedPropId || pTitle === selectedPropId;
+  };
+
+  const filteredCustomerRows = useMemo(() => {
+    if (!currentReport) return [];
+    const rawRows: any[] = Array.isArray(currentReport?.rows) ? currentReport.rows : [];
+    const { startTime, endTime } = parseRangeBounds(reportFrom, reportTo);
+
+    return rawRows.filter((r) => {
+      if (!matchesProperty(r, reportPropertyId)) return false;
+
+      const recordTime = getRecordTime(r);
+      if (!Number.isNaN(recordTime)) {
+        if (recordTime < startTime || recordTime > endTime) return false;
+      }
+
+      return true;
+    });
+  }, [currentReport, reportFrom, reportTo, reportPropertyId]);
+
+  const filteredCustomerSummary = useMemo(() => {
+    if (activeCustomerReport === 'paymentHistory') {
+      const rows = filteredCustomerRows;
+      const totalPayments = rows.length;
+      const totalApproved = rows.reduce((acc, r) => (r.status === 'approved' ? acc + Number(r.amount || 0) : acc), 0);
+      const totalSubmitted = rows.reduce((acc, r) => (r.status === 'submitted' ? acc + Number(r.amount || 0) : acc), 0);
+      const totalRejected = rows.reduce((acc, r) => (r.status === 'rejected' ? acc + Number(r.amount || 0) : acc), 0);
+      const failedPayments = rows.filter((r) => r.status === 'rejected').length;
+      const pendingDueAmount = rows.length > 0 ? Number(currentReport?.summary?.pendingDueAmount ?? 0) : 0;
+      return {
+        totalPayments,
+        totalApproved,
+        totalSubmitted,
+        totalRejected,
+        failedPayments,
+        pendingDueAmount,
+      };
+    }
+
+    if (activeCustomerReport === 'expenseSummary') {
+      const rows = filteredCustomerRows;
+      const totals = rows.reduce(
+        (acc: any, r: any) => {
+          acc.rent += Number(r.rent || 0);
+          acc.maintenance += Number(r.maintenance || 0);
+          acc.utilities += Number(r.utilities || 0);
+          acc.total += Number(r.total || 0);
+          return acc;
+        },
+        { rent: 0, maintenance: 0, utilities: 0, total: 0 }
+      );
+      return {
+        months: rows.length,
+        totalRent: totals.rent,
+        totalMaintenance: totals.maintenance,
+        totalUtilities: totals.utilities,
+        totalExpenses: totals.total,
+      };
+    }
+
+    if (activeCustomerReport === 'maintenance') {
+      const rows = filteredCustomerRows;
+      const totalRequests = rows.length;
+      const pending = rows.filter((r: any) => r.status === 'pending').length;
+      const inProgress = rows.filter((r: any) => r.status === 'in-progress').length;
+      const completed = rows.filter((r: any) => r.status === 'completed').length;
+      return {
+        totalRequests,
+        pending,
+        inProgress,
+        completed,
+      };
+    }
+
+    return {};
+  }, [activeCustomerReport, filteredCustomerRows, currentReport]);
+
   const paymentHistoryDerived = useMemo(() => {
     if (activeCustomerReport !== 'paymentHistory' || !currentReport) return null;
-    const rows = Array.isArray(currentReport?.rows) ? currentReport.rows : [];
+    const rows = filteredCustomerRows;
 
     const statusCounts = { approved: 0, submitted: 0, rejected: 0 };
     rows.forEach((r: any) => {
@@ -637,37 +746,76 @@ export default function CustomerDashboard({
       { name: t('Failed', 'தோல்வி'), value: statusCounts.rejected }
     ];
 
-    const monthlyPaid = Array.isArray(currentReport?.monthlyPaid) ? currentReport.monthlyPaid : [];
+    const byMonth = new Map<string, { key: string; name: string; amount: number }>();
+    rows.forEach((r: any) => {
+      const raw = r?.paymentDate || r?.approvedDate || r?.month;
+      if (!raw) return;
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const name = d.toLocaleString(undefined, { month: 'short' });
+      const current = byMonth.get(key) || { key, name, amount: 0 };
+      if (r.status === 'approved') current.amount += Number(r.amount || 0);
+      byMonth.set(key, current);
+    });
+    const monthlyPaid = Array.from(byMonth.values()).sort((a, b) => a.key.localeCompare(b.key));
 
-    const methodData = Array.isArray(currentReport?.paymentMethodBreakdown)
-      ? currentReport.paymentMethodBreakdown.map((m: any) => ({
-          name: String(m?.name || ''),
-          value: Number(m?.value || 0)
-        }))
-      : [];
+    const byMode = new Map<string, number>();
+    rows.forEach((r: any) => {
+      const key = String(r?.mode || '').trim();
+      if (!key || r.status !== 'approved') return;
+      byMode.set(key, (byMode.get(key) || 0) + Number(r.amount || 0));
+    });
+    const methodData = Array.from(byMode.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value]) => ({ name, value }));
 
     return { statusData, monthlyPaid, methodData };
-  }, [activeCustomerReport, currentReport, t]);
+  }, [activeCustomerReport, currentReport, filteredCustomerRows, t]);
 
   const expenseSummaryDerived = useMemo(() => {
     if (activeCustomerReport !== 'expenseSummary' || !currentReport) return null;
-    const rows = Array.isArray(currentReport?.rows) ? currentReport.rows : [];
+    const rows = filteredCustomerRows;
     const chartData = rows.map((r: any) => ({ name: String(r?.name || r?.key || ''), total: Number(r?.total || 0) }));
     return { chartData };
-  }, [activeCustomerReport, currentReport]);
+  }, [activeCustomerReport, currentReport, filteredCustomerRows]);
 
   const maintenanceDerived = useMemo(() => {
     if (activeCustomerReport !== 'maintenance' || !currentReport) return null;
-    const summary = currentReport?.summary || {};
+    const summary = (filteredCustomerSummary as any) || {};
     const statusData = [
       { name: t('Completed', 'முடிந்தது'), value: Number(summary?.completed ?? 0) },
       { name: t('In Progress', 'செயலில்'), value: Number(summary?.inProgress ?? 0) },
       { name: t('Pending', 'நிலுவையில்'), value: Number(summary?.pending ?? 0) }
     ];
-    const monthlyRequests = Array.isArray(currentReport?.monthlyRequests) ? currentReport.monthlyRequests : [];
-    const topCategories = Array.isArray(currentReport?.topCategories) ? currentReport.topCategories : [];
+    const rows = filteredCustomerRows;
+    const byMonth = new Map<string, { key: string; name: string; count: number }>();
+    rows.forEach((r: any) => {
+      const raw = r?.requestDate || r?.createdAt;
+      if (!raw) return;
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const name = d.toLocaleString(undefined, { month: 'short' });
+      const current = byMonth.get(key) || { key, name, count: 0 };
+      current.count += 1;
+      byMonth.set(key, current);
+    });
+    const monthlyRequests = Array.from(byMonth.values()).sort((a, b) => a.key.localeCompare(b.key));
+
+    const byCat = new Map<string, number>();
+    rows.forEach((r: any) => {
+      const key = String(r?.category || r?.issue || '').trim();
+      if (!key) return;
+      byCat.set(key, (byCat.get(key) || 0) + 1);
+    });
+    const topCategories = Array.from(byCat.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([name, count]) => ({ name, count }));
+
     return { statusData, monthlyRequests, topCategories };
-  }, [activeCustomerReport, currentReport, t]);
+  }, [activeCustomerReport, currentReport, filteredCustomerSummary, filteredCustomerRows, t]);
 
   const svgToPngDataUrl = async (svgEl: SVGElement | null) => {
     if (!svgEl) return null;
@@ -731,7 +879,7 @@ export default function CustomerDashboard({
     }
 
     if (activeCustomerReport === 'paymentHistory') {
-      const s = currentReport?.summary || {};
+      const s = (filteredCustomerSummary as any) || {};
       autoTable(doc, {
         startY: y,
         head: [[t('Metric', 'அளவுகோல்'), t('Value', 'மதிப்பு')]],
@@ -754,7 +902,7 @@ export default function CustomerDashboard({
       autoTable(doc, {
         startY: y,
         head: [[t('Month', 'மாதம்'), t('Property', 'சொத்து'), t('Amount', 'தொகை'), t('Date', 'தேதி'), t('Method', 'முறை'), t('Status', 'நிலை')]],
-        body: (Array.isArray(currentReport?.rows) ? currentReport.rows : []).map((r: any) => [
+        body: filteredCustomerRows.map((r: any) => [
           formatShortDate(r?.month),
           String(r?.propertyTitle || ''),
           money(r?.amount ?? 0),
@@ -767,7 +915,7 @@ export default function CustomerDashboard({
     }
 
     if (activeCustomerReport === 'expenseSummary') {
-      const s = currentReport?.summary || {};
+      const s = (filteredCustomerSummary as any) || {};
       autoTable(doc, {
         startY: y,
         head: [[t('Metric', 'அளவுகோல்'), t('Value', 'மதிப்பு')]],
@@ -790,7 +938,7 @@ export default function CustomerDashboard({
       autoTable(doc, {
         startY: y,
         head: [[t('Month', 'மாதம்'), t('Rent', 'வாடகை'), t('Maintenance', 'பராமரிப்பு'), t('Utilities', 'பயன்பாடுகள்'), t('Total', 'மொத்தம்')]],
-        body: (Array.isArray(currentReport?.rows) ? currentReport.rows : []).map((r: any) => [
+        body: filteredCustomerRows.map((r: any) => [
           String(r?.name || r?.key || ''),
           money(r?.rent ?? 0),
           money(r?.maintenance ?? 0),
@@ -802,7 +950,7 @@ export default function CustomerDashboard({
     }
 
     if (activeCustomerReport === 'maintenance') {
-      const s = currentReport?.summary || {};
+      const s = (filteredCustomerSummary as any) || {};
       autoTable(doc, {
         startY: y,
         head: [[t('Metric', 'அளவுகோல்'), t('Value', 'மதிப்பு')]],
@@ -825,7 +973,7 @@ export default function CustomerDashboard({
       autoTable(doc, {
         startY: y,
         head: [[t('Property', 'சொத்து'), t('Issue', 'பிரச்சனை'), t('Category', 'வகை'), t('Status', 'நிலை'), t('Request Date', 'கோரிக்கை தேதி'), t('Resolution Date', 'தீர்வு தேதி')]],
-        body: (Array.isArray(currentReport?.rows) ? currentReport.rows : []).map((r: any) => [
+        body: filteredCustomerRows.map((r: any) => [
           String(r?.propertyTitle || ''),
           String(r?.issue || ''),
           String(r?.category || ''),
@@ -865,14 +1013,14 @@ export default function CustomerDashboard({
     lines.push('');
 
     if (activeCustomerReport === 'paymentHistory') {
-      const s = currentReport?.summary || {};
+      const s = (filteredCustomerSummary as any) || {};
       lines.push(`Total Approved,${escCsv(s.totalApproved ?? 0)}`);
       lines.push(`Total Submitted,${escCsv(s.totalSubmitted ?? 0)}`);
       lines.push(`Failed Payments,${escCsv(s.failedPayments ?? 0)}`);
       lines.push(`Pending Dues,${escCsv(s.pendingDueAmount ?? 0)}`);
       lines.push('');
       lines.push('Month,Property,Amount,Payment Date,Payment Method,Status,Receipt Number');
-      (Array.isArray(currentReport?.rows) ? currentReport.rows : []).forEach((r: any) => {
+      filteredCustomerRows.forEach((r: any) => {
         lines.push(
           `${escCsv(formatShortDate(r.month))},${escCsv(r.propertyTitle || '')},${escCsv(r.amount ?? 0)},${escCsv(formatShortDate(r.paymentDate || r.approvedDate))},${escCsv(r.mode || '')},${escCsv(r.status || '')},${escCsv(r.receiptNumber || '')}`
         );
@@ -880,14 +1028,14 @@ export default function CustomerDashboard({
     }
 
     if (activeCustomerReport === 'expenseSummary') {
-      const s = currentReport?.summary || {};
+      const s = (filteredCustomerSummary as any) || {};
       lines.push(`Total Rent,${escCsv(s.totalRent ?? 0)}`);
       lines.push(`Total Maintenance,${escCsv(s.totalMaintenance ?? 0)}`);
       lines.push(`Total Utilities,${escCsv(s.totalUtilities ?? 0)}`);
       lines.push(`Total Expenses,${escCsv(s.totalExpenses ?? 0)}`);
       lines.push('');
       lines.push('Month,Rent,Maintenance,Utilities,Total');
-      (Array.isArray(currentReport?.rows) ? currentReport.rows : []).forEach((r: any) => {
+      filteredCustomerRows.forEach((r: any) => {
         lines.push(
           `${escCsv(r.name || r.key || '')},${escCsv(r.rent ?? 0)},${escCsv(r.maintenance ?? 0)},${escCsv(r.utilities ?? 0)},${escCsv(r.total ?? 0)}`
         );
@@ -895,14 +1043,14 @@ export default function CustomerDashboard({
     }
 
     if (activeCustomerReport === 'maintenance') {
-      const s = currentReport?.summary || {};
+      const s = (filteredCustomerSummary as any) || {};
       lines.push(`Total Requests,${escCsv(s.totalRequests ?? 0)}`);
       lines.push(`Pending,${escCsv(s.pending ?? 0)}`);
       lines.push(`In Progress,${escCsv(s.inProgress ?? 0)}`);
       lines.push(`Completed,${escCsv(s.completed ?? 0)}`);
       lines.push('');
       lines.push('Property,Issue,Category,Status,Request Date,Resolution Date');
-      (Array.isArray(currentReport?.rows) ? currentReport.rows : []).forEach((r: any) => {
+      filteredCustomerRows.forEach((r: any) => {
         lines.push(
           `${escCsv(r.propertyTitle || '')},${escCsv(r.issue || '')},${escCsv(r.category || '')},${escCsv(r.status || '')},${escCsv(formatShortDate(r.requestDate))},${escCsv(formatShortDate(r.resolutionDate))}`
         );
@@ -1264,8 +1412,8 @@ export default function CustomerDashboard({
                 </CardContent>
               </Card>
 
-              <RentStatusGraph 
-                data={rentHistory?.graph || []} 
+              <RentStatusGraph
+                data={rentHistory?.graph || []}
                 payments={rentHistory?.lastPayments || []}
                 title={t('Rent Status Summary', 'வாடகை நிலை சுருக்கம்')}
                 role="tenant"
@@ -1513,489 +1661,549 @@ export default function CustomerDashboard({
                 <CardDescription>{t('Track status of your property requests', 'உங்கள் சொத்து கோரிக்கைகளின் நிலையை கண்காணிக்கவும்')}</CardDescription>
               </CardHeader>
               <CardContent>
-                 <RequestList />
+                <RequestList />
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="reports" className="mt-6 space-y-6">
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card
-                className="cursor-pointer hover:bg-muted/30 transition-colors"
-                onClick={() => setActiveCustomerReport('paymentHistory')}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    {t('Payment History Report', 'கட்டண வரலாறு அறிக்கை')}
-                  </CardTitle>
-                  <CardDescription>
-                    {t('Monthly rent paid + payment dates/methods + pending/failed.', 'மாதாந்திர கட்டணம் + தேதி/முறை + நிலுவை/தோல்வி.')}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button
-                    className="w-full"
-                    variant={activeCustomerReport === 'paymentHistory' ? 'default' : 'outline'}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveCustomerReport('paymentHistory');
-                      void generateReport('paymentHistory');
-                    }}
-                  >
-                    {t('Generate Report', 'அறிக்கை உருவாக்கு')}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card
-                className="cursor-pointer hover:bg-muted/30 transition-colors"
-                onClick={() => setActiveCustomerReport('expenseSummary')}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <IndianRupee className="h-4 w-4" />
-                    {t('Expense Summary Report', 'செலவு சுருக்க அறிக்கை')}
-                  </CardTitle>
-                  <CardDescription>
-                    {t('Rent + maintenance + utilities with month-wise chart.', 'வாடகை + பராமரிப்பு + பயன்பாடுகள் (மாத வாரியாக).')}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button
-                    className="w-full"
-                    variant={activeCustomerReport === 'expenseSummary' ? 'default' : 'outline'}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveCustomerReport('expenseSummary');
-                      void generateReport('expenseSummary');
-                    }}
-                  >
-                    {t('Generate Report', 'அறிக்கை உருவாக்கு')}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card
-                className="cursor-pointer hover:bg-muted/30 transition-colors"
-                onClick={() => setActiveCustomerReport('maintenance')}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Wrench className="h-4 w-4" />
-                    {t('Maintenance Request Report', 'பராமரிப்பு கோரிக்கை அறிக்கை')}
-                  </CardTitle>
-                  <CardDescription>
-                    {t('Complaints, status, request & resolution dates.', 'பிரச்சனைகள், நிலை, கோரிக்கை & தீர்வு தேதிகள்.')}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button
-                    className="w-full"
-                    variant={activeCustomerReport === 'maintenance' ? 'default' : 'outline'}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveCustomerReport('maintenance');
-                      void generateReport('maintenance');
-                    }}
-                  >
-                    {t('Generate Report', 'அறிக்கை உருவாக்கு')}
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('Filters', 'வடிகட்டிகள்')}</CardTitle>
-                <CardDescription>{t('Adjust report range and property', 'காலவரை மற்றும் சொத்தை தேர்வு செய்யவும்')}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label>{t('From', 'இருந்து')}</Label>
-                    <Input type="date" value={reportFrom} onChange={(e) => setReportFrom(e.target.value)} />
+          <TabsContent value="reports" className="mt-2 pb-2">
+            {/* MAIN CONTENT — 2-COLUMN FIT-TO-PAGE GRID */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+              {/* LEFT COLUMN (lg:col-span-3): FULL-HEIGHT FROSTED SIDEBAR */}
+              <div className="lg:col-span-3 h-full">
+                <div className="h-full flex flex-col justify-between gap-2 rounded-2xl border border-slate-200/80 dark:border-slate-600/75 bg-white/85 dark:bg-slate-900/75 backdrop-blur-md p-2.5 shadow-sm">
+                  {/* Top Section — Compact Single-Row Filter Strip */}
+                  <div className="rounded-xl border border-slate-200/80 dark:border-slate-600/60 bg-white/90 dark:bg-slate-800/60 p-2 shadow-sm">
+                    <div className="grid grid-cols-12 gap-1.5 items-end">
+                      <div className="col-span-4">
+                        <label className="text-[10px] font-medium text-slate-500 dark:text-slate-300 mb-0.5 block">{t('From', 'இருந்து')}</label>
+                        <input
+                          type="date"
+                          value={reportFrom}
+                          onChange={(e) => setReportFrom(e.target.value)}
+                          className="w-full px-1.5 py-1 text-[11px] rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="col-span-4">
+                        <label className="text-[10px] font-medium text-slate-500 dark:text-slate-300 mb-0.5 block">{t('To', 'வரை')}</label>
+                        <input
+                          type="date"
+                          value={reportTo}
+                          onChange={(e) => setReportTo(e.target.value)}
+                          className="w-full px-1.5 py-1 text-[11px] rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="col-span-4">
+                        <label className="text-[10px] font-medium text-slate-500 dark:text-slate-300 mb-0.5 block">{t('Property', 'சொத்து')}</label>
+                        <select
+                          value={reportPropertyId}
+                          onChange={(e) => setReportPropertyId(e.target.value)}
+                          className="w-full px-1.5 py-1 text-[11px] rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="all">{t('All Properties', 'அனைத்து சொத்துக்கள்')}</option>
+                          {reportProperties.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {displayTa(p.title || t('Property', 'சொத்து'))}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>{t('To', 'வரை')}</Label>
-                    <Input type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)} />
+
+                  {/* Middle Section — The 3 Selector Cards */}
+                  <div className="flex flex-col gap-2">
+                    <div
+                      className={`p-2.5 rounded-xl border transition-all cursor-pointer shadow-sm ${activeCustomerReport === 'paymentHistory'
+                        ? 'border-blue-500/80 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-400/60 ring-1 ring-blue-500/30'
+                        : 'border-slate-200/80 dark:border-slate-600/75 bg-white/85 dark:bg-slate-900/75 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                        }`}
+                      onClick={() => setActiveCustomerReport('paymentHistory')}
+                    >
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                        <h4 className="text-xs font-semibold text-slate-900 dark:text-white leading-tight">
+                          {t('Payment History Report', 'கட்டண வரலாறு அறிக்கை')}
+                        </h4>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mb-1.5 leading-snug">
+                        {t('Monthly rent paid + payment dates/methods + pending/failed.', 'மாதாந்திர கட்டணம் + தேதி/முறை + நிலுவை/தோல்வி.')}
+                      </p>
+                      <Button
+                        className="w-full py-1 rounded-full text-xs font-semibold"
+                        variant={activeCustomerReport === 'paymentHistory' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveCustomerReport('paymentHistory');
+                          void generateReport('paymentHistory');
+                        }}
+                      >
+                        {t('Generate Report', 'அறிக்கை உருவாக்கு')}
+                      </Button>
+                    </div>
+
+                    <div
+                      className={`p-2.5 rounded-xl border transition-all cursor-pointer shadow-sm ${activeCustomerReport === 'expenseSummary'
+                        ? 'border-blue-500/80 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-400/60 ring-1 ring-blue-500/30'
+                        : 'border-slate-200/80 dark:border-slate-600/75 bg-white/85 dark:bg-slate-900/75 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                        }`}
+                      onClick={() => setActiveCustomerReport('expenseSummary')}
+                    >
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <IndianRupee className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                        <h4 className="text-xs font-semibold text-slate-900 dark:text-white leading-tight">
+                          {t('Expense Summary Report', 'செலவு சுருக்க அறிக்கை')}
+                        </h4>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mb-1.5 leading-snug">
+                        {t('Rent + maintenance + utilities with month-wise chart.', 'வாடகை + பராமரிப்பு + பயன்பாடுகள் (மாத வாரியாக).')}
+                      </p>
+                      <Button
+                        className="w-full py-1 rounded-full text-xs font-semibold"
+                        variant={activeCustomerReport === 'expenseSummary' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveCustomerReport('expenseSummary');
+                          void generateReport('expenseSummary');
+                        }}
+                      >
+                        {t('Generate Report', 'அறிக்கை உருவாக்கு')}
+                      </Button>
+                    </div>
+
+                    <div
+                      className={`p-2.5 rounded-xl border transition-all cursor-pointer shadow-sm ${activeCustomerReport === 'maintenance'
+                        ? 'border-blue-500/80 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-400/60 ring-1 ring-blue-500/30'
+                        : 'border-slate-200/80 dark:border-slate-600/75 bg-white/85 dark:bg-slate-900/75 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                        }`}
+                      onClick={() => setActiveCustomerReport('maintenance')}
+                    >
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <Wrench className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                        <h4 className="text-xs font-semibold text-slate-900 dark:text-white leading-tight">
+                          {t('Maintenance Request Report', 'பராமரிப்பு கோரிக்கை அறிக்கை')}
+                        </h4>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mb-1.5 leading-snug">
+                        {t('Complaints, status, request & resolution dates.', 'பிரச்சனைகள், நிலை, கோரிக்கை & தீர்வு தேதிகள்.')}
+                      </p>
+                      <Button
+                        className="w-full py-1 rounded-full text-xs font-semibold"
+                        variant={activeCustomerReport === 'maintenance' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveCustomerReport('maintenance');
+                          void generateReport('maintenance');
+                        }}
+                      >
+                        {t('Generate Report', 'அறிக்கை உருவாக்கு')}
+                      </Button>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>{t('Property', 'சொத்து')}</Label>
-                    <Select value={reportPropertyId} onValueChange={setReportPropertyId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={t('All Properties', 'அனைத்து சொத்துக்கள்')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">{t('All Properties', 'அனைத்து சொத்துக்கள்')}</SelectItem>
-                        {reportProperties.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {displayTa(p.title || t('Property', 'சொத்து'))}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+
+                  {/* Bottom group: Insights Summary Card */}
+                  <div className="rounded-xl border border-slate-200/70 dark:border-slate-600/60 bg-slate-50/80 dark:bg-slate-800/60 p-2.5 shadow-sm space-y-1.5 mt-auto">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5 text-blue-500" />
+                      {currentReport?.ai?.requested && Array.isArray(currentReport?.ai?.insights) && currentReport.ai.insights.length > 0
+                        ? t('AI Insights', 'AI உள்ளுணர்வுகள்')
+                        : t('Insights', 'உள்ளுணர்வுகள்')}
+                    </div>
+                    {currentReport?.ai?.requested && Array.isArray(currentReport?.ai?.insights) && currentReport.ai.insights.length > 0 ? (
+                      <div className="space-y-1">
+                        {currentReport?.ai?.executiveSummary ? (
+                          <div className="text-[11px] text-muted-foreground leading-relaxed line-clamp-3">
+                            {String(currentReport.ai.executiveSummary)}
+                          </div>
+                        ) : null}
+                        <ul className="list-disc pl-4 text-[11px] text-muted-foreground space-y-0.5">
+                          {currentReport.ai.insights.slice(0, 3).map((x: any, idx: number) => (
+                            <li key={idx}>{String(x)}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : activeCustomerReport === 'paymentHistory' && paymentHistoryDerived ? (
+                      <ul className="list-disc pl-4 text-[11px] text-muted-foreground space-y-0.5">
+                        <li>{t(`Total Approved: ${money((filteredCustomerSummary as any)?.totalApproved ?? 0)}`, `அனுமதிக்கப்பட்டது: ${money((filteredCustomerSummary as any)?.totalApproved ?? 0)}`)}</li>
+                        <li>{t(`Pending Dues: ${money((filteredCustomerSummary as any)?.pendingDueAmount ?? 0)}`, `நிலுவைத் தொகை: ${money((filteredCustomerSummary as any)?.pendingDueAmount ?? 0)}`)}</li>
+                        <li>{t(`Total Records: ${filteredCustomerRows.length}`, `மொத்த பதிவுகள்: ${filteredCustomerRows.length}`)}</li>
+                      </ul>
+                    ) : activeCustomerReport === 'expenseSummary' && expenseSummaryDerived ? (
+                      <ul className="list-disc pl-4 text-[11px] text-muted-foreground space-y-0.5">
+                        <li>{t(`Total Expenses: ${money((filteredCustomerSummary as any)?.totalExpenses ?? 0)}`, `மொத்த செலவுகள்: ${money((filteredCustomerSummary as any)?.totalExpenses ?? 0)}`)}</li>
+                        <li>{t(`Total Rent: ${money((filteredCustomerSummary as any)?.totalRent ?? 0)}`, `மொத்த வாடகை: ${money((filteredCustomerSummary as any)?.totalRent ?? 0)}`)}</li>
+                        <li>{t(`Total Maintenance: ${money((filteredCustomerSummary as any)?.totalMaintenance ?? 0)}`, `மொத்த பராமரிப்பு: ${money((filteredCustomerSummary as any)?.totalMaintenance ?? 0)}`)}</li>
+                      </ul>
+                    ) : activeCustomerReport === 'maintenance' && maintenanceDerived ? (
+                      <ul className="list-disc pl-4 text-[11px] text-muted-foreground space-y-0.5">
+                        <li>{t(`Total Requests: ${(filteredCustomerSummary as any)?.totalRequests ?? 0}`, `மொத்த கோரிக்கைகள்: ${(filteredCustomerSummary as any)?.totalRequests ?? 0}`)}</li>
+                        <li>{t(`Completed: ${(filteredCustomerSummary as any)?.completed ?? 0}`, `முடிந்தது: ${(filteredCustomerSummary as any)?.completed ?? 0}`)}</li>
+                        <li>{t(`Pending: ${(filteredCustomerSummary as any)?.pending ?? 0}`, `நிலுவையில்: ${(filteredCustomerSummary as any)?.pending ?? 0}`)}</li>
+                      </ul>
+                    ) : (
+                      <div className="text-[11px] text-muted-foreground">
+                        {t('Select filters and click Generate Report.', 'வடிகட்டிகளைத் தேர்ந்தெடுத்து “அறிக்கை உருவாக்கு” ஐ கிளிக் செய்யவும்.')}
+                      </div>
+                    )}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-1">
-                    <CardTitle>{buildReportTitle()}</CardTitle>
-                    <CardDescription>{t('Summary on top, detailed table below.', 'மேலே சுருக்கம், கீழே விரிவான அட்டவணை.')}</CardDescription>
-                    <div className="pt-3 space-y-1 text-sm text-muted-foreground">
-                      <div>
-                        {t('Customer Name:', 'வாடிக்கையாளர் பெயர்:')} {String(userProfile?.name || 'Customer')}
+              {/* RIGHT COLUMN (lg:col-span-9): ACTIVE GENERATED REPORT VIEW */}
+              <div className="lg:col-span-9 h-full">
+                <Card className="h-full flex flex-col justify-between rounded-2xl border border-slate-200/80 dark:border-slate-600/75 bg-white/85 dark:bg-slate-900/75 backdrop-blur-md shadow-sm px-4 py-2.5">
+                  <div className="flex items-center justify-between gap-2 pb-1 m-0">
+                    <div className="space-y-0 min-w-0">
+                      <CardTitle className="text-base sm:text-lg truncate">{buildReportTitle()}</CardTitle>
+                      <CardDescription className="text-xs">{t('Summary on top, detailed table below.', 'மேலே சுருக்கம், கீழே விரிவான அட்டவணை.')}</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button
+                        className="h-8 px-3 py-1.5 text-xs whitespace-nowrap rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm"
+                        onClick={() => void generateReport(activeCustomerReport)}
+                        disabled={reportIsLoading}
+                      >
+                        {reportIsLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                        {t('Generate Report', 'அறிக்கை உருவாக்கு')}
+                      </Button>
+                      <Button variant="outline" className="h-8 px-3 py-1.5 text-xs whitespace-nowrap rounded-xl" onClick={handleDownloadPdf} disabled={!currentReport || reportIsLoading}>
+                        <Download className="mr-1.5 h-3.5 w-3.5" />
+                        {t('Download as PDF', 'PDF ஆக பதிவிறக்கம்')}
+                      </Button>
+                      <Button variant="outline" className="h-8 px-3 py-1.5 text-xs whitespace-nowrap rounded-xl" onClick={handlePrintReport} disabled={!currentReport || reportIsLoading}>
+                        <Printer className="mr-1.5 h-3.5 w-3.5" />
+                        {t('Print Report', 'அச்சிடு')}
+                      </Button>
+                      <Button variant="outline" className="h-8 px-3 py-1.5 text-xs whitespace-nowrap rounded-xl" onClick={handleDownloadCsv} disabled={!currentReport || reportIsLoading}>
+                        <Download className="mr-1.5 h-3.5 w-3.5" />
+                        {t('Export CSV', 'CSV ஏற்றுமதி')}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {activeCustomerReport ? (
+                    <div className="py-1 my-1 border-y border-slate-200/80 dark:border-slate-600/60 flex flex-wrap items-center justify-between gap-x-4 text-[11px] leading-tight text-slate-600 dark:text-slate-300">
+                      <div className="flex flex-wrap items-center gap-x-2">
+                        <div>
+                          <span className="font-medium text-slate-700 dark:text-slate-200">{t('Customer Name:', 'வாடிக்கையாளர் பெயர்:')}</span>{' '}
+                          <span>{String(userProfile?.name || 'Customer')}</span>
+                        </div>
+                        <span className="text-slate-300 dark:text-slate-600">•</span>
+                        <div>
+                          <span className="font-medium text-slate-700 dark:text-slate-200">{t('Report Period:', 'அறிக்கை காலம்:')}</span>{' '}
+                          <span>{reportFrom} → {reportTo}</span>
+                        </div>
+                        <span className="text-slate-300 dark:text-slate-600">•</span>
+                        <div>
+                          <span className="font-medium text-slate-700 dark:text-slate-200">{t('Generated On:', 'உருவாக்கப்பட்ட தேதி:')}</span>{' '}
+                          <span>{currentReport?.generatedAt ? new Date(currentReport.generatedAt).toLocaleDateString() : '-'}</span>
+                        </div>
                       </div>
-                      <div>
-                        {t('Report Period:', 'அறிக்கை காலம்:')} {reportFrom} → {reportTo}
-                      </div>
-                      <div>
-                        {t('Generated On:', 'உருவாக்கப்பட்ட தேதி:')}{' '}
-                        {currentReport?.generatedAt ? new Date(currentReport.generatedAt).toLocaleDateString() : '-'}
-                      </div>
-                      <div className="italic">
+                      <div className="italic text-[11px] text-slate-400 dark:text-slate-400">
                         {currentReport?.ai?.requested && currentReport?.ai?.generated
                           ? t('This report is AI-assisted and generated by Reside Management System.', 'இந்த அறிக்கை AI உதவியுடன் Reside Management System மூலம் உருவாக்கப்படுகிறது.')
                           : t('This report is system-generated by Reside Management System.', 'இந்த அறிக்கை Reside Management System மூலம் உருவாக்கப்படுகிறது.')}
                       </div>
                     </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button onClick={() => void generateReport(activeCustomerReport)} disabled={reportIsLoading}>
-                      {t('Generate Report', 'அறிக்கை உருவாக்கு')}
-                    </Button>
-                    <Button variant="outline" onClick={handleDownloadPdf} disabled={!currentReport || reportIsLoading}>
-                      <Download className="mr-2 h-4 w-4" />
-                      {t('Download as PDF', 'PDF ஆக பதிவிறக்கம்')}
-                    </Button>
-                    <Button variant="outline" onClick={handlePrintReport} disabled={!currentReport || reportIsLoading}>
-                      <Printer className="mr-2 h-4 w-4" />
-                      {t('Print Report', 'அச்சிடு')}
-                    </Button>
-                    <Button variant="outline" onClick={handleDownloadCsv} disabled={!currentReport || reportIsLoading}>
-                      <Download className="mr-2 h-4 w-4" />
-                      {t('Export CSV', 'CSV ஏற்றுமதி')}
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {reportIsLoading ? (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t('Generating report...', 'அறிக்கை உருவாக்கப்படுகிறது...')}
-                  </div>
-                ) : !currentReport ? (
-                  <div className="text-sm text-muted-foreground">
-                    {t('Click Generate Report to fetch data.', 'அறிக்கை பெற “அறிக்கை உருவாக்கு” ஐ அழுத்தவும்.')}
-                  </div>
-                ) : (
-                  <>
-                    {currentReport?.ai?.requested ? (
-                      <div className="rounded-lg border p-4">
-                        <div className="font-medium mb-2">{t('Insights', 'உள்ளடக்கம்')}</div>
-                        {currentReport?.ai?.executiveSummary ? (
-                          <div className="text-sm text-muted-foreground mb-2">{String(currentReport.ai.executiveSummary)}</div>
-                        ) : null}
-                        {Array.isArray(currentReport?.ai?.insights) && currentReport.ai.insights.length > 0 ? (
-                          <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
-                            {currentReport.ai.insights.slice(0, 6).map((x: any, idx: number) => (
-                              <li key={idx}>{String(x)}</li>
-                            ))}
-                          </ul>
-                        ) : null}
-                        <div className="text-xs text-muted-foreground mt-3">
-                          {currentReport?.ai?.generated
-                            ? t('This report is AI-assisted and generated by Reside Management System.', 'இந்த அறிக்கை AI உதவியுடன் Reside Management System மூலம் உருவாக்கப்படுகிறது.')
-                            : t('This report is system-generated by Reside Management System.', 'இந்த அறிக்கை Reside Management System மூலம் உருவாக்கப்படுகிறது.')}
-                        </div>
-                      </div>
-                    ) : null}
+                  ) : null}
 
-                    {activeCustomerReport === 'paymentHistory' ? (
-                      <div className="grid gap-4 md:grid-cols-4">
-                        <Card className="rounded-2xl">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{t('Total Approved', 'மொத்த அனுமதிக்கப்பட்டது')}</CardTitle>
-                          </CardHeader>
-                          <CardContent className="text-2xl font-bold">{money(currentReport?.summary?.totalApproved ?? 0)}</CardContent>
-                        </Card>
-                        <Card className="rounded-2xl">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{t('Pending Dues', 'நிலுவைத் தொகை')}</CardTitle>
-                          </CardHeader>
-                          <CardContent className="text-2xl font-bold">{money(currentReport?.summary?.pendingDueAmount ?? 0)}</CardContent>
-                        </Card>
-                        <Card className="rounded-2xl">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{t('Failed Payments', 'தோல்வி கட்டணங்கள்')}</CardTitle>
-                          </CardHeader>
-                          <CardContent className="text-2xl font-bold">{Number(currentReport?.summary?.failedPayments ?? 0).toLocaleString()}</CardContent>
-                        </Card>
-                        <Card className="rounded-2xl">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{t('Total Payments', 'மொத்த கட்டணங்கள்')}</CardTitle>
-                          </CardHeader>
-                          <CardContent className="text-2xl font-bold">{Number(currentReport?.summary?.totalPayments ?? 0).toLocaleString()}</CardContent>
-                        </Card>
+                  <CardContent className="p-0 space-y-2">
+                    {reportIsLoading ? (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {t('Generating report...', 'அறிக்கை உருவாக்கப்படுகிறது...')}
                       </div>
-                    ) : null}
-
-                    {activeCustomerReport === 'expenseSummary' ? (
-                      <div className="grid gap-4 md:grid-cols-4">
-                        <Card className="rounded-2xl">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{t('Total Rent', 'மொத்த வாடகை')}</CardTitle>
-                          </CardHeader>
-                          <CardContent className="text-2xl font-bold">{money(currentReport?.summary?.totalRent ?? 0)}</CardContent>
-                        </Card>
-                        <Card className="rounded-2xl">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{t('Total Maintenance', 'மொத்த பராமரிப்பு')}</CardTitle>
-                          </CardHeader>
-                          <CardContent className="text-2xl font-bold">{money(currentReport?.summary?.totalMaintenance ?? 0)}</CardContent>
-                        </Card>
-                        <Card className="rounded-2xl">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{t('Total Utilities', 'மொத்த பயன்பாடுகள்')}</CardTitle>
-                          </CardHeader>
-                          <CardContent className="text-2xl font-bold">{money(currentReport?.summary?.totalUtilities ?? 0)}</CardContent>
-                        </Card>
-                        <Card className="rounded-2xl">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{t('Total Expenses', 'மொத்த செலவுகள்')}</CardTitle>
-                          </CardHeader>
-                          <CardContent className="text-2xl font-bold">{money(currentReport?.summary?.totalExpenses ?? 0)}</CardContent>
-                        </Card>
+                    ) : !currentReport ? (
+                      <div className="text-sm text-muted-foreground">
+                        {t('Click Generate Report to fetch data.', 'அறிக்கை பெற “அறிக்கை உருவாக்கு” ஐ அழுத்தவும்.')}
                       </div>
-                    ) : null}
-
-                    {activeCustomerReport === 'maintenance' ? (
-                      <div className="grid gap-4 md:grid-cols-4">
-                        <Card className="rounded-2xl">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{t('Total Requests', 'மொத்த கோரிக்கைகள்')}</CardTitle>
-                          </CardHeader>
-                          <CardContent className="text-2xl font-bold">{Number(currentReport?.summary?.totalRequests ?? 0).toLocaleString()}</CardContent>
-                        </Card>
-                        <Card className="rounded-2xl">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{t('Pending', 'நிலுவையில்')}</CardTitle>
-                          </CardHeader>
-                          <CardContent className="text-2xl font-bold">{Number(currentReport?.summary?.pending ?? 0).toLocaleString()}</CardContent>
-                        </Card>
-                        <Card className="rounded-2xl">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{t('In Progress', 'செயலில்')}</CardTitle>
-                          </CardHeader>
-                          <CardContent className="text-2xl font-bold">{Number(currentReport?.summary?.inProgress ?? 0).toLocaleString()}</CardContent>
-                        </Card>
-                        <Card className="rounded-2xl">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{t('Completed', 'முடிந்தது')}</CardTitle>
-                          </CardHeader>
-                          <CardContent className="text-2xl font-bold">{Number(currentReport?.summary?.completed ?? 0).toLocaleString()}</CardContent>
-                        </Card>
-                      </div>
-                    ) : null}
-
-                    {activeCustomerReport === 'paymentHistory' && paymentHistoryDerived ? (
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <Card className="rounded-2xl">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{t('Monthly Paid', 'மாதாந்திர செலுத்தப்பட்டது')}</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div ref={paymentHistoryChartRef} className="h-[240px] w-full">
-                              <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={paymentHistoryDerived.monthlyPaid}>
-                                  <CartesianGrid strokeDasharray="3 3" />
-                                  <XAxis dataKey="name" />
-                                  <YAxis />
-                                  <Tooltip />
-                                  <Bar dataKey="amount" fill="#16a34a" />
-                                </BarChart>
-                              </ResponsiveContainer>
+                    ) : (
+                      <>
+                        {activeCustomerReport === 'paymentHistory' ? (
+                          <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 mt-1.5 mb-2">
+                            <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Total Approved', 'மொத்த அனுமதிக்கப்பட்டது')}</div>
+                              <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{money((filteredCustomerSummary as any)?.totalApproved ?? 0)}</div>
                             </div>
-                          </CardContent>
-                        </Card>
-                        <Card className="rounded-2xl">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{t('Payment Status', 'கட்டண நிலை')}</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="h-[240px] w-full">
-                              <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                  <Pie data={paymentHistoryDerived.statusData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={90} paddingAngle={2}>
-                                    <Cell fill="#16a34a" />
-                                    <Cell fill="#2563eb" />
-                                    <Cell fill="#ef4444" />
-                                  </Pie>
-                                  <Tooltip />
-                                </PieChart>
-                              </ResponsiveContainer>
+                            <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Pending Dues', 'நிலுவைத் தொகை')}</div>
+                              <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{money((filteredCustomerSummary as any)?.pendingDueAmount ?? 0)}</div>
                             </div>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    ) : null}
-
-                    {activeCustomerReport === 'expenseSummary' && expenseSummaryDerived ? (
-                      <Card className="rounded-2xl">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm">{t('Month-wise Spending', 'மாத வாரியான செலவுகள்')}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div ref={expenseSummaryChartRef} className="h-[260px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={expenseSummaryDerived.chartData}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" />
-                                <YAxis />
-                                <Tooltip />
-                                <Bar dataKey="total" fill="#2563eb" />
-                              </BarChart>
-                            </ResponsiveContainer>
+                            <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Failed Payments', 'தோல்வி கட்டணங்கள்')}</div>
+                              <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{Number((filteredCustomerSummary as any)?.failedPayments ?? 0).toLocaleString()}</div>
+                            </div>
+                            <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Total Payments', 'மொத்த கட்டணங்கள்')}</div>
+                              <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{Number((filteredCustomerSummary as any)?.totalPayments ?? 0).toLocaleString()}</div>
+                            </div>
                           </div>
-                        </CardContent>
-                      </Card>
-                    ) : null}
+                        ) : null}
 
-                    {activeCustomerReport === 'maintenance' && maintenanceDerived ? (
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <Card className="rounded-2xl">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{t('Status', 'நிலை')}</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div ref={maintenanceChartRef} className="h-[240px] w-full">
-                              <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                  <Pie data={maintenanceDerived.statusData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={90} paddingAngle={2}>
-                                    <Cell fill="#16a34a" />
-                                    <Cell fill="#2563eb" />
-                                    <Cell fill="#f59e0b" />
-                                  </Pie>
-                                  <Tooltip />
-                                </PieChart>
-                              </ResponsiveContainer>
+                        {activeCustomerReport === 'expenseSummary' ? (
+                          <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 mt-1.5 mb-2">
+                            <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Total Rent', 'மொத்த வாடகை')}</div>
+                              <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{money((filteredCustomerSummary as any)?.totalRent ?? 0)}</div>
                             </div>
-                          </CardContent>
-                        </Card>
-                        <Card className="rounded-2xl">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{t('Monthly Requests', 'மாதாந்திர கோரிக்கைகள்')}</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="h-[240px] w-full">
-                              <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={maintenanceDerived.monthlyRequests}>
-                                  <CartesianGrid strokeDasharray="3 3" />
-                                  <XAxis dataKey="name" />
-                                  <YAxis />
-                                  <Tooltip />
-                                  <Bar dataKey="count" fill="#f59e0b" />
-                                </BarChart>
-                              </ResponsiveContainer>
+                            <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Total Maintenance', 'மொத்த பராமரிப்பு')}</div>
+                              <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{money((filteredCustomerSummary as any)?.totalMaintenance ?? 0)}</div>
                             </div>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    ) : null}
+                            <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Total Utilities', 'மொத்த பயன்பாடுகள்')}</div>
+                              <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{money((filteredCustomerSummary as any)?.totalUtilities ?? 0)}</div>
+                            </div>
+                            <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Total Expenses', 'மொத்த செலவுகள்')}</div>
+                              <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{money((filteredCustomerSummary as any)?.totalExpenses ?? 0)}</div>
+                            </div>
+                          </div>
+                        ) : null}
 
-                    <div className="rounded-lg border overflow-x-auto">
-                      {activeCustomerReport === 'paymentHistory' ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>{t('Month', 'மாதம்')}</TableHead>
-                              <TableHead>{t('Property', 'சொத்து')}</TableHead>
-                              <TableHead>{t('Amount', 'தொகை')}</TableHead>
-                              <TableHead>{t('Date', 'தேதி')}</TableHead>
-                              <TableHead>{t('Method', 'முறை')}</TableHead>
-                              <TableHead>{t('Status', 'நிலை')}</TableHead>
-                              <TableHead>{t('Receipt', 'ரசீது')}</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {(Array.isArray(currentReport?.rows) ? currentReport.rows : []).map((r: any, idx: number) => (
-                              <TableRow key={String(r?.paymentId || idx)}>
-                                <TableCell>{formatShortDate(r?.month)}</TableCell>
-                                <TableCell>{displayTa(r?.propertyTitle || '')}</TableCell>
-                                <TableCell>{money(r?.amount ?? 0)}</TableCell>
-                                <TableCell>{formatShortDate(r?.paymentDate || r?.approvedDate)}</TableCell>
-                                <TableCell>{String(r?.mode || '')}</TableCell>
-                                <TableCell>{String(r?.status || '')}</TableCell>
-                                <TableCell>{String(r?.receiptNumber || '')}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      ) : null}
+                        {activeCustomerReport === 'maintenance' ? (
+                          <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 mt-1.5 mb-2">
+                            <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Total Requests', 'மொத்த கோரிக்கைகள்')}</div>
+                              <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{Number((filteredCustomerSummary as any)?.totalRequests ?? 0).toLocaleString()}</div>
+                            </div>
+                            <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Pending', 'நிலுவையில்')}</div>
+                              <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{Number((filteredCustomerSummary as any)?.pending ?? 0).toLocaleString()}</div>
+                            </div>
+                            <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('In Progress', 'செயலில்')}</div>
+                              <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{Number((filteredCustomerSummary as any)?.inProgress ?? 0).toLocaleString()}</div>
+                            </div>
+                            <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Completed', 'முடிந்தது')}</div>
+                              <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{Number((filteredCustomerSummary as any)?.completed ?? 0).toLocaleString()}</div>
+                            </div>
+                          </div>
+                        ) : null}
 
-                      {activeCustomerReport === 'expenseSummary' ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>{t('Month', 'மாதம்')}</TableHead>
-                              <TableHead>{t('Rent', 'வாடகை')}</TableHead>
-                              <TableHead>{t('Maintenance', 'பராமரிப்பு')}</TableHead>
-                              <TableHead>{t('Utilities', 'பயன்பாடுகள்')}</TableHead>
-                              <TableHead>{t('Total', 'மொத்தம்')}</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {(Array.isArray(currentReport?.rows) ? currentReport.rows : []).map((r: any, idx: number) => (
-                              <TableRow key={String(r?.key || r?.name || idx)}>
-                                <TableCell>{String(r?.name || r?.key || '')}</TableCell>
-                                <TableCell>{money(r?.rent ?? 0)}</TableCell>
-                                <TableCell>{money(r?.maintenance ?? 0)}</TableCell>
-                                <TableCell>{money(r?.utilities ?? 0)}</TableCell>
-                                <TableCell>{money(r?.total ?? 0)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      ) : null}
+                        {activeCustomerReport === 'paymentHistory' && paymentHistoryDerived ? (
+                          <div className="grid gap-2.5 mb-2 md:grid-cols-2">
+                            <Card className="rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/60 dark:bg-slate-800/60 p-2.5">
+                              <CardHeader className="p-0 pb-1">
+                                <CardTitle className="text-xs font-semibold">{t('Monthly Paid', 'மாதாந்திர செலுத்தப்பட்டது')}</CardTitle>
+                              </CardHeader>
+                              <CardContent className="p-0">
+                                <div ref={paymentHistoryChartRef} className="h-32 w-full">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={paymentHistoryDerived.monthlyPaid}>
+                                      <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.35} />
+                                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} height={20} />
+                                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${Number(v || 0) / 1000}k`} />
+                                      <Tooltip formatter={(v: any) => money(v)} />
+                                      <Bar dataKey="amount" fill="#16a34a" radius={[6, 6, 0, 0]} maxBarSize={44} />
+                                    </BarChart>
+                                  </ResponsiveContainer>
+                                </div>
+                              </CardContent>
+                            </Card>
+                            <Card className="rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/60 dark:bg-slate-800/60 p-2.5">
+                              <CardHeader className="p-0 pb-1">
+                                <CardTitle className="text-xs font-semibold">{t('Payment Status', 'கட்டண நிலை')}</CardTitle>
+                              </CardHeader>
+                              <CardContent className="p-0">
+                                <div className="h-32 w-full">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                      <Pie data={paymentHistoryDerived.statusData} dataKey="value" nameKey="name" innerRadius={36} outerRadius={48} paddingAngle={2}>
+                                        <Cell fill="#16a34a" />
+                                        <Cell fill="#2563eb" />
+                                        <Cell fill="#ef4444" />
+                                      </Pie>
+                                      <Tooltip />
+                                    </PieChart>
+                                  </ResponsiveContainer>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </div>
+                        ) : null}
 
-                      {activeCustomerReport === 'maintenance' ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>{t('Property', 'சொத்து')}</TableHead>
-                              <TableHead>{t('Issue', 'பிரச்சனை')}</TableHead>
-                              <TableHead>{t('Status', 'நிலை')}</TableHead>
-                              <TableHead>{t('Request Date', 'கோரிக்கை தேதி')}</TableHead>
-                              <TableHead>{t('Resolution Date', 'தீர்வு தேதி')}</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {(Array.isArray(currentReport?.rows) ? currentReport.rows : []).map((r: any, idx: number) => (
-                              <TableRow key={String(r?.requestId || idx)}>
-                                <TableCell>{displayTa(r?.propertyTitle || '')}</TableCell>
-                                <TableCell>{String(r?.issue || '')}</TableCell>
-                                <TableCell>{String(r?.status || '')}</TableCell>
-                                <TableCell>{formatShortDate(r?.requestDate)}</TableCell>
-                                <TableCell>{formatShortDate(r?.resolutionDate)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      ) : null}
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
+                        {activeCustomerReport === 'expenseSummary' && expenseSummaryDerived ? (
+                          <Card className="rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/60 dark:bg-slate-800/60 p-2.5 mb-2">
+                            <CardHeader className="p-0 pb-1">
+                              <CardTitle className="text-xs font-semibold">{t('Month-wise Spending', 'மாத வாரியான செலவுகள்')}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                              <div ref={expenseSummaryChartRef} className="h-32 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <BarChart data={expenseSummaryDerived.chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.35} />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} height={20} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${Number(v || 0) / 1000}k`} />
+                                    <Tooltip formatter={(v: any) => money(v)} />
+                                    <Bar dataKey="total" fill="#2563eb" radius={[6, 6, 0, 0]} maxBarSize={44} />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ) : null}
+
+                        {activeCustomerReport === 'maintenance' && maintenanceDerived ? (
+                          <div className="grid gap-2.5 mb-2 md:grid-cols-2">
+                            <Card className="rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/60 dark:bg-slate-800/60 p-2.5">
+                              <CardHeader className="p-0 pb-1">
+                                <CardTitle className="text-xs font-semibold">{t('Status', 'நிலை')}</CardTitle>
+                              </CardHeader>
+                              <CardContent className="p-0">
+                                <div ref={maintenanceChartRef} className="h-32 w-full">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                      <Pie data={maintenanceDerived.statusData} dataKey="value" nameKey="name" innerRadius={36} outerRadius={48} paddingAngle={2}>
+                                        <Cell fill="#16a34a" />
+                                        <Cell fill="#2563eb" />
+                                        <Cell fill="#f59e0b" />
+                                      </Pie>
+                                      <Tooltip />
+                                    </PieChart>
+                                  </ResponsiveContainer>
+                                </div>
+                              </CardContent>
+                            </Card>
+                            <Card className="rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/60 dark:bg-slate-800/60 p-2.5">
+                              <CardHeader className="p-0 pb-1">
+                                <CardTitle className="text-xs font-semibold">{t('Monthly Requests', 'மாதாந்திர கோரிக்கைகள்')}</CardTitle>
+                              </CardHeader>
+                              <CardContent className="p-0">
+                                <div className="h-32 w-full">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={maintenanceDerived.monthlyRequests}>
+                                      <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.35} />
+                                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} height={20} />
+                                      <YAxis axisLine={false} tickLine={false} allowDecimals={false} tick={{ fontSize: 11 }} />
+                                      <Tooltip />
+                                      <Bar dataKey="count" fill="#f59e0b" radius={[6, 6, 0, 0]} maxBarSize={44} />
+                                    </BarChart>
+                                  </ResponsiveContainer>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </div>
+                        ) : null}
+
+                        <div className="overflow-auto rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/40 dark:bg-slate-800/40">
+                          {activeCustomerReport === 'paymentHistory' ? (
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="h-8">
+                                  <TableHead className="py-1.5 px-2.5 text-xs">{t('Month', 'மாதம்')}</TableHead>
+                                  <TableHead className="py-1.5 px-2.5 text-xs">{t('Property', 'சொத்து')}</TableHead>
+                                  <TableHead className="py-1.5 px-2.5 text-xs">{t('Amount', 'தொகை')}</TableHead>
+                                  <TableHead className="py-1.5 px-2.5 text-xs">{t('Date', 'தேதி')}</TableHead>
+                                  <TableHead className="py-1.5 px-2.5 text-xs">{t('Method', 'முறை')}</TableHead>
+                                  <TableHead className="py-1.5 px-2.5 text-xs">{t('Status', 'நிலை')}</TableHead>
+                                  <TableHead className="py-1.5 px-2.5 text-xs">{t('Receipt', 'ரசீது')}</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {filteredCustomerRows.length === 0 ? (
+                                  <TableRow>
+                                    <TableCell colSpan={7} className="text-center py-6 text-xs text-muted-foreground">
+                                      {t('No records found for the selected date range and property.', 'தேர்ந்தெடுக்கப்பட்ட தேதி வரம்பு மற்றும் சொத்திற்கு பதிவுகள் எதுவும் இல்லை.')}
+                                    </TableCell>
+                                  </TableRow>
+                                ) : (
+                                  filteredCustomerRows.map((r: any, idx: number) => (
+                                    <TableRow key={String(r?.paymentId || idx)}>
+                                      <TableCell className="py-1.5 px-2.5 text-xs">{formatShortDate(r?.month)}</TableCell>
+                                      <TableCell className="py-1.5 px-2.5 text-xs font-medium">{displayTa(r?.propertyTitle || '')}</TableCell>
+                                      <TableCell className="py-1.5 px-2.5 text-xs">{money(r?.amount ?? 0)}</TableCell>
+                                      <TableCell className="py-1.5 px-2.5 text-xs">{formatShortDate(r?.paymentDate || r?.approvedDate)}</TableCell>
+                                      <TableCell className="py-1.5 px-2.5 text-xs">{String(r?.mode || '')}</TableCell>
+                                      <TableCell className="py-1.5 px-2.5 text-xs">{String(r?.status || '')}</TableCell>
+                                      <TableCell className="py-1.5 px-2.5 text-xs">{String(r?.receiptNumber || '')}</TableCell>
+                                    </TableRow>
+                                  ))
+                                )}
+                              </TableBody>
+                            </Table>
+                          ) : null}
+
+                          {activeCustomerReport === 'expenseSummary' ? (
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="h-8">
+                                  <TableHead className="py-1.5 px-2.5 text-xs">{t('Month', 'மாதம்')}</TableHead>
+                                  <TableHead className="py-1.5 px-2.5 text-xs">{t('Rent', 'வாடகை')}</TableHead>
+                                  <TableHead className="py-1.5 px-2.5 text-xs">{t('Maintenance', 'பராமரிப்பு')}</TableHead>
+                                  <TableHead className="py-1.5 px-2.5 text-xs">{t('Utilities', 'பயன்பாடுகள்')}</TableHead>
+                                  <TableHead className="py-1.5 px-2.5 text-xs">{t('Total', 'மொத்தம்')}</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {filteredCustomerRows.length === 0 ? (
+                                  <TableRow>
+                                    <TableCell colSpan={5} className="text-center py-6 text-xs text-muted-foreground">
+                                      {t('No records found for the selected date range and property.', 'தேர்ந்தெடுக்கப்பட்ட தேதி வரம்பு மற்றும் சொத்திற்கு பதிவுகள் எதுவும் இல்லை.')}
+                                    </TableCell>
+                                  </TableRow>
+                                ) : (
+                                  filteredCustomerRows.map((r: any, idx: number) => (
+                                    <TableRow key={String(r?.key || r?.name || idx)}>
+                                      <TableCell className="py-1.5 px-2.5 text-xs">{String(r?.name || r?.key || '')}</TableCell>
+                                      <TableCell className="py-1.5 px-2.5 text-xs">{money(r?.rent ?? 0)}</TableCell>
+                                      <TableCell className="py-1.5 px-2.5 text-xs">{money(r?.maintenance ?? 0)}</TableCell>
+                                      <TableCell className="py-1.5 px-2.5 text-xs">{money(r?.utilities ?? 0)}</TableCell>
+                                      <TableCell className="py-1.5 px-2.5 text-xs">{money(r?.total ?? 0)}</TableCell>
+                                    </TableRow>
+                                  ))
+                                )}
+                              </TableBody>
+                            </Table>
+                          ) : null}
+
+                          {activeCustomerReport === 'maintenance' ? (
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="h-8">
+                                  <TableHead className="py-1.5 px-2.5 text-xs">{t('Property', 'சொத்து')}</TableHead>
+                                  <TableHead className="py-1.5 px-2.5 text-xs">{t('Issue', 'பிரச்சனை')}</TableHead>
+                                  <TableHead className="py-1.5 px-2.5 text-xs">{t('Status', 'நிலை')}</TableHead>
+                                  <TableHead className="py-1.5 px-2.5 text-xs">{t('Request Date', 'கோரிக்கை தேதி')}</TableHead>
+                                  <TableHead className="py-1.5 px-2.5 text-xs">{t('Resolution Date', 'தீர்வு தேதி')}</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {filteredCustomerRows.length === 0 ? (
+                                  <TableRow>
+                                    <TableCell colSpan={5} className="text-center py-6 text-xs text-muted-foreground">
+                                      {t('No records found for the selected date range and property.', 'தேர்ந்தெடுக்கப்பட்ட தேதி வரம்பு மற்றும் சொத்திற்கு பதிவுகள் எதுவும் இல்லை.')}
+                                    </TableCell>
+                                  </TableRow>
+                                ) : (
+                                  filteredCustomerRows.map((r: any, idx: number) => (
+                                    <TableRow key={String(r?.requestId || idx)}>
+                                      <TableCell className="py-1.5 px-2.5 text-xs font-medium">{displayTa(r?.propertyTitle || '')}</TableCell>
+                                      <TableCell className="py-1.5 px-2.5 text-xs">{String(r?.issue || '')}</TableCell>
+                                      <TableCell className="py-1.5 px-2.5 text-xs">{String(r?.status || '')}</TableCell>
+                                      <TableCell className="py-1.5 px-2.5 text-xs">{formatShortDate(r?.requestDate)}</TableCell>
+                                      <TableCell className="py-1.5 px-2.5 text-xs">{formatShortDate(r?.resolutionDate)}</TableCell>
+                                    </TableRow>
+                                  ))
+                                )}
+                              </TableBody>
+                            </Table>
+                          ) : null}
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Agreement Content - Removed as it's now part of My Rentals */}
-          
+
           {/* Settings Content */}
           <TabsContent value="settings" className="mt-4">
             <ProfileSettingsView
@@ -2032,13 +2240,13 @@ export default function CustomerDashboard({
               <DialogDescription>
                 {requestsModalType === 'maintenance'
                   ? t(
-                      'Select a property to open its Maintenance tab',
-                      'Maintenance தாளைத் திறக்க ஒரு சொத்தைத் தேர்ந்தெடுக்கவும்'
-                    )
+                    'Select a property to open its Maintenance tab',
+                    'Maintenance தாளைத் திறக்க ஒரு சொத்தைத் தேர்ந்தெடுக்கவும்'
+                  )
                   : t(
-                      'Select a property to open its Vacate tab',
-                      'Vacate தாளைத் திறக்க ஒரு சொத்தைத் தேர்ந்தெடுக்கவும்'
-                    )}
+                    'Select a property to open its Vacate tab',
+                    'Vacate தாளைத் திறக்க ஒரு சொத்தைத் தேர்ந்தெடுக்கவும்'
+                  )}
               </DialogDescription>
             </DialogHeader>
 
@@ -2103,8 +2311,8 @@ export default function CustomerDashboard({
                                 p.latestStatus === 'approved'
                                   ? 'default'
                                   : p.latestStatus === 'rejected'
-                                  ? 'destructive'
-                                  : 'secondary'
+                                    ? 'destructive'
+                                    : 'secondary'
                               }
                             >
                               {String(p.latestStatus).toUpperCase()}
@@ -2163,11 +2371,11 @@ export default function CustomerDashboard({
               {t('Detailed information for this metric.', 'இந்த அளவுக்கான விரிவான தகவல்.')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="mt-4 space-y-4 max-h-[60vh] overflow-y-auto">
             {/* Active Rentals Content */}
             {metricDetailsType === 'activeRentals' && (
-               activeAgreements.length === 0 ? (
+              activeAgreements.length === 0 ? (
                 <p className="text-muted-foreground">{t('No active rentals found.', 'செயலில் உள்ள வாடகைகள் எதுவும் இல்லை.')}</p>
               ) : (
                 <div className="space-y-4">
@@ -2175,9 +2383,9 @@ export default function CustomerDashboard({
                     <div key={agreement._id} className="border p-4 rounded-md">
                       <h4 className="font-semibold">{displayTa(agreement.property?.title || t('Property', 'சொத்து'))}</h4>
                       <div className="text-sm text-muted-foreground mt-1 space-y-1">
-                         <p>{t('Owner:', 'உரிமையாளர்:')} {agreement.owner?.name}</p>
-                         <p>{t('Rent:', 'வாடகை:')} ₹{agreement.rentAmount}</p>
-                         <p>{t('Start Date:', 'தொடக்கம்:')} {new Date(agreement.startDate).toLocaleDateString()}</p>
+                        <p>{t('Owner:', 'உரிமையாளர்:')} {agreement.owner?.name}</p>
+                        <p>{t('Rent:', 'வாடகை:')} ₹{agreement.rentAmount}</p>
+                        <p>{t('Start Date:', 'தொடக்கம்:')} {new Date(agreement.startDate).toLocaleDateString()}</p>
                       </div>
                     </div>
                   ))}
@@ -2207,7 +2415,7 @@ export default function CustomerDashboard({
                           <p className="text-muted-foreground">{t('Balance', 'மீதி')}</p>
                           <p className="font-medium text-red-600">₹{record.balance}</p>
                         </div>
-                         <div>
+                        <div>
                           <p className="text-muted-foreground">{t('Status', 'நிலை')}</p>
                           <Badge variant={record.status === 'paid' ? 'default' : 'destructive'}>
                             {record.status}
@@ -2221,20 +2429,20 @@ export default function CustomerDashboard({
             )}
 
             {/* This Month Due Content */}
-             {metricDetailsType === 'thisMonthDue' && (
-               thisMonthRecords.filter((r: any) => r.balance > 0).length === 0 ? (
+            {metricDetailsType === 'thisMonthDue' && (
+              thisMonthRecords.filter((r: any) => r.balance > 0).length === 0 ? (
                 <p className="text-muted-foreground">{t('No dues pending for this month.', 'இந்த மாதத்திற்கான நிலுவைகள் எதுவும் இல்லை.')}</p>
               ) : (
                 <div className="space-y-4">
                   {thisMonthRecords.filter((r: any) => r.balance > 0).map((record: any) => (
                     <div key={record._id} className="border p-4 rounded-md border-l-4 border-l-red-500">
                       <h4 className="font-semibold">{displayTa(record.property?.title || t('Property', 'சொத்து'))}</h4>
-                       <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
+                      <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
                         <div>
                           <p className="text-muted-foreground">{t('Due Amount', 'நிலுவை தொகை')}</p>
                           <p className="font-bold text-red-600">₹{record.balance}</p>
                         </div>
-                         <div>
+                        <div>
                           <p className="text-muted-foreground">{t('Due Date', 'கடைசி தேதி')}</p>
                           <p className="font-medium">{record.dueDate ? new Date(record.dueDate).toLocaleDateString() : 'N/A'}</p>
                         </div>
@@ -2246,56 +2454,56 @@ export default function CustomerDashboard({
             )}
 
             {/* Pending Property Requests */}
-             {metricDetailsType === 'pendingPropertyRequests' && (
-                tenantRequests.filter((r: any) => r.status === 'pending').length === 0 ? (
-                 <p className="text-muted-foreground">{t('No pending property requests.', 'நிலுவையில் உள்ள சொத்து கோரிக்கைகள் இல்லை.')}</p>
-               ) : (
-                 <div className="space-y-4">
-                   {tenantRequests.filter((r: any) => r.status === 'pending').map((req: any) => (
-                     <div key={req._id} className="border p-4 rounded-md">
-                       <h4 className="font-semibold">{displayTa(req.property?.title || t('Property Request', 'சொத்து கோரிக்கை'))}</h4>
-                       <p className="text-sm text-muted-foreground mt-1">
-                         {t('Sent on:', 'அனுப்பப்பட்டது:')} {new Date(req.createdAt).toLocaleDateString()}
-                       </p>
-                       {req.message && (
-                         <div className="mt-2 bg-muted p-2 rounded text-sm">
-                           "{req.message}"
-                         </div>
-                       )}
-                     </div>
-                   ))}
-                 </div>
-               )
-             )}
+            {metricDetailsType === 'pendingPropertyRequests' && (
+              tenantRequests.filter((r: any) => r.status === 'pending').length === 0 ? (
+                <p className="text-muted-foreground">{t('No pending property requests.', 'நிலுவையில் உள்ள சொத்து கோரிக்கைகள் இல்லை.')}</p>
+              ) : (
+                <div className="space-y-4">
+                  {tenantRequests.filter((r: any) => r.status === 'pending').map((req: any) => (
+                    <div key={req._id} className="border p-4 rounded-md">
+                      <h4 className="font-semibold">{displayTa(req.property?.title || t('Property Request', 'சொத்து கோரிக்கை'))}</h4>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {t('Sent on:', 'அனுப்பப்பட்டது:')} {new Date(req.createdAt).toLocaleDateString()}
+                      </p>
+                      {req.message && (
+                        <div className="mt-2 bg-muted p-2 rounded text-sm">
+                          "{req.message}"
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
 
             {/* Open Maintenance */}
             {metricDetailsType === 'openMaintenance' && (
-                maintenanceRequests.filter((r: any) => ['pending', 'in-progress'].includes(r.status)).length === 0 ? (
-                 <p className="text-muted-foreground">{t('No open maintenance requests.', 'திறந்த பராமரிப்பு கோரிக்கைகள் இல்லை.')}</p>
-               ) : (
-                 <div className="space-y-4">
-                   {maintenanceRequests.filter((r: any) => ['pending', 'in-progress'].includes(r.status)).map((req: any) => (
-                     <div key={req._id} className="border p-4 rounded-md">
-                        <div className="flex justify-between items-start">
-                          <h4 className="font-semibold">{req.title || t('Maintenance Issue', 'பராமரிப்பு சிக்கல்')}</h4>
-                           <Badge variant={req.status === 'in-progress' ? 'default' : 'secondary'}>
-                            {req.status}
-                          </Badge>
+              maintenanceRequests.filter((r: any) => ['pending', 'in-progress'].includes(r.status)).length === 0 ? (
+                <p className="text-muted-foreground">{t('No open maintenance requests.', 'திறந்த பராமரிப்பு கோரிக்கைகள் இல்லை.')}</p>
+              ) : (
+                <div className="space-y-4">
+                  {maintenanceRequests.filter((r: any) => ['pending', 'in-progress'].includes(r.status)).map((req: any) => (
+                    <div key={req._id} className="border p-4 rounded-md">
+                      <div className="flex justify-between items-start">
+                        <h4 className="font-semibold">{req.title || t('Maintenance Issue', 'பராமரிப்பு சிக்கல்')}</h4>
+                        <Badge variant={req.status === 'in-progress' ? 'default' : 'secondary'}>
+                          {req.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm font-medium mt-1">{displayTa(req.property?.title)}</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {t('Reported on:', 'அறிவிக்கப்பட்டது:')} {new Date(req.createdAt).toLocaleDateString()}
+                      </p>
+                      {req.description && (
+                        <div className="mt-2 bg-muted p-2 rounded text-sm">
+                          {req.description}
                         </div>
-                        <p className="text-sm font-medium mt-1">{displayTa(req.property?.title)}</p>
-                       <p className="text-sm text-muted-foreground mt-1">
-                         {t('Reported on:', 'அறிவிக்கப்பட்டது:')} {new Date(req.createdAt).toLocaleDateString()}
-                       </p>
-                       {req.description && (
-                         <div className="mt-2 bg-muted p-2 rounded text-sm">
-                           {req.description}
-                         </div>
-                       )}
-                     </div>
-                   ))}
-                 </div>
-               )
-             )}
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
 
             {/* Latest Vacate Status */}
             {metricDetailsType === 'latestVacate' && (
@@ -2303,39 +2511,39 @@ export default function CustomerDashboard({
                 <p className="text-muted-foreground">{t('No vacate requests found.', 'வெளியேறு கோரிக்கைகள் எதுவும் இல்லை.')}</p>
               ) : (
                 <div className="border p-4 rounded-md">
-                   <div className="flex justify-between items-center mb-4">
-                      <h4 className="font-semibold text-lg">{t('Vacate Request Details', 'வெளியேறு கோரிக்கை விவரங்கள்')}</h4>
-                      <Badge variant={latestVacate.status === 'approved' ? 'default' : latestVacate.status === 'rejected' ? 'destructive' : 'secondary'}>
-                        {latestVacate.status?.toUpperCase()}
-                      </Badge>
-                   </div>
-                   
-                   <div className="space-y-3">
-                      <div>
-                        <p className="text-sm text-muted-foreground">{t('Property', 'சொத்து')}</p>
-                        <p className="font-medium">{displayTa(latestVacate.property?.title || t('Unknown Property', 'தெரியாத சொத்து'))}</p>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                         <div>
-                            <p className="text-sm text-muted-foreground">{t('Requested Date', 'கோரப்பட்ட தேதி')}</p>
-                            <p className="font-medium">{latestVacate.requestedVacateDate ? new Date(latestVacate.requestedVacateDate).toLocaleDateString() : 'N/A'}</p>
-                         </div>
-                         <div>
-                            <p className="text-sm text-muted-foreground">{t('Created At', 'உருவாக்கப்பட்டது')}</p>
-                            <p className="font-medium">{new Date(latestVacate.createdAt).toLocaleDateString()}</p>
-                         </div>
-                      </div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="font-semibold text-lg">{t('Vacate Request Details', 'வெளியேறு கோரிக்கை விவரங்கள்')}</h4>
+                    <Badge variant={latestVacate.status === 'approved' ? 'default' : latestVacate.status === 'rejected' ? 'destructive' : 'secondary'}>
+                      {latestVacate.status?.toUpperCase()}
+                    </Badge>
+                  </div>
 
-                      {latestVacate.reason && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">{t('Reason', 'காரணம்')}</p>
-                          <div className="bg-muted p-2 rounded text-sm mt-1">
-                            {latestVacate.reason}
-                          </div>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t('Property', 'சொத்து')}</p>
+                      <p className="font-medium">{displayTa(latestVacate.property?.title || t('Unknown Property', 'தெரியாத சொத்து'))}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">{t('Requested Date', 'கோரப்பட்ட தேதி')}</p>
+                        <p className="font-medium">{latestVacate.requestedVacateDate ? new Date(latestVacate.requestedVacateDate).toLocaleDateString() : 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">{t('Created At', 'உருவாக்கப்பட்டது')}</p>
+                        <p className="font-medium">{new Date(latestVacate.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+
+                    {latestVacate.reason && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">{t('Reason', 'காரணம்')}</p>
+                        <div className="bg-muted p-2 rounded text-sm mt-1">
+                          {latestVacate.reason}
                         </div>
-                      )}
-                   </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )
             )}

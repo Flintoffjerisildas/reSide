@@ -107,15 +107,15 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
       return;
     }
     try {
-      const data = await register(name, email, password, registrationPurpose);
+      await register(name, email, password, registrationPurpose);
       setOtpEmail(email);
-      if (data?.devOtp) {
-        setOtp(data.devOtp);
-        toast.info(t(`OTP: ${data.devOtp}`, `OTP: ${data.devOtp}`), { duration: 10000 });
-      } else {
-        setOtp('');
-      }
-      toast.success(t('OTP sent to your email', 'OTP உங்கள் மின்னஞ்சலுக்கு அனுப்பப்பட்டது'));
+      setOtp('');
+      toast.success(
+        t(
+          `Verification code sent to ${email}. Please check your inbox or spam folder.`,
+          `சரிபார்ப்புக் குறியீடு ${email} க்கு அனுப்பப்பட்டது. உங்கள் இன்பாக்ஸ் அல்லது ஸ்பேம் கோப்புறையை சரிபார்க்கவும்.`
+        )
+      );
       setView('register-otp');
     } catch (error: any) {
       console.error('Register error:', error);
@@ -209,11 +209,21 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
         body: JSON.stringify({ email: otpEmail, purpose })
       });
       const data = await response.json();
-      if (data?.devOtp) {
-        setOtp(data.devOtp);
-        toast.info(t(`OTP: ${data.devOtp}`, `OTP: ${data.devOtp}`), { duration: 10000 });
+      if (purpose === 'register') {
+        setOtp('');
+        toast.success(
+          t(
+            `Verification code sent to ${otpEmail}. Please check your inbox or spam folder.`,
+            `சரிபார்ப்புக் குறியீடு ${otpEmail} க்கு அனுப்பப்பட்டது. உங்கள் இன்பாக்ஸ் அல்லது ஸ்பேம் கோப்புறையை சரிபார்க்கவும்.`
+          )
+        );
+      } else {
+        if (data?.devOtp) {
+          setOtp(data.devOtp);
+          toast.info(t(`OTP: ${data.devOtp}`, `OTP: ${data.devOtp}`), { duration: 10000 });
+        }
+        toast.success(t('OTP resent successfully', 'OTP மீண்டும் அனுப்பப்பட்டது'));
       }
-      toast.success(t('OTP resent successfully', 'OTP மீண்டும் அனுப்பப்பட்டது'));
       setOtpCountdown(60);
     } catch (error: any) {
       console.error('Resend OTP error:', error);
@@ -405,8 +415,9 @@ export default function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                 maxLength={6}
                 placeholder="123456"
                 value={otp}
-                onChange={(e) => setOtp(e.target.value)}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 disabled={loading}
+                autoFocus
               />
               <p className="text-xs text-muted-foreground">
                 {otpCountdown > 0

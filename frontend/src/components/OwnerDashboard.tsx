@@ -40,8 +40,11 @@ import {
   Loader2,
   Calendar,
   Megaphone,
-  RefreshCcw
+  RefreshCcw,
+  Filter,
+  MessageSquare
 } from 'lucide-react';
+import { useMessenger } from '../hooks/useMessenger';
 import PropertyForm from './PropertyForm';
 import PropertyCard from './PropertyCard';
 import PropertyFullScreenView from './PropertyFullScreenView';
@@ -106,6 +109,7 @@ export default function OwnerDashboard({
   const deletePropertyMutation = useDeleteProperty();
 
   const [isPropertyFormOpen, setIsPropertyFormOpen] = useState(false);
+  const { unreadCount: messengerUnreadCount, openMessenger } = useMessenger();
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [deletingProperty, setDeletingProperty] = useState<Property | null>(null);
@@ -281,13 +285,111 @@ export default function OwnerDashboard({
     return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
+  const parseRangeBounds = (fromStr: string, toStr: string) => {
+    const rawFrom = String(fromStr || '').trim().slice(0, 10);
+    const rawTo = String(toStr || '').trim().slice(0, 10);
+    const start = rawFrom ? new Date(`${rawFrom}T00:00:00`).getTime() : -Infinity;
+    const end = rawTo ? new Date(`${rawTo}T23:59:59.999`).getTime() : Infinity;
+    return {
+      startTime: Number.isNaN(start) ? -Infinity : start,
+      endTime: Number.isNaN(end) ? Infinity : end,
+    };
+  };
+
+  const getRecordTime = (record: any) => {
+    const raw =
+      record?.paymentDate ||
+      record?.paidAt ||
+      record?.dueDate ||
+      record?.month ||
+      record?.requestDate ||
+      record?.createdAt ||
+      record?.updatedAt;
+    if (!raw) return NaN;
+    const d = new Date(raw);
+    return d.getTime();
+  };
+
+  const matchesProperty = (record: any, selectedPropId: string) => {
+    if (!selectedPropId || selectedPropId === 'all') return true;
+    const pId = String(record?.propertyId || record?.property?._id || record?.property || '');
+    const pTitle = String(record?.propertyTitle || record?.property?.title || '');
+    return pId === selectedPropId || pTitle === selectedPropId;
+  };
+
+  const filteredRows = useMemo(() => {
+    if (!currentReport) return [];
+    const rawRows: any[] = Array.isArray(currentReport?.rows) ? currentReport.rows : [];
+    const { startTime, endTime } = parseRangeBounds(reportFrom, reportTo);
+
+    return rawRows.filter((r) => {
+      if (!matchesProperty(r, reportPropertyId)) return false;
+
+      const recordTime = getRecordTime(r);
+      if (!Number.isNaN(recordTime)) {
+        if (recordTime < startTime || recordTime > endTime) return false;
+      }
+
+      return true;
+    });
+  }, [currentReport, reportFrom, reportTo, reportPropertyId]);
+
+  const filteredSummary = useMemo(() => {
+    if (activeReport === 'rent') {
+      const distinctProps = new Set(filteredRows.map((r: any) => String(r.propertyId || r.propertyTitle || '')).filter(Boolean));
+      let totalRentExpected = 0;
+      let totalRentCollected = 0;
+      let pendingAmount = 0;
+      filteredRows.forEach((r: any) => {
+        totalRentExpected += Number(r.rent || 0);
+        totalRentCollected += Number(r.paid || 0);
+        pendingAmount += Number(r.pending || 0);
+      });
+      return {
+        totalProperties: distinctProps.size,
+        totalRentExpected,
+        totalRentCollected,
+        pendingAmount
+      };
+    }
+
+    if (activeReport === 'occupancy') {
+      const totalProperties = filteredRows.length;
+      const occupied = filteredRows.filter((r: any) => {
+        const st = String(r.status || '').toLowerCase();
+        return st === 'occupied' || Boolean(r.tenantName);
+      }).length;
+      const vacant = Math.max(0, totalProperties - occupied);
+      const occupancyRate = totalProperties > 0 ? Number(((occupied / totalProperties) * 100).toFixed(2)) : 0;
+      return {
+        totalProperties,
+        occupied,
+        vacant,
+        occupancyRate
+      };
+    }
+
+    if (activeReport === 'maintenance') {
+      const totalRequests = filteredRows.length;
+      const completed = filteredRows.filter((r: any) => String(r.status || '') === 'completed').length;
+      const pending = filteredRows.filter((r: any) => String(r.status || '') === 'pending' || String(r.status || '') === 'in-progress').length;
+      return {
+        totalRequests,
+        completed,
+        pending
+      };
+    }
+
+    return {};
+  }, [activeReport, filteredRows]);
+
   const rentDerived = useMemo(() => {
     if (activeReport !== 'rent' || !currentReport) return null;
-    const s = currentReport?.summary || {};
+    const s = filteredSummary as any;
     const expected = Number(s?.totalRentExpected ?? 0);
     const collected = Number(s?.totalRentCollected ?? 0);
     const pending = Number(s?.pendingAmount ?? 0);
-    const rows = Array.isArray(currentReport?.rows) ? currentReport.rows : [];
+    const rows = filteredRows;
     const collectedPct = expected > 0 ? Math.round((collected / expected) * 100) : 0;
     const pendingPct = Math.max(0, 100 - collectedPct);
 
@@ -298,7 +400,7 @@ export default function OwnerDashboard({
 
     const byMonth = new Map<string, { key: string; name: string; amount: number }>();
     rows.forEach((r: any) => {
-      const raw = r?.month || r?.dueDate;
+      const raw = r?.paymentDate || r?.paidAt || r?.dueDate || r?.month;
       if (!raw) return;
       const d = new Date(raw);
       if (Number.isNaN(d.getTime())) return;
@@ -327,11 +429,11 @@ export default function OwnerDashboard({
       pendingTenants,
       defaulters
     };
-  }, [activeReport, currentReport, t]);
+  }, [activeReport, currentReport, filteredSummary, filteredRows, t]);
 
   const occupancyDerived = useMemo(() => {
     if (activeReport !== 'occupancy' || !currentReport) return null;
-    const s = currentReport?.summary || {};
+    const s = filteredSummary as any;
     const total = Number(s?.totalProperties ?? 0);
     const occupied = Number(s?.occupied ?? 0);
     const vacant = Number(s?.vacant ?? 0);
@@ -354,13 +456,13 @@ export default function OwnerDashboard({
         { name: t('Vacant', 'காலி'), count: vacant }
       ]
     };
-  }, [activeReport, currentReport, t]);
+  }, [activeReport, currentReport, filteredSummary, t]);
 
   const maintenanceDerived = useMemo(() => {
     if (activeReport !== 'maintenance' || !currentReport) return null;
-    const s = currentReport?.summary || {};
+    const s = filteredSummary as any;
     const totalRequests = Number(s?.totalRequests ?? 0);
-    const rows = Array.isArray(currentReport?.rows) ? currentReport.rows : [];
+    const rows = filteredRows;
 
     const statusCounts = { pending: 0, inProgress: 0, completed: 0 };
     rows.forEach((r: any) => {
@@ -408,7 +510,7 @@ export default function OwnerDashboard({
       statusData,
       topIssues
     };
-  }, [activeReport, currentReport, t]);
+  }, [activeReport, currentReport, filteredSummary, filteredRows, t]);
 
   const downloadCsv = (fileName: string, lines: string[]) => {
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
@@ -488,7 +590,7 @@ export default function OwnerDashboard({
     doc.text(`Range: ${reportFrom} to ${reportTo}`, 14, 48);
 
     if (activeReport === 'rent') {
-      const summary = currentReport?.summary || {};
+      const summary = (filteredSummary as any) || {};
       const expected = Number(summary?.totalRentExpected ?? 0);
       const collected = Number(summary?.totalRentCollected ?? 0);
       const pending = Number(summary?.pendingAmount ?? 0);
@@ -531,7 +633,7 @@ export default function OwnerDashboard({
 
       const afterChartsY = afterSummaryY + chartH + 10;
 
-      const rows = Array.isArray(currentReport?.rows) ? currentReport.rows : [];
+      const rows = filteredRows;
       autoTable(doc, {
         startY: afterChartsY,
         head: [['Property', 'Tenant', 'Rent', 'Paid', 'Pending', 'Due Date', 'Status']],
@@ -555,10 +657,10 @@ export default function OwnerDashboard({
         aiInsights.length > 0
           ? aiInsights.slice(0, 6)
           : [
-              `${pendingTenants} tenant(s) have pending dues`,
-              `Collection Efficiency: ${collectionEfficiency}%`,
-              `Defaulters identified: ${defaulters}`
-            ];
+            `${pendingTenants} tenant(s) have pending dues`,
+            `Collection Efficiency: ${collectionEfficiency}%`,
+            `Defaulters identified: ${defaulters}`
+          ];
       doc.setFontSize(11);
       doc.text(aiInsights.length ? 'AI Insights' : 'Insights', 14, insightsY);
       doc.setFontSize(10);
@@ -577,7 +679,7 @@ export default function OwnerDashboard({
     }
 
     if (activeReport === 'occupancy') {
-      const summary = currentReport?.summary || {};
+      const summary = (filteredSummary as any) || {};
       const occupied = Number(summary?.occupied ?? 0);
       const vacant = Number(summary?.vacant ?? 0);
       const occupancyRate = Number(summary?.occupancyRate ?? 0);
@@ -612,7 +714,7 @@ export default function OwnerDashboard({
       if (barPng) doc.addImage(barPng, 'PNG', 14 + chartW + 8, afterSummaryY, chartW, chartH);
 
       const afterChartsY = afterSummaryY + chartH + 10;
-      const rows = Array.isArray(currentReport?.rows) ? currentReport.rows : [];
+      const rows = filteredRows;
       autoTable(doc, {
         startY: afterChartsY,
         head: [['Property', 'Location', 'Status', 'Tenant Name']],
@@ -647,7 +749,7 @@ export default function OwnerDashboard({
     }
 
     if (activeReport === 'maintenance') {
-      const summary = currentReport?.summary || {};
+      const summary = (filteredSummary as any) || {};
       const completed = Number(summary?.completed ?? 0);
       const pending = Number(summary?.pending ?? 0);
 
@@ -681,7 +783,7 @@ export default function OwnerDashboard({
       if (barPng) doc.addImage(barPng, 'PNG', 14 + chartW + 8, afterSummaryY, chartW, chartH);
 
       const afterChartsY = afterSummaryY + chartH + 10;
-      const rows = Array.isArray(currentReport?.rows) ? currentReport.rows : [];
+      const rows = filteredRows;
       autoTable(doc, {
         startY: afterChartsY,
         head: [['Maintenance Name', 'Property', 'Status']],
@@ -712,7 +814,7 @@ export default function OwnerDashboard({
 
     const summaryPairs: Array<[string, string]> = [];
     if (activeReport === 'occupancy') {
-      const s = currentReport?.summary || {};
+      const s = (filteredSummary as any) || {};
       summaryPairs.push(
         ['Total Properties', String(s.totalProperties ?? 0)],
         ['Occupied', String(s.occupied ?? 0)],
@@ -721,7 +823,7 @@ export default function OwnerDashboard({
       );
     }
     if (activeReport === 'maintenance') {
-      const s = currentReport?.summary || {};
+      const s = (filteredSummary as any) || {};
       summaryPairs.push(
         ['Total Requests', String(s.totalRequests ?? 0)],
         ['Completed', String(s.completed ?? 0)],
@@ -740,7 +842,7 @@ export default function OwnerDashboard({
     const afterSummaryY = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 8 : 80;
 
     if (activeReport === 'occupancy') {
-      const rows = Array.isArray(currentReport?.rows) ? currentReport.rows : [];
+      const rows = filteredRows;
       autoTable(doc, {
         startY: afterSummaryY,
         head: [['Property', 'Location', 'Status', 'Tenant Name']],
@@ -756,7 +858,7 @@ export default function OwnerDashboard({
     }
 
     if (activeReport === 'maintenance') {
-      const rows = Array.isArray(currentReport?.rows) ? currentReport.rows : [];
+      const rows = filteredRows;
       autoTable(doc, {
         startY: afterSummaryY,
         head: [['Maintenance Name', 'Property', 'Status']],
@@ -784,7 +886,7 @@ export default function OwnerDashboard({
     const summary: Array<[string, string]> = [];
 
     if (activeReport === 'rent') {
-      const s = currentReport?.summary || {};
+      const s = (filteredSummary as any) || {};
       summary.push(
         ['Total Properties', String(s.totalProperties ?? 0)],
         ['Total Rent Expected', money(s.totalRentExpected ?? 0)],
@@ -793,7 +895,7 @@ export default function OwnerDashboard({
       );
     }
     if (activeReport === 'occupancy') {
-      const s = currentReport?.summary || {};
+      const s = (filteredSummary as any) || {};
       summary.push(
         ['Total Properties', String(s.totalProperties ?? 0)],
         ['Occupied', String(s.occupied ?? 0)],
@@ -802,11 +904,11 @@ export default function OwnerDashboard({
       );
     }
     if (activeReport === 'maintenance') {
-      const s = currentReport?.summary || {};
+      const s = (filteredSummary as any) || {};
       summary.push(['Total Requests', String(s.totalRequests ?? 0)], ['Completed', String(s.completed ?? 0)], ['Pending', String(s.pending ?? 0)]);
     }
 
-    const rows = Array.isArray(currentReport?.rows) ? currentReport.rows : [];
+    const rows = filteredRows;
     const columns =
       activeReport === 'rent'
         ? ['Property', 'Tenant Name', 'Rent', 'Paid', 'Pending', 'Payment Date', 'Payment Status']
@@ -817,14 +919,14 @@ export default function OwnerDashboard({
     const bodyRows =
       activeReport === 'rent'
         ? rows.map((r: any) => [
-            r.propertyTitle || r.propertyId,
-            r.tenantName,
-            money(r.rent ?? 0),
-            money(r.paid ?? 0),
-            money(r.pending ?? 0),
-            formatShortDate(r.dueDate || r.month),
-            r.status
-          ])
+          r.propertyTitle || r.propertyId,
+          r.tenantName,
+          money(r.rent ?? 0),
+          money(r.paid ?? 0),
+          money(r.pending ?? 0),
+          formatShortDate(r.dueDate || r.month),
+          r.status
+        ])
         : activeReport === 'occupancy'
           ? rows.map((r: any) => [r.propertyTitle || r.propertyId, r.location, r.status, r.tenantName])
           : rows.map((r: any) => [r.issue, r.propertyTitle, r.status]);
@@ -864,8 +966,8 @@ export default function OwnerDashboard({
             </thead>
             <tbody>
               ${bodyRows
-                .map((r: any[]) => `<tr>${r.map((c) => `<td>${String(c ?? '')}</td>`).join('')}</tr>`)
-                .join('')}
+        .map((r: any[]) => `<tr>${r.map((c) => `<td>${String(c ?? '')}</td>`).join('')}</tr>`)
+        .join('')}
             </tbody>
           </table>
           <footer>This is a system-generated report</footer>
@@ -1365,1303 +1467,1360 @@ export default function OwnerDashboard({
   return (
     <>
       <div className={hideHeaderActions ? "w-full" : "w-full py-6 sm:py-8 px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12"}>
-          <div className="w-full space-y-8">
+        <div className="w-full space-y-8">
 
-        {/* Header Section */}
-        {!hideHeaderActions && (
-          <>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">
-                  {t('Owner Dashboard', 'உரிமையாளர் கட்டுப்பாட்டு அறை')}
-                </h1>
-                <p className="text-muted-foreground mt-1">
-                  {t('Welcome back', 'மீண்டும் வருக')}, {userProfile?.name || 'Owner'}
-                </p>
-              </div>
-              <Button onClick={() => setIsPropertyFormOpen(true)} className="gap-2">
-                <Plus className="h-4 w-4" />
-                {t('Add Property', 'சொத்தைச் சேர்க்கவும்')}
-              </Button>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Button variant="outline" className="h-11 justify-start rounded-xl" onClick={() => onBrowseProperties?.('rent')}>
-                <Home className="mr-2 h-4 w-4" />
-                {t('Rent', 'வாடகை')}
-              </Button>
-              <Button variant="outline" className="h-11 justify-start rounded-xl" onClick={() => onBrowseProperties?.('buy')}>
-                <Building className="mr-2 h-4 w-4" />
-                {t('Buy', 'வாங்க')}
-              </Button>
-              <Button className="h-11 justify-start rounded-xl" onClick={() => setIsPropertyFormOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                {t('List Property', 'சொத்தை பட்டியலிடுங்கள்')}
-              </Button>
-            </div>
-          </>
-        )}
-
-        {/* Navigation Tabs */}
-        <Tabs value={currentTab} onValueChange={setActiveTab} className="w-full">
+          {/* Header Section */}
           {!hideHeaderActions && (
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1">
-              <TabsTrigger value="overview">
-                <Home className="w-4 h-4 mr-2" />
-                {t('Overview', 'கண்ணோட்டம்')}
-              </TabsTrigger>
-              <TabsTrigger value="properties">
-                <Building className="w-4 h-4 mr-2" />
-                {t('My Properties', 'என் சொத்துக்கள்')}
-              </TabsTrigger>
-              <TabsTrigger value="requests">
-                <Inbox className="w-4 h-4 mr-2" />
-                {t('Requests', 'கோரிக்கைகள்')}
-              </TabsTrigger>
-              <TabsTrigger value="announcements">
-                <Megaphone className="w-4 h-4 mr-2" />
-                {t('Announcements', 'அறிவிப்புகள்')}
-                {announcements.length > 0 && (
-                  <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs">
-                    {announcements.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="reports">
-                <FileText className="w-4 h-4 mr-2" />
-                {t('Reports', 'அறிக்கைகள்')}
-              </TabsTrigger>
-              <TabsTrigger value="settings">
-                <User className="w-4 h-4 mr-2" />
-                {t('My Profile', 'என் சுயவிவரம்')}
-              </TabsTrigger>
-            </TabsList>
+            <>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight">
+                    {t('Owner Dashboard', 'உரிமையாளர் கட்டுப்பாட்டு அறை')}
+                  </h1>
+                  <p className="text-muted-foreground mt-1">
+                    {t('Welcome back', 'மீண்டும் வருக')}, {userProfile?.name || 'Owner'}
+                  </p>
+                </div>
+                <Button onClick={() => setIsPropertyFormOpen(true)} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  {t('Add Property', 'சொத்தைச் சேர்க்கவும்')}
+                </Button>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Button variant="outline" className="h-11 justify-start rounded-xl" onClick={() => onBrowseProperties?.('rent')}>
+                  <Home className="mr-2 h-4 w-4" />
+                  {t('Rent', 'வாடகை')}
+                </Button>
+                <Button variant="outline" className="h-11 justify-start rounded-xl" onClick={() => onBrowseProperties?.('buy')}>
+                  <Building className="mr-2 h-4 w-4" />
+                  {t('Buy', 'வாங்க')}
+                </Button>
+                <Button className="h-11 justify-start rounded-xl" onClick={() => setIsPropertyFormOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t('List Property', 'சொத்தை பட்டியலிடுங்கள்')}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="relative h-11 justify-start rounded-xl border-slate-200/90 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  onClick={() => openMessenger()}
+                >
+                  <MessageSquare className="mr-2 h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <span>{t('Messenger', 'செய்தியாளர்')}</span>
+                  {messengerUnreadCount > 0 && (
+                    <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white shadow-xs">
+                      {messengerUnreadCount > 9 ? '9+' : messengerUnreadCount}
+                    </span>
+                  )}
+                </Button>
+              </div>
+            </>
           )}
 
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="mt-6 space-y-8">
-            {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card
-                className="cursor-pointer"
-                onClick={() => setRentDetailsType('totalProperties')}
-              >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    {t('Total Properties', 'மொத்த சொத்துக்கள்')}
-                  </CardTitle>
-                  <Home className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{totalProperties}</div>
-                </CardContent>
-              </Card>
-              <Card
-                className="cursor-pointer"
-                onClick={() => setRentDetailsType('occupiedProperties')}
-              >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    {t('Occupied Properties', 'குடியேற்றப்பட்ட சொத்துக்கள்')}
-                  </CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{occupiedProperties}</div>
-                </CardContent>
-              </Card>
-              <Card
-                className="cursor-pointer"
-                onClick={() => setRentDetailsType('vacantProperties')}
-              >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    {t('Vacant Properties', 'காலியாக உள்ள சொத்துக்கள்')}
-                  </CardTitle>
-                  <Home className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{vacantProperties}</div>
-                </CardContent>
-              </Card>
-              <Card
-                className="cursor-pointer"
-                onClick={() => setRentDetailsType('totalTenants')}
-              >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    {t('Total Tenants', 'மொத்த குத்தகைதாரர்கள்')}
-                  </CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{totalTenants}</div>
-                </CardContent>
-              </Card>
-              <Card
-                className="cursor-pointer"
-                onClick={() => setRentDetailsType('expectedRent')}
-              >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    {t('This Month Expected Rent', 'இந்த மாத எதிர்பார்க்கப்படும் வாடகை')}
-                  </CardTitle>
-                  <IndianRupee className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    ₹{financialSummary.expected.toLocaleString()}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card
-                className="cursor-pointer"
-                onClick={() => setRentDetailsType('pendingRent')}
-              >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    {t('This Month Pending Rent', 'இந்த மாத நிலுவை வாடகை')}
-                  </CardTitle>
-                  <IndianRupee className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    ₹{financialSummary.pending.toLocaleString()}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid gap-8 md:grid-cols-2">
-              <Card 
-                id="tenant-requests-overview"
-                className={totalPendingRequests > 0 ? "border-amber-500/50 shadow-md transition-all duration-500 relative overflow-hidden" : ""}
-              >
-                {totalPendingRequests > 0 && (
-                  <div className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full animate-ping -mr-1 -mt-1" />
-                )}
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    {t('Tenant Requests Overview', 'குத்தகைதாரர் கோரிக்கைகள் கண்ணோட்டம்')}
-                    {totalPendingRequests > 0 && (
-                      <Badge variant="destructive" className="ml-2 animate-pulse">
-                        {totalPendingRequests} {t('New', 'புதியது')}
-                      </Badge>
-                    )}
-                  </CardTitle>
-                  <CardDescription>
-                    {t(
-                      'Quick view of rent, maintenance and payment requests',
-                      'வாடகை, பராமரிப்பு மற்றும் கட்டண கோரிக்கைகளின் விரைவு கண்ணோட்டம்'
-                    )}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div
-                    className={`flex items-center justify-between p-3 rounded-md border cursor-pointer transition-colors hover:bg-muted/50 ${
-                      overviewActiveSection === 'rentRequests' ? 'bg-muted' : ''
-                    } ${pendingRentCount > 0 ? 'border-l-4 border-l-blue-500 bg-blue-50/50' : ''}`}
-                    onClick={() => {
-                      setOverviewActiveSection('rentRequests');
-                      setTenantRequestsModalType('rent');
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-full ${pendingRentCount > 0 ? 'bg-blue-100' : 'bg-muted'}`}>
-                        <Home className={`h-4 w-4 ${pendingRentCount > 0 ? 'text-blue-600' : 'text-blue-500'}`} />
-                      </div>
-                      <div>
-                        <p className="font-medium">
-                          {t('Rent Requests', 'வாடகை கோரிக்கைகள்')}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {t(
-                            'Incoming rent enquiries from tenants',
-                            'குத்தகைதாரர்களிடமிருந்து வரும் வாடகை தொடர்பான கோரிக்கைகள்'
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge variant={pendingRentCount > 0 ? "destructive" : "secondary"} className={pendingRentCount > 0 ? "animate-pulse" : ""}>
-                      {pendingRentCount}
+          {/* Navigation Tabs */}
+          <Tabs value={currentTab} onValueChange={setActiveTab} className="w-full">
+            {!hideHeaderActions && (
+              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1">
+                <TabsTrigger value="overview">
+                  <Home className="w-4 h-4 mr-2" />
+                  {t('Overview', 'கண்ணோட்டம்')}
+                </TabsTrigger>
+                <TabsTrigger value="properties">
+                  <Building className="w-4 h-4 mr-2" />
+                  {t('My Properties', 'என் சொத்துக்கள்')}
+                </TabsTrigger>
+                <TabsTrigger value="requests">
+                  <Inbox className="w-4 h-4 mr-2" />
+                  {t('Requests', 'கோரிக்கைகள்')}
+                </TabsTrigger>
+                <TabsTrigger value="announcements">
+                  <Megaphone className="w-4 h-4 mr-2" />
+                  {t('Announcements', 'அறிவிப்புகள்')}
+                  {announcements.length > 0 && (
+                    <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs">
+                      {announcements.length}
                     </Badge>
-                  </div>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="reports">
+                  <FileText className="w-4 h-4 mr-2" />
+                  {t('Reports', 'அறிக்கைகள்')}
+                </TabsTrigger>
+                <TabsTrigger value="settings">
+                  <User className="w-4 h-4 mr-2" />
+                  {t('My Profile', 'என் சுயவிவரம்')}
+                </TabsTrigger>
+              </TabsList>
+            )}
 
-                  <div
-                    className={`flex items-center justify-between p-3 rounded-md border cursor-pointer transition-colors hover:bg-muted/50 ${
-                      overviewActiveSection === 'maintenanceRequests' ? 'bg-muted' : ''
-                    } ${pendingMaintenanceCount > 0 ? 'border-l-4 border-l-amber-500 bg-amber-50/50' : ''}`}
-                    onClick={() => {
-                      setOverviewActiveSection('maintenanceRequests');
-                      setTenantRequestsModalType('maintenance');
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-full ${pendingMaintenanceCount > 0 ? 'bg-amber-100' : 'bg-muted'}`}>
-                        <Wrench className={`h-4 w-4 ${pendingMaintenanceCount > 0 ? 'text-amber-600' : 'text-amber-500'}`} />
-                      </div>
-                      <div>
-                        <p className="font-medium">
-                          {t('Maintenance Requests', 'பராமரிப்பு கோரிக்கைகள்')}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {t(
-                            'Issues raised by tenants for your properties',
-                            'உங்கள் சொத்துகளுக்காக குத்தகைதாரர்கள் எழுப்பிய சிக்கல்கள்'
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge variant={pendingMaintenanceCount > 0 ? "destructive" : "secondary"} className={pendingMaintenanceCount > 0 ? "animate-pulse" : ""}>
-                      {pendingMaintenanceCount}
-                    </Badge>
-                  </div>
-
-                  <div
-                    className={`flex items-center justify-between p-3 rounded-md border cursor-pointer transition-colors hover:bg-muted/50 ${
-                      overviewActiveSection === 'paymentRequests' ? 'bg-muted' : ''
-                    } ${pendingPaymentCount > 0 ? 'border-l-4 border-l-green-500 bg-green-50/50' : ''}`}
-                    onClick={() => {
-                      setOverviewActiveSection('paymentRequests');
-                      setTenantRequestsModalType('payment');
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-full ${pendingPaymentCount > 0 ? 'bg-green-100' : 'bg-muted'}`}>
-                        <CreditCard className={`h-4 w-4 ${pendingPaymentCount > 0 ? 'text-green-600' : 'text-green-500'}`} />
-                      </div>
-                      <div>
-                        <p className="font-medium">
-                          {t('Payment Requests', 'கட்டண கோரிக்கைகள்')}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {t(
-                            'Pending rent payments submitted by tenants',
-                            'குத்தகைதாரர்களால் சமர்ப்பிக்கப்பட்ட நிலுவை வாடகை கட்டணங்கள்'
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge variant={pendingPaymentCount > 0 ? "destructive" : "secondary"} className={pendingPaymentCount > 0 ? "animate-pulse" : ""}>
-                      {pendingPaymentCount}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <RentStatusGraph 
-                data={rentHistory?.graph || []} 
-                payments={rentHistory?.lastPayments || []}
-                title={t('Rent Status Summary', 'வாடகை நிலை சுருக்கம்')}
-                role="owner"
-              />
-            </div>
-
-            {announcements.length > 0 && (
-              <Card className="mt-8">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <div>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Megaphone className="h-4 w-4 text-blue-600" />
-                      {t('Recent Announcements', 'சமீபத்திய அறிவிப்புகள்')}
+            {/* Overview Tab */}
+            <TabsContent value="overview" className="mt-6 space-y-8">
+              {/* Stats Cards */}
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card
+                  className="cursor-pointer"
+                  onClick={() => setRentDetailsType('totalProperties')}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      {t('Total Properties', 'மொத்த சொத்துக்கள்')}
                     </CardTitle>
-                    <CardDescription className="text-xs">
-                      {t('Official notices from management', 'நிர்வாகத்தின் அதிகாரப்பூர்வ அறிவிப்புகள்')}
+                    <Home className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{totalProperties}</div>
+                  </CardContent>
+                </Card>
+                <Card
+                  className="cursor-pointer"
+                  onClick={() => setRentDetailsType('occupiedProperties')}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      {t('Occupied Properties', 'குடியேற்றப்பட்ட சொத்துக்கள்')}
+                    </CardTitle>
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{occupiedProperties}</div>
+                  </CardContent>
+                </Card>
+                <Card
+                  className="cursor-pointer"
+                  onClick={() => setRentDetailsType('vacantProperties')}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      {t('Vacant Properties', 'காலியாக உள்ள சொத்துக்கள்')}
+                    </CardTitle>
+                    <Home className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{vacantProperties}</div>
+                  </CardContent>
+                </Card>
+                <Card
+                  className="cursor-pointer"
+                  onClick={() => setRentDetailsType('totalTenants')}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      {t('Total Tenants', 'மொத்த குத்தகைதாரர்கள்')}
+                    </CardTitle>
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{totalTenants}</div>
+                  </CardContent>
+                </Card>
+                <Card
+                  className="cursor-pointer"
+                  onClick={() => setRentDetailsType('expectedRent')}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      {t('This Month Expected Rent', 'இந்த மாத எதிர்பார்க்கப்படும் வாடகை')}
+                    </CardTitle>
+                    <IndianRupee className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      ₹{financialSummary.expected.toLocaleString()}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card
+                  className="cursor-pointer"
+                  onClick={() => setRentDetailsType('pendingRent')}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      {t('This Month Pending Rent', 'இந்த மாத நிலுவை வாடகை')}
+                    </CardTitle>
+                    <IndianRupee className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      ₹{financialSummary.pending.toLocaleString()}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid gap-8 md:grid-cols-2">
+                <Card
+                  id="tenant-requests-overview"
+                  className={totalPendingRequests > 0 ? "border-amber-500/50 shadow-md transition-all duration-500 relative overflow-hidden" : ""}
+                >
+                  {totalPendingRequests > 0 && (
+                    <div className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full animate-ping -mr-1 -mt-1" />
+                  )}
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      {t('Tenant Requests Overview', 'குத்தகைதாரர் கோரிக்கைகள் கண்ணோட்டம்')}
+                      {totalPendingRequests > 0 && (
+                        <Badge variant="destructive" className="ml-2 animate-pulse">
+                          {totalPendingRequests} {t('New', 'புதியது')}
+                        </Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription>
+                      {t(
+                        'Quick view of rent, maintenance and payment requests',
+                        'வாடகை, பராமரிப்பு மற்றும் கட்டண கோரிக்கைகளின் விரைவு கண்ணோட்டம்'
+                      )}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div
+                      className={`flex items-center justify-between p-3 rounded-md border cursor-pointer transition-colors hover:bg-muted/50 ${overviewActiveSection === 'rentRequests' ? 'bg-muted' : ''
+                        } ${pendingRentCount > 0 ? 'border-l-4 border-l-blue-500 bg-blue-50/50' : ''}`}
+                      onClick={() => {
+                        setOverviewActiveSection('rentRequests');
+                        setTenantRequestsModalType('rent');
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-full ${pendingRentCount > 0 ? 'bg-blue-100' : 'bg-muted'}`}>
+                          <Home className={`h-4 w-4 ${pendingRentCount > 0 ? 'text-blue-600' : 'text-blue-500'}`} />
+                        </div>
+                        <div>
+                          <p className="font-medium">
+                            {t('Rent Requests', 'வாடகை கோரிக்கைகள்')}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {t(
+                              'Incoming rent enquiries from tenants',
+                              'குத்தகைதாரர்களிடமிருந்து வரும் வாடகை தொடர்பான கோரிக்கைகள்'
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant={pendingRentCount > 0 ? "destructive" : "secondary"} className={pendingRentCount > 0 ? "animate-pulse" : ""}>
+                        {pendingRentCount}
+                      </Badge>
+                    </div>
+
+                    <div
+                      className={`flex items-center justify-between p-3 rounded-md border cursor-pointer transition-colors hover:bg-muted/50 ${overviewActiveSection === 'maintenanceRequests' ? 'bg-muted' : ''
+                        } ${pendingMaintenanceCount > 0 ? 'border-l-4 border-l-amber-500 bg-amber-50/50' : ''}`}
+                      onClick={() => {
+                        setOverviewActiveSection('maintenanceRequests');
+                        setTenantRequestsModalType('maintenance');
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-full ${pendingMaintenanceCount > 0 ? 'bg-amber-100' : 'bg-muted'}`}>
+                          <Wrench className={`h-4 w-4 ${pendingMaintenanceCount > 0 ? 'text-amber-600' : 'text-amber-500'}`} />
+                        </div>
+                        <div>
+                          <p className="font-medium">
+                            {t('Maintenance Requests', 'பராமரிப்பு கோரிக்கைகள்')}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {t(
+                              'Issues raised by tenants for your properties',
+                              'உங்கள் சொத்துகளுக்காக குத்தகைதாரர்கள் எழுப்பிய சிக்கல்கள்'
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant={pendingMaintenanceCount > 0 ? "destructive" : "secondary"} className={pendingMaintenanceCount > 0 ? "animate-pulse" : ""}>
+                        {pendingMaintenanceCount}
+                      </Badge>
+                    </div>
+
+                    <div
+                      className={`flex items-center justify-between p-3 rounded-md border cursor-pointer transition-colors hover:bg-muted/50 ${overviewActiveSection === 'paymentRequests' ? 'bg-muted' : ''
+                        } ${pendingPaymentCount > 0 ? 'border-l-4 border-l-green-500 bg-green-50/50' : ''}`}
+                      onClick={() => {
+                        setOverviewActiveSection('paymentRequests');
+                        setTenantRequestsModalType('payment');
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-full ${pendingPaymentCount > 0 ? 'bg-green-100' : 'bg-muted'}`}>
+                          <CreditCard className={`h-4 w-4 ${pendingPaymentCount > 0 ? 'text-green-600' : 'text-green-500'}`} />
+                        </div>
+                        <div>
+                          <p className="font-medium">
+                            {t('Payment Requests', 'கட்டண கோரிக்கைகள்')}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {t(
+                              'Pending rent payments submitted by tenants',
+                              'குத்தகைதாரர்களால் சமர்ப்பிக்கப்பட்ட நிலுவை வாடகை கட்டணங்கள்'
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant={pendingPaymentCount > 0 ? "destructive" : "secondary"} className={pendingPaymentCount > 0 ? "animate-pulse" : ""}>
+                        {pendingPaymentCount}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <RentStatusGraph
+                  data={rentHistory?.graph || []}
+                  payments={rentHistory?.lastPayments || []}
+                  title={t('Rent Status Summary', 'வாடகை நிலை சுருக்கம்')}
+                  role="owner"
+                />
+              </div>
+
+              {announcements.length > 0 && (
+                <Card className="mt-8">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <div>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Megaphone className="h-4 w-4 text-blue-600" />
+                        {t('Recent Announcements', 'சமீபத்திய அறிவிப்புகள்')}
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        {t('Official notices from management', 'நிர்வாகத்தின் அதிகாரப்பூர்வ அறிவிப்புகள்')}
+                      </CardDescription>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setActiveTab('announcements')}
+                      className="text-xs text-blue-600 hover:text-blue-700"
+                    >
+                      {t('View All', 'அனைத்தையும் பார்க்க')} ({announcements.length})
+                    </Button>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {announcements.slice(0, 2).map((ann) => (
+                      <div
+                        key={ann._id}
+                        className="border rounded-xl p-3 bg-muted/20 hover:bg-muted/40 transition-colors"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="font-semibold text-sm text-foreground">{ann.title}</h4>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {new Date(ann.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{ann.message}</p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            {/* Announcements Tab */}
+            <TabsContent value="announcements" className="mt-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
+                  <div>
+                    <CardTitle className="text-xl flex items-center gap-2">
+                      <Megaphone className="h-5 w-5 text-blue-600" />
+                      {t('Platform Announcements', 'தள அறிவிப்புகள்')}
+                    </CardTitle>
+                    <CardDescription>
+                      {t('Important updates and official announcements from administration.', 'நிர்வாகத்திடமிருந்து முக்கியமான அறிவிப்புகள் மற்றும் புதுப்பிப்புகள்.')}
                     </CardDescription>
                   </div>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    onClick={() => setActiveTab('announcements')}
-                    className="text-xs text-blue-600 hover:text-blue-700"
+                    onClick={() => refetchAnnouncements()}
+                    disabled={announcementsLoading}
+                    className="rounded-xl h-8 text-xs"
                   >
-                    {t('View All', 'அனைத்தையும் பார்க்க')} ({announcements.length})
+                    <RefreshCcw className={`mr-1.5 h-3.5 w-3.5 ${announcementsLoading ? 'animate-spin' : ''}`} />
+                    {t('Refresh', 'புதுப்பி')}
                   </Button>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  {announcements.slice(0, 2).map((ann) => (
-                    <div
-                      key={ann._id}
-                      className="border rounded-xl p-3 bg-muted/20 hover:bg-muted/40 transition-colors"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <h4 className="font-semibold text-sm text-foreground">{ann.title}</h4>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {new Date(ann.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{ann.message}</p>
+                <CardContent className="p-6">
+                  {announcementsLoading ? (
+                    <div className="py-16 text-center text-muted-foreground space-y-3">
+                      <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
+                      <p className="text-sm">{t('Loading announcements...', 'அறிவிப்புகள் ஏற்றப்படுகின்றன...')}</p>
                     </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          {/* Announcements Tab */}
-          <TabsContent value="announcements" className="mt-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
-                <div>
-                  <CardTitle className="text-xl flex items-center gap-2">
-                    <Megaphone className="h-5 w-5 text-blue-600" />
-                    {t('Platform Announcements', 'தள அறிவிப்புகள்')}
-                  </CardTitle>
-                  <CardDescription>
-                    {t('Important updates and official announcements from administration.', 'நிர்வாகத்திடமிருந்து முக்கியமான அறிவிப்புகள் மற்றும் புதுப்பிப்புகள்.')}
-                  </CardDescription>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => refetchAnnouncements()}
-                  disabled={announcementsLoading}
-                  className="rounded-xl h-8 text-xs"
-                >
-                  <RefreshCcw className={`mr-1.5 h-3.5 w-3.5 ${announcementsLoading ? 'animate-spin' : ''}`} />
-                  {t('Refresh', 'புதுப்பி')}
-                </Button>
-              </CardHeader>
-              <CardContent className="p-6">
-                {announcementsLoading ? (
-                  <div className="py-16 text-center text-muted-foreground space-y-3">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
-                    <p className="text-sm">{t('Loading announcements...', 'அறிவிப்புகள் ஏற்றப்படுகின்றன...')}</p>
-                  </div>
-                ) : announcementsError ? (
-                  <div className="py-12 text-center space-y-3">
-                    <p className="text-sm text-destructive">{t('Failed to load announcements.', 'அறிவிப்புகளை ஏற்ற முடியவில்லை.')}</p>
-                    <Button variant="outline" size="sm" onClick={() => refetchAnnouncements()} className="rounded-xl h-8">
-                      {t('Retry', 'மீண்டும் முயற்சி')}
-                    </Button>
-                  </div>
-                ) : announcements.length === 0 ? (
-                  <div className="py-16 text-center text-muted-foreground space-y-3">
-                    <Megaphone className="h-12 w-12 mx-auto opacity-30" />
-                    <p className="text-base font-medium">{t('No announcements at this time.', 'தற்போது அறிவிப்புகள் எதுவும் இல்லை.')}</p>
-                    <p className="text-xs text-muted-foreground">{t('Check back later for updates and news from management.', 'நிர்வாகத்தின் புதுப்பிப்புகள் மற்றும் செய்திகளுக்குப் பின்னர் சரிபார்க்கவும்.')}</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {announcements.map((ann) => (
-                      <div
-                        key={ann._id}
-                        className="rounded-2xl border bg-card p-5 space-y-3 shadow-sm hover:shadow transition"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <h3 className="font-semibold text-base text-foreground">{ann.title}</h3>
-                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                              <Calendar className="h-3.5 w-3.5" />
-                              <span>{new Date(ann.createdAt).toLocaleString()}</span>
-                              <span>•</span>
-                              <span>{ann.creatorName || t('Administrator', 'நிர்வாகி')}</span>
-                            </div>
-                          </div>
-                          <Badge variant="outline" className="rounded-full text-xs shrink-0 border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-300">
-                            {t('Announcement', 'அறிவிப்பு')}
-                          </Badge>
-                        </div>
-                        <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed bg-muted/30 p-4 rounded-xl border">
-                          {ann.message}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* My Properties Tab */}
-          <TabsContent value="properties" className="mt-4 sm:mt-6">
-            {activeOwnerProperty ? (
-              <PropertyFullScreenView 
-                property={activeOwnerProperty}
-                properties={myProperties}
-                selectedPropertyId={getId(activeOwnerProperty)}
-                onSelectProperty={(prop) => {
-                  setSelectedProperty(prop);
-                  onSelectProperty?.(getId(prop));
-                }}
-                initialTab={selectedPropertyInitialTab}
-                onBack={handleBackFromProperty}
-              />
-            ) : (
-              <div className="text-center py-12 text-muted-foreground">
-                {t('No properties found. Add your first property!', 'சொத்துக்கள் எதுவும் காணப்படவில்லை. உங்கள் முதல் சொத்தைச் சேர்க்கவும்!')}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Requests Tab */}
-          <TabsContent value="requests" className="mt-6">
-            <Card>
-              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
-                <div>
-                  <CardTitle>{t('Property Requests', 'சொத்து கோரிக்கைகள்')}</CardTitle>
-                  <CardDescription>
-                    {t('Manage incoming rent and buy requests from potential tenants and buyers.', 'சாத்தியமான குத்தகைதாரர்கள் மற்றும் வாங்குபவர்களிடமிருந்து வரும் கோரிக்கைகளை நிர்வகிக்கவும்.')}
-                  </CardDescription>
-                </div>
-
-                {/* Requirement 6: Owner Category Filters */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => setRequestFilterCategory('all')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      requestFilterCategory === 'all'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
-                    }`}
-                  >
-                    {t('Incoming Requests', 'பெறப்பட்ட கோரிக்கைகள்')} ({ownerRequestCounts.all})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRequestFilterCategory('pending')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      requestFilterCategory === 'pending'
-                        ? 'bg-amber-600 text-white shadow-sm'
-                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
-                    }`}
-                  >
-                    {t('Accept / Reject', 'ஏற்க / நிராகரிக்க')} ({ownerRequestCounts.pending})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRequestFilterCategory('awaiting_payment')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      requestFilterCategory === 'awaiting_payment'
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
-                    }`}
-                  >
-                    {t('Accepted / Awaiting Payment', 'ஏற்றுக்கொள்ளப்பட்டது / கட்டணம் நிலுவையில்')} ({ownerRequestCounts.awaitingPayment})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRequestFilterCategory('completed')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      requestFilterCategory === 'completed'
-                        ? 'bg-slate-700 text-white shadow-sm'
-                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
-                    }`}
-                  >
-                    {t('Completed Transactions', 'முடிந்த ஒப்பந்தங்கள்')} ({ownerRequestCounts.completed})
-                  </button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {filteredOwnerRequests.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Inbox className="mx-auto h-12 w-12 text-muted-foreground/20 mb-4" />
-                    {t('No requests found in this category.', 'இந்த பிரிவில் கோரிக்கைகள் எதுவும் காணப்படவில்லை.')}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {filteredOwnerRequests.map((request: any) => (
-                      <div key={request._id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg bg-card hover:bg-muted/50 transition-colors gap-4">
-                        <div className="space-y-1 mb-2 md:mb-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${request.type === 'rent' ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
-                              }`}>
-                              {request.type === 'rent' ? t('Rent Request', 'வாடகை கோரிக்கை') : t('Buy Request', 'வாங்க கோரிக்கை')}
-                            </span>
-                            <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
-                              request.status === 'pending'
-                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                                : ['accepted', 'approved', 'terms_confirmed'].includes(request.status)
-                                ? 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300'
-                                : request.status === 'payment_pending'
-                                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
-                                : request.status === 'completed'
-                                ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
-                                : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
-                              }`}>
-                              {request.status === 'pending'
-                                ? t('Pending Review', 'மதிப்பாய்வு நிலுவையில்')
-                                : ['accepted', 'approved', 'terms_confirmed'].includes(request.status)
-                                ? t('Accepted — Awaiting Payment', 'ஏற்றுக்கொள்ளப்பட்டது - கட்டணம் நிலுவை')
-                                : request.status === 'payment_pending'
-                                ? t('Payment Verification Pending', 'கட்டண சரிபார்ப்பு நிலுவையில்')
-                                : request.status === 'completed'
-                                ? t('Completed', 'முடிக்கப்பட்டது')
-                                : t('Declined', 'நிராகரிக்கப்பட்டது')}
-                            </span>
-                          </div>
-                          <h4 className="font-semibold text-lg">{displayTa(request.property?.title)}</h4>
-                          <div className="text-sm text-muted-foreground space-y-1">
-                            <div className="flex items-center gap-2">
-                              <User className="h-3 w-3" />
-                              <span>{request.tenant?.name || 'Applicant'} ({request.tenant?.email})</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-3 w-3" />
-                              <span>{displayTa(request.property?.location)}</span>
-                            </div>
-                            {request.offerAmount && (
-                              <div className="text-xs pt-1">
-                                <span className="text-muted-foreground">{t('Offer Amount: ', 'சலுகை தொகை: ')}</span>
-                                <b className="text-primary">₹{Number(request.offerAmount).toLocaleString('en-IN')}</b>
+                  ) : announcementsError ? (
+                    <div className="py-12 text-center space-y-3">
+                      <p className="text-sm text-destructive">{t('Failed to load announcements.', 'அறிவிப்புகளை ஏற்ற முடியவில்லை.')}</p>
+                      <Button variant="outline" size="sm" onClick={() => refetchAnnouncements()} className="rounded-xl h-8">
+                        {t('Retry', 'மீண்டும் முயற்சி')}
+                      </Button>
+                    </div>
+                  ) : announcements.length === 0 ? (
+                    <div className="py-16 text-center text-muted-foreground space-y-3">
+                      <Megaphone className="h-12 w-12 mx-auto opacity-30" />
+                      <p className="text-base font-medium">{t('No announcements at this time.', 'தற்போது அறிவிப்புகள் எதுவும் இல்லை.')}</p>
+                      <p className="text-xs text-muted-foreground">{t('Check back later for updates and news from management.', 'நிர்வாகத்தின் புதுப்பிப்புகள் மற்றும் செய்திகளுக்குப் பின்னர் சரிபார்க்கவும்.')}</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {announcements.map((ann) => (
+                        <div
+                          key={ann._id}
+                          className="rounded-2xl border bg-card p-5 space-y-3 shadow-sm hover:shadow transition"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h3 className="font-semibold text-base text-foreground">{ann.title}</h3>
+                              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                                <Calendar className="h-3.5 w-3.5" />
+                                <span>{new Date(ann.createdAt).toLocaleString()}</span>
+                                <span>•</span>
+                                <span>{ann.creatorName || t('Administrator', 'நிர்வாகி')}</span>
                               </div>
-                            )}
+                            </div>
+                            <Badge variant="outline" className="rounded-full text-xs shrink-0 border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-300">
+                              {t('Announcement', 'அறிவிப்பு')}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed bg-muted/30 p-4 rounded-xl border">
+                            {ann.message}
                           </div>
                         </div>
-
-                        {/* Quick Actions */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {request.status === 'pending' && (
-                            <>
-                              <Button
-                                size="sm"
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-medium"
-                                disabled={approveRequest.isPending || rejectRequest.isPending}
-                                onClick={() => handleApproveRequest(request._id)}
-                              >
-                                {request.type === 'buy' ? t('Accept Offer', 'சலுகையை ஏற்றுக்கொள்') : t('Accept Application', 'விண்ணப்பத்தை ஏற்றுக்கொள்')}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30 font-medium"
-                                disabled={approveRequest.isPending || rejectRequest.isPending}
-                                onClick={() => handleRejectRequest(request._id)}
-                              >
-                                {t('Reject', 'நிராகரி')}
-                              </Button>
-                            </>
-                          )}
-                          {request.status === 'payment_pending' && (
-                            <Button
-                              size="sm"
-                              className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm font-medium"
-                              onClick={() => setSelectedRequest(request)}
-                            >
-                              <CreditCard className="w-3.5 h-3.5 mr-1" />
-                              {t('Verify Payment', 'கட்டணத்தை சரிபார்')}
-                            </Button>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedRequest(request)}
-                          >
-                            {t('View Details', 'விவரங்கள்')}
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Reports Tab */}
-          <TabsContent value="reports" className="mt-6 space-y-6">
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card
-                className="cursor-pointer hover:bg-muted/30 transition-colors"
-                onClick={() => {
-                  setActiveReport('rent');
-                  setReportFrom(monthStartStr);
-                  setReportTo(todayStr);
-                }}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    {t('Generate Rent Report', 'வாடகை அறிக்கை உருவாக்கவும்')}
-                  </CardTitle>
-                  <CardDescription>
-                    {t('Summary + detailed rent collection.', 'சுருக்கம் + விரிவான வாடகை வசூல்.')}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button className="w-full" variant={activeReport === 'rent' ? 'default' : 'outline'}>
-                    {activeReport === 'rent' ? t('Selected', 'தேர்ந்தெடுக்கப்பட்டது') : t('Generate', 'உருவாக்கு')}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card
-                className="cursor-pointer hover:bg-muted/30 transition-colors"
-                onClick={() => {
-                  setActiveReport('occupancy');
-                  setReportFrom(last90DaysStr);
-                  setReportTo(todayStr);
-                }}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    {t('Generate Occupancy Report', 'குடியேற்ற அறிக்கை உருவாக்கவும்')}
-                  </CardTitle>
-                  <CardDescription>
-                    {t('Occupied vs vacant properties.', 'குடியேற்றம் மற்றும் காலி சொத்துகள்.')}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button className="w-full" variant={activeReport === 'occupancy' ? 'default' : 'outline'}>
-                    {activeReport === 'occupancy' ? t('Selected', 'தேர்ந்தெடுக்கப்பட்டது') : t('Generate', 'உருவாக்கு')}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card
-                className="cursor-pointer hover:bg-muted/30 transition-colors"
-                onClick={() => {
-                  setActiveReport('maintenance');
-                  setReportFrom(last180DaysStr);
-                  setReportTo(todayStr);
-                }}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    {t('Generate Maintenance Report', 'பராமரிப்பு அறிக்கை உருவாக்கவும்')}
-                  </CardTitle>
-                  <CardDescription>
-                    {t('Requests, status, and cost.', 'கோரிக்கைகள், நிலை, மற்றும் செலவு.')}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button className="w-full" variant={activeReport === 'maintenance' ? 'default' : 'outline'}>
-                    {activeReport === 'maintenance' ? t('Selected', 'தேர்ந்தெடுக்கப்பட்டது') : t('Generate', 'உருவாக்கு')}
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('Filters', 'வடிப்பான்கள்')}</CardTitle>
-                <CardDescription>
-                  {t('Select date range and property (optional).', 'தேதி வரம்பையும் சொத்தையும் தேர்வு செய்யவும் (விருப்பம்).')}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-4 md:grid-cols-3">
-                <div className="grid gap-2">
-                  <Label>{t('From', 'இருந்து')}</Label>
-                  <Input type="date" value={reportFrom} onChange={(e) => setReportFrom(e.target.value)} />
-                </div>
-                <div className="grid gap-2">
-                  <Label>{t('To', 'வரை')}</Label>
-                  <Input type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)} />
-                </div>
-                <div className="grid gap-2">
-                  <Label>{t('Property (optional)', 'சொத்து (விருப்பம்)')}</Label>
-                  <Select value={reportPropertyId} onValueChange={setReportPropertyId}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t('All Properties', 'அனைத்து சொத்துகள்')}</SelectItem>
-                      {myProperties.map((p: any) => (
-                        <SelectItem key={String(p._id || p.id)} value={String(p._id || p.id)}>
-                          {displayTa(p.title || t('Property', 'சொத்து'))}
-                        </SelectItem>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-            {activeReport ? (
+            {/* My Properties Tab */}
+            <TabsContent value="properties" className="mt-4 sm:mt-6">
+              {activeOwnerProperty ? (
+                <PropertyFullScreenView
+                  property={activeOwnerProperty}
+                  properties={myProperties}
+                  selectedPropertyId={getId(activeOwnerProperty)}
+                  onSelectProperty={(prop) => {
+                    setSelectedProperty(prop);
+                    onSelectProperty?.(getId(prop));
+                  }}
+                  initialTab={selectedPropertyInitialTab}
+                  onBack={handleBackFromProperty}
+                />
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  {t('No properties found. Add your first property!', 'சொத்துக்கள் எதுவும் காணப்படவில்லை. உங்கள் முதல் சொத்தைச் சேர்க்கவும்!')}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Requests Tab */}
+            <TabsContent value="requests" className="mt-6">
               <Card>
-                <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="space-y-1">
-                    <CardTitle>{buildReportTitle()}</CardTitle>
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
+                  <div>
+                    <CardTitle>{t('Property Requests', 'சொத்து கோரிக்கைகள்')}</CardTitle>
                     <CardDescription>
-                      {t('Summary on top, detailed table below.', 'மேல் பகுதியில் சுருக்கம், கீழே விரிவான அட்டவணை.')}
+                      {t('Manage incoming rent and buy requests from potential tenants and buyers.', 'சாத்தியமான குத்தகைதாரர்கள் மற்றும் வாங்குபவர்களிடமிருந்து வரும் கோரிக்கைகளை நிர்வகிக்கவும்.')}
                     </CardDescription>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      className="h-9 rounded-xl"
-                      onClick={() => {
-                        if (!activeReport) return;
-                        if (activeReport === 'rent') rentReportQuery.refetch();
-                        if (activeReport === 'occupancy') occupancyReportQuery.refetch();
-                        if (activeReport === 'maintenance') maintenanceReportQuery.refetch();
-                      }}
-                      disabled={isGeneratingReport}
+                  {/* Requirement 6: Owner Category Filters */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setRequestFilterCategory('all')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${requestFilterCategory === 'all'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                        }`}
                     >
-                      {isGeneratingReport ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      {t('Generate Report', 'அறிக்கை உருவாக்கு')}
-                    </Button>
-                    <Button variant="outline" className="h-9 rounded-xl" onClick={handleDownloadPdf} disabled={!currentReport || isGeneratingReport}>
-                      {isGeneratingReport ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                      {t('Download as PDF', 'PDF ஆக பதிவிறக்கவும்')}
-                    </Button>
-                    <Button variant="outline" className="h-9 rounded-xl" onClick={handlePrint} disabled={!currentReport || isGeneratingReport}>
-                      <Printer className="mr-2 h-4 w-4" />
-                      {t('Print Report', 'அறிக்கையை அச்சிடு')}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-9 rounded-xl"
-                      onClick={() => {
-                        if (!activeReport || !currentReport) return;
-                        const nowStamp = new Date().toISOString().slice(0, 10);
-                        const lines: string[] = [];
-                        lines.push(`RESIDE REPORT`);
-                        lines.push(`${escCsv(buildReportTitle())}`);
-                        lines.push(`Owner,${escCsv(userProfile?.name || 'Owner')}`);
-                        lines.push(`Range,${escCsv(reportFrom)} to ${escCsv(reportTo)}`);
-                        lines.push('');
-
-                        if (activeReport === 'rent') {
-                          const s = currentReport?.summary || {};
-                          lines.push(`Total Properties,${escCsv(s.totalProperties ?? 0)}`);
-                          lines.push(`Total Rent Expected,${escCsv(s.totalRentExpected ?? 0)}`);
-                          lines.push(`Total Rent Collected,${escCsv(s.totalRentCollected ?? 0)}`);
-                          lines.push(`Pending Amount,${escCsv(s.pendingAmount ?? 0)}`);
-                          lines.push('');
-                          lines.push('Property,Tenant Name,Rent,Paid,Pending,Payment Date,Status');
-                          (Array.isArray(currentReport?.rows) ? currentReport.rows : []).forEach((r: any) => {
-                            lines.push(
-                              `${escCsv(r.propertyTitle || r.propertyId || '')},${escCsv(r.tenantName || '')},${escCsv(r.rent ?? 0)},${escCsv(r.paid ?? 0)},${escCsv(r.pending ?? 0)},${escCsv(formatShortDate(r.dueDate || r.month))},${escCsv(r.status || '')}`
-                            );
-                          });
-                        }
-
-                        if (activeReport === 'occupancy') {
-                          const s = currentReport?.summary || {};
-                          lines.push(`Total Properties,${escCsv(s.totalProperties ?? 0)}`);
-                          lines.push(`Occupied,${escCsv(s.occupied ?? 0)}`);
-                          lines.push(`Vacant,${escCsv(s.vacant ?? 0)}`);
-                          lines.push(`Occupancy Rate,${escCsv(s.occupancyRate ?? 0)}`);
-                          lines.push('');
-                          lines.push('Property,Location,Status,Tenant Name');
-                          (Array.isArray(currentReport?.rows) ? currentReport.rows : []).forEach((r: any) => {
-                            lines.push(
-                              `${escCsv(r.propertyTitle || r.propertyId || '')},${escCsv(r.location || '')},${escCsv(r.status || '')},${escCsv(r.tenantName || '')}`
-                            );
-                          });
-                        }
-
-                        if (activeReport === 'maintenance') {
-                          const s = currentReport?.summary || {};
-                          lines.push(`Total Requests,${escCsv(s.totalRequests ?? 0)}`);
-                          lines.push(`Completed,${escCsv(s.completed ?? 0)}`);
-                          lines.push(`Pending,${escCsv(s.pending ?? 0)}`);
-                          lines.push('');
-                          lines.push('Maintenance Name,Property,Status');
-                          (Array.isArray(currentReport?.rows) ? currentReport.rows : []).forEach((r: any) => {
-                            lines.push(
-                              `${escCsv(r.issue || '')},${escCsv(r.propertyTitle || '')},${escCsv(r.status || '')}`
-                            );
-                          });
-                        }
-
-                        downloadCsv(`reside-${activeReport}-report-${nowStamp}.csv`, lines);
-                      }}
-                      disabled={!currentReport || isGeneratingReport}
+                      {t('Incoming Requests', 'பெறப்பட்ட கோரிக்கைகள்')} ({ownerRequestCounts.all})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRequestFilterCategory('pending')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${requestFilterCategory === 'pending'
+                        ? 'bg-amber-600 text-white shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                        }`}
                     >
-                      <Download className="mr-2 h-4 w-4" />
-                      {t('Export CSV', 'CSV ஏற்றுமதி')}
-                    </Button>
+                      {t('Accept / Reject', 'ஏற்க / நிராகரிக்க')} ({ownerRequestCounts.pending})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRequestFilterCategory('awaiting_payment')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${requestFilterCategory === 'awaiting_payment'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                        }`}
+                    >
+                      {t('Accepted / Awaiting Payment', 'ஏற்றுக்கொள்ளப்பட்டது / கட்டணம் நிலுவையில்')} ({ownerRequestCounts.awaitingPayment})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRequestFilterCategory('completed')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${requestFilterCategory === 'completed'
+                        ? 'bg-slate-700 text-white shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                        }`}
+                    >
+                      {t('Completed Transactions', 'முடிந்த ஒப்பந்தங்கள்')} ({ownerRequestCounts.completed})
+                    </button>
                   </div>
                 </CardHeader>
-
-                <CardContent className="space-y-6">
-                  {isGeneratingReport ? (
-                    <div className="flex items-center justify-center py-12 text-muted-foreground">
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      {t('Generating report...', 'அறிக்கை உருவாக்கப்படுகிறது...')}
+                <CardContent>
+                  {filteredOwnerRequests.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Inbox className="mx-auto h-12 w-12 text-muted-foreground/20 mb-4" />
+                      {t('No requests found in this category.', 'இந்த பிரிவில் கோரிக்கைகள் எதுவும் காணப்படவில்லை.')}
                     </div>
-                  ) : null}
-
-                  {!isGeneratingReport && !currentReport ? (
-                    <div className="py-10 text-center text-muted-foreground">
-                      {reportErrorMessage ? (
-                        <div className="space-y-2">
-                          <div className="text-sm font-medium text-red-600">
-                            {t('Failed to generate report.', 'அறிக்கையை உருவாக்க முடியவில்லை.')}
+                  ) : (
+                    <div className="space-y-4">
+                      {filteredOwnerRequests.map((request: any) => (
+                        <div key={request._id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg bg-card hover:bg-muted/50 transition-colors gap-4">
+                          <div className="space-y-1 mb-2 md:mb-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${request.type === 'rent' ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
+                                }`}>
+                                {request.type === 'rent' ? t('Rent Request', 'வாடகை கோரிக்கை') : t('Buy Request', 'வாங்க கோரிக்கை')}
+                              </span>
+                              <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${request.status === 'pending'
+                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                                : ['accepted', 'approved', 'terms_confirmed'].includes(request.status)
+                                  ? 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300'
+                                  : request.status === 'payment_pending'
+                                    ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
+                                    : request.status === 'completed'
+                                      ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
+                                      : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
+                                }`}>
+                                {request.status === 'pending'
+                                  ? t('Pending Review', 'மதிப்பாய்வு நிலுவையில்')
+                                  : ['accepted', 'approved', 'terms_confirmed'].includes(request.status)
+                                    ? t('Accepted — Awaiting Payment', 'ஏற்றுக்கொள்ளப்பட்டது - கட்டணம் நிலுவை')
+                                    : request.status === 'payment_pending'
+                                      ? t('Payment Verification Pending', 'கட்டண சரிபார்ப்பு நிலுவையில்')
+                                      : request.status === 'completed'
+                                        ? t('Completed', 'முடிக்கப்பட்டது')
+                                        : t('Declined', 'நிராகரிக்கப்பட்டது')}
+                              </span>
+                            </div>
+                            <h4 className="font-semibold text-lg">{displayTa(request.property?.title)}</h4>
+                            <div className="text-sm text-muted-foreground space-y-1">
+                              <div className="flex items-center gap-2">
+                                <User className="h-3 w-3" />
+                                <span>{request.tenant?.name || 'Applicant'} ({request.tenant?.email})</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-3 w-3" />
+                                <span>{displayTa(request.property?.location)}</span>
+                              </div>
+                              {request.offerAmount && (
+                                <div className="text-xs pt-1">
+                                  <span className="text-muted-foreground">{t('Offer Amount: ', 'சலுகை தொகை: ')}</span>
+                                  <b className="text-primary">₹{Number(request.offerAmount).toLocaleString('en-IN')}</b>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <div className="text-xs text-red-600">{reportErrorMessage}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {t(
-                              'If you just updated the backend, restart the server and click Generate Report.',
-                              'நீங்கள் இப்போதுதான் backend-ஐ புதுப்பித்திருந்தால், server-ஐ மீண்டும் தொடங்கி “அறிக்கை உருவாக்கு” ஐ கிளிக் செய்யவும்.'
+
+                          {/* Quick Actions */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {request.status === 'pending' && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-medium"
+                                  disabled={approveRequest.isPending || rejectRequest.isPending}
+                                  onClick={() => handleApproveRequest(request._id)}
+                                >
+                                  {request.type === 'buy' ? t('Accept Offer', 'சலுகையை ஏற்றுக்கொள்') : t('Accept Application', 'விண்ணப்பத்தை ஏற்றுக்கொள்')}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30 font-medium"
+                                  disabled={approveRequest.isPending || rejectRequest.isPending}
+                                  onClick={() => handleRejectRequest(request._id)}
+                                >
+                                  {t('Reject', 'நிராகரி')}
+                                </Button>
+                              </>
                             )}
+                            {request.status === 'payment_pending' && (
+                              <Button
+                                size="sm"
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm font-medium"
+                                onClick={() => setSelectedRequest(request)}
+                              >
+                                <CreditCard className="w-3.5 h-3.5 mr-1" />
+                                {t('Verify Payment', 'கட்டணத்தை சரிபார்')}
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedRequest(request)}
+                            >
+                              {t('View Details', 'விவரங்கள்')}
+                            </Button>
                           </div>
                         </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <div>{t('Click Generate Report to load the report.', 'அறிக்கையை பார்க்க “அறிக்கை உருவாக்கு” ஐ கிளிக் செய்யவும்.')}</div>
-                          <div className="text-xs">{t('Adjust filters if needed.', 'தேவைப்பட்டால் வடிப்பான்களை மாற்றவும்.')}</div>
-                        </div>
-                      )}
+                      ))}
                     </div>
-                  ) : null}
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-                  {!isGeneratingReport && currentReport ? (
-                    <>
-                      {activeReport ? (
-                        <div className="space-y-1 text-sm text-muted-foreground">
-                          <div>
-                            {t('Owner Name', 'உரிமையாளர் பெயர்')}: <span className="text-foreground">{String(userProfile?.name || 'Owner')}</span>
-                          </div>
-                          <div>
-                            {t('Report Period', 'அறிக்கை காலம்')}: <span className="text-foreground">{reportFrom} → {reportTo}</span>
-                          </div>
-                          <div>
-                            {t('Generated On', 'உருவாக்கப்பட்ட தேதி')}: <span className="text-foreground">{formatShortDate(currentReport?.generatedAt || new Date().toISOString())}</span>
-                          </div>
-                          <div className="text-xs italic">
-                            {aiIsGenerated
-                              ? t(
-                                  'This report is AI-assisted and generated by Reside Management System.',
-                                  'இந்த அறிக்கை AI உதவியுடன் Reside Management System மூலம் உருவாக்கப்படுகிறது.'
-                                )
-                              : t('This report is system-generated by Reside Management System.', 'இந்த அறிக்கை Reside Management System மூலம் உருவாக்கப்படுகிறது.')}
-                          </div>
+            {/* Reports Tab */}
+            <TabsContent value="reports" className="mt-2 pb-2">
+              {/* MAIN CONTENT — 2-COLUMN FIT-TO-PAGE GRID */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+                {/* LEFT COLUMN (lg:col-span-3): FULL-HEIGHT FROSTED SIDEBAR */}
+                <div className="lg:col-span-3 h-full">
+                  <div className="h-full flex flex-col justify-between gap-2 rounded-2xl border border-slate-200/80 dark:border-slate-600/75 bg-white/85 dark:bg-slate-900/75 backdrop-blur-md p-2.5 shadow-sm">
+                    {/* Top Section — Compact Single-Row Filter Strip */}
+                    <div className="rounded-xl border border-slate-200/80 dark:border-slate-600/60 bg-white/90 dark:bg-slate-800/60 p-2 shadow-sm">
+                      <div className="grid grid-cols-12 gap-1.5 items-end">
+                        <div className="col-span-4">
+                          <label className="text-[10px] font-medium text-slate-500 dark:text-slate-300 mb-0.5 block">{t('From', 'இருந்து')}</label>
+                          <input
+                            type="date"
+                            value={reportFrom}
+                            onChange={(e) => setReportFrom(e.target.value)}
+                            className="w-full px-1.5 py-1 text-[11px] rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
                         </div>
-                      ) : null}
-
-                      <div className="grid gap-4 md:grid-cols-4">
-                        {activeReport === 'rent' ? (
-                          <>
-                            <Card className="rounded-2xl">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-sm">{t('Total Properties', 'மொத்த சொத்துக்கள்')}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="text-2xl font-bold">{Number(currentReport?.summary?.totalProperties ?? 0).toLocaleString()}</CardContent>
-                            </Card>
-                            <Card className="rounded-2xl">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-sm">{t('Total Rent Expected', 'மொத்த எதிர்பார்க்கப்படும் வாடகை')}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="text-2xl font-bold">{money(currentReport?.summary?.totalRentExpected ?? 0)}</CardContent>
-                            </Card>
-                            <Card className="rounded-2xl">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-sm">{t('Total Rent Collected', 'மொத்த வசூலிக்கப்பட்ட வாடகை')}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="text-2xl font-bold">{money(currentReport?.summary?.totalRentCollected ?? 0)}</CardContent>
-                            </Card>
-                            <Card className="rounded-2xl">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-sm">{t('Pending Amount', 'நிலுவை தொகை')}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="text-2xl font-bold">{money(currentReport?.summary?.pendingAmount ?? 0)}</CardContent>
-                            </Card>
-                          </>
-                        ) : null}
-
-                        {activeReport === 'occupancy' ? (
-                          <>
-                            <Card className="rounded-2xl">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-sm">{t('Total Properties', 'மொத்த சொத்துக்கள்')}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="text-2xl font-bold">{Number(currentReport?.summary?.totalProperties ?? 0).toLocaleString()}</CardContent>
-                            </Card>
-                            <Card className="rounded-2xl">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-sm">{t('Occupied', 'குடியேற்றப்பட்டது')}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="text-2xl font-bold">{Number(currentReport?.summary?.occupied ?? 0).toLocaleString()}</CardContent>
-                            </Card>
-                            <Card className="rounded-2xl">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-sm">{t('Vacant', 'காலி')}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="text-2xl font-bold">{Number(currentReport?.summary?.vacant ?? 0).toLocaleString()}</CardContent>
-                            </Card>
-                            <Card className="rounded-2xl">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-sm">{t('Occupancy Rate', 'குடியேற்ற விகிதம்')}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="text-2xl font-bold">{Number(currentReport?.summary?.occupancyRate ?? 0).toFixed(2)}%</CardContent>
-                            </Card>
-                          </>
-                        ) : null}
-
-                        {activeReport === 'maintenance' ? (
-                          <>
-                            <Card className="rounded-2xl">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-sm">{t('Total Requests', 'மொத்த கோரிக்கைகள்')}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="text-2xl font-bold">{Number(currentReport?.summary?.totalRequests ?? 0).toLocaleString()}</CardContent>
-                            </Card>
-                            <Card className="rounded-2xl">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-sm">{t('Completed', 'முடிந்தது')}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="text-2xl font-bold">{Number(currentReport?.summary?.completed ?? 0).toLocaleString()}</CardContent>
-                            </Card>
-                            <Card className="rounded-2xl">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-sm">{t('Pending', 'நிலுவையில்')}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="text-2xl font-bold">{Number(currentReport?.summary?.pending ?? 0).toLocaleString()}</CardContent>
-                            </Card>
-                          </>
-                        ) : null}
-                      </div>
-
-                      {activeReport === 'rent' && rentDerived ? (
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <Card className="rounded-2xl">
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm">{t('Payment Status', 'கட்டண நிலை')}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div ref={paymentStatusChartRef} className="h-[240px] w-full">
-                                {rentDerived.paymentStatusData.some((d) => Number(d?.value ?? 0) > 0) ? (
-                                  <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                      <Pie data={rentDerived.paymentStatusData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={90} paddingAngle={2}>
-                                        <Cell fill="#16a34a" />
-                                        <Cell fill="#ef4444" />
-                                      </Pie>
-                                      <Tooltip formatter={(v: any) => money(v)} />
-                                    </PieChart>
-                                  </ResponsiveContainer>
-                                ) : (
-                                  <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
-                                    {t('No data for selected range', 'தேர்ந்தெடுக்கப்பட்ட காலத்திற்கு தரவு இல்லை')}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
-                                  {t('Collected', 'வசூலிக்கப்பட்டது')} {rentDerived.collectedPct}%
-                                </Badge>
-                                <Badge className="bg-red-100 text-red-700 hover:bg-red-100">
-                                  {t('Pending', 'நிலுவையில்')} {rentDerived.pendingPct}%
-                                </Badge>
-                              </div>
-                            </CardContent>
-                          </Card>
-
-                          <Card className="rounded-2xl">
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm">{t('Monthly Rent Collection', 'மாதாந்திர வாடகை வசூல்')}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div ref={monthlyCollectionChartRef} className="h-[240px] w-full">
-                                {rentDerived.monthlyCollection.some((d) => Number(d?.amount ?? 0) > 0) ? (
-                                  <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={rentDerived.monthlyCollection}>
-                                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                      <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                                      <YAxis axisLine={false} tickLine={false} tickFormatter={(v) => `₹${Number(v || 0) / 1000}k`} />
-                                      <Tooltip formatter={(v: any) => money(v)} />
-                                      <Bar dataKey="amount" radius={[6, 6, 0, 0]} fill="#2563eb" />
-                                    </BarChart>
-                                  </ResponsiveContainer>
-                                ) : (
-                                  <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
-                                    {t('No data for selected range', 'தேர்ந்தெடுக்கப்பட்ட காலத்திற்கு தரவு இல்லை')}
-                                  </div>
-                                )}
-                              </div>
-                            </CardContent>
-                          </Card>
+                        <div className="col-span-4">
+                          <label className="text-[10px] font-medium text-slate-500 dark:text-slate-300 mb-0.5 block">{t('To', 'வரை')}</label>
+                          <input
+                            type="date"
+                            value={reportTo}
+                            onChange={(e) => setReportTo(e.target.value)}
+                            className="w-full px-1.5 py-1 text-[11px] rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
                         </div>
-                      ) : null}
-
-                      {activeReport === 'occupancy' && occupancyDerived ? (
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <Card className="rounded-2xl">
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm">{t('Occupancy Status', 'குடியேற்ற நிலை')}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div ref={occupancyStatusChartRef} className="h-[240px] w-full">
-                                {occupancyDerived.statusData.some((d) => Number(d?.value ?? 0) > 0) ? (
-                                  <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                      <Pie data={occupancyDerived.statusData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={90} paddingAngle={2}>
-                                        <Cell fill="#2563eb" />
-                                        <Cell fill="#94a3b8" />
-                                      </Pie>
-                                      <Tooltip />
-                                    </PieChart>
-                                  </ResponsiveContainer>
-                                ) : (
-                                  <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
-                                    {t('No data for selected range', 'தேர்ந்தெடுக்கப்பட்ட காலத்திற்கு தரவு இல்லை')}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
-                                  {t('Occupied', 'குடியேற்றப்பட்டது')} {occupancyDerived.occupiedPct}%
-                                </Badge>
-                                <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100">
-                                  {t('Vacant', 'காலி')} {occupancyDerived.vacantPct}%
-                                </Badge>
-                                <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
-                                  {t('Rate', 'விகிதம்')} {occupancyDerived.occupancyRate.toFixed(2)}%
-                                </Badge>
-                              </div>
-                            </CardContent>
-                          </Card>
-
-                          <Card className="rounded-2xl">
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm">{t('Occupancy Breakdown', 'குடியேற்ற விவரம்')}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div ref={occupancyBreakdownChartRef} className="h-[240px] w-full">
-                                {occupancyDerived.breakdownData.some((d) => Number(d?.count ?? 0) > 0) ? (
-                                  <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={occupancyDerived.breakdownData}>
-                                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                      <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                                      <YAxis axisLine={false} tickLine={false} allowDecimals={false} />
-                                      <Tooltip />
-                                      <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                                        <Cell fill="#2563eb" />
-                                        <Cell fill="#94a3b8" />
-                                      </Bar>
-                                    </BarChart>
-                                  </ResponsiveContainer>
-                                ) : (
-                                  <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
-                                    {t('No data for selected range', 'தேர்ந்தெடுக்கப்பட்ட காலத்திற்கு தரவு இல்லை')}
-                                  </div>
-                                )}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </div>
-                      ) : null}
-
-                      {activeReport === 'maintenance' && maintenanceDerived ? (
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <Card className="rounded-2xl">
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm">{t('Request Status', 'கோரிக்கை நிலை')}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div ref={maintenanceStatusChartRef} className="h-[240px] w-full">
-                                {maintenanceDerived.statusData.some((d) => Number(d?.value ?? 0) > 0) ? (
-                                  <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                      <Pie data={maintenanceDerived.statusData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={90} paddingAngle={2}>
-                                        <Cell fill="#16a34a" />
-                                        <Cell fill="#f59e0b" />
-                                        <Cell fill="#ef4444" />
-                                      </Pie>
-                                      <Tooltip />
-                                    </PieChart>
-                                  </ResponsiveContainer>
-                                ) : (
-                                  <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
-                                    {t('No data for selected range', 'தேர்ந்தெடுக்கப்பட்ட காலத்திற்கு தரவு இல்லை')}
-                                  </div>
-                                )}
-                              </div>
-                            </CardContent>
-                          </Card>
-
-                          <Card className="rounded-2xl">
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm">{t('Top Maintenance Types', 'முக்கிய பராமரிப்பு வகைகள்')}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div ref={maintenanceIssueChartRef} className="h-[240px] w-full">
-                                {maintenanceDerived.topIssues.some((d) => Number(d?.count ?? 0) > 0) ? (
-                                  <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={maintenanceDerived.topIssues}>
-                                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                      <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} angle={-25} textAnchor="end" height={60} />
-                                      <YAxis axisLine={false} tickLine={false} allowDecimals={false} />
-                                      <Tooltip />
-                                      <Bar dataKey="count" radius={[6, 6, 0, 0]} fill="#7c3aed" />
-                                    </BarChart>
-                                  </ResponsiveContainer>
-                                ) : (
-                                  <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
-                                    {t('No data for selected range', 'தேர்ந்தெடுக்கப்பட்ட காலத்திற்கு தரவு இல்லை')}
-                                  </div>
-                                )}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </div>
-                      ) : null}
-
-                      <div className="overflow-auto rounded-xl border">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              {activeReport === 'rent' ? (
-                                <>
-                                  <TableHead>{t('Property', 'சொத்து')}</TableHead>
-                                  <TableHead>{t('Tenant Name', 'குத்தகைதாரர் பெயர்')}</TableHead>
-                                  <TableHead className="text-right">{t('Rent', 'வாடகை')}</TableHead>
-                                  <TableHead className="text-right">{t('Paid', 'செலுத்தப்பட்டது')}</TableHead>
-                                  <TableHead className="text-right">{t('Pending', 'நிலுவை')}</TableHead>
-                                  <TableHead>{t('Payment Date', 'கட்டண தேதி')}</TableHead>
-                                  <TableHead>{t('Payment Status', 'கட்டண நிலை')}</TableHead>
-                                </>
-                              ) : null}
-
-                              {activeReport === 'occupancy' ? (
-                                <>
-                                  <TableHead>{t('Property', 'சொத்து')}</TableHead>
-                                  <TableHead>{t('Location', 'இடம்')}</TableHead>
-                                  <TableHead>{t('Status', 'நிலை')}</TableHead>
-                                  <TableHead>{t('Tenant Name', 'குத்தகைதாரர் பெயர்')}</TableHead>
-                                </>
-                              ) : null}
-
-                              {activeReport === 'maintenance' ? (
-                                <>
-                                  <TableHead>{t('Maintenance Name', 'பராமரிப்பு பெயர்')}</TableHead>
-                                  <TableHead>{t('Property', 'சொத்து')}</TableHead>
-                                  <TableHead>{t('Status', 'நிலை')}</TableHead>
-                                </>
-                              ) : null}
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {(Array.isArray(currentReport?.rows) ? currentReport.rows : []).map((r: any) => (
-                              <TableRow key={String(r.rentRecordId || r.propertyId || r.requestId)}>
-                                {activeReport === 'rent' ? (
-                                  <>
-                                    <TableCell className="font-medium">{String(r.propertyTitle || r.propertyId || '')}</TableCell>
-                                    <TableCell>{String(r.tenantName || '')}</TableCell>
-                                    <TableCell className="text-right">{money(r.rent ?? 0)}</TableCell>
-                                    <TableCell className="text-right">{money(r.paid ?? 0)}</TableCell>
-                                    <TableCell className="text-right">{money(r.pending ?? 0)}</TableCell>
-                                    <TableCell>{formatShortDate(r.dueDate || r.month)}</TableCell>
-                                    <TableCell>
-                                      {(() => {
-                                        const st = String(r.status || '');
-                                        const cls =
-                                          st === 'paid'
-                                            ? 'bg-green-100 text-green-700 hover:bg-green-100'
-                                            : st === 'partially_paid'
-                                              ? 'bg-amber-100 text-amber-700 hover:bg-amber-100'
-                                              : st === 'overdue'
-                                                ? 'bg-red-100 text-red-700 hover:bg-red-100'
-                                                : 'bg-slate-100 text-slate-700 hover:bg-slate-100';
-                                        return <Badge className={cls}>{st || t('pending', 'நிலுவையில்')}</Badge>;
-                                      })()}
-                                    </TableCell>
-                                  </>
-                                ) : null}
-
-                                {activeReport === 'occupancy' ? (
-                                  <>
-                                    <TableCell className="font-medium">{String(r.propertyTitle || r.propertyId || '')}</TableCell>
-                                    <TableCell>{String(r.location || '')}</TableCell>
-                                    <TableCell>{String(r.status || '')}</TableCell>
-                                    <TableCell>{String(r.tenantName || '')}</TableCell>
-                                  </>
-                                ) : null}
-
-                                {activeReport === 'maintenance' ? (
-                                  <>
-                                    <TableCell className="font-medium">{String(r.issue || '')}</TableCell>
-                                    <TableCell>{String(r.propertyTitle || '')}</TableCell>
-                                    <TableCell>{String(r.status || '')}</TableCell>
-                                  </>
-                                ) : null}
-                              </TableRow>
+                        <div className="col-span-4">
+                          <label className="text-[10px] font-medium text-slate-500 dark:text-slate-300 mb-0.5 block">{t('Property', 'சொத்து')}</label>
+                          <select
+                            value={reportPropertyId}
+                            onChange={(e) => setReportPropertyId(e.target.value)}
+                            className="w-full px-1.5 py-1 text-[11px] rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          >
+                            <option value="all">{t('All Properties', 'அனைத்து சொத்துகள்')}</option>
+                            {myProperties.map((p: any) => (
+                              <option key={String(p._id || p.id)} value={String(p._id || p.id)}>
+                                {displayTa(p.title || t('Property', 'சொத்து'))}
+                              </option>
                             ))}
-                          </TableBody>
-                        </Table>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Middle Section — The 3 Selector Cards */}
+                    <div className="flex flex-col gap-2">
+                      <div
+                        className={`p-2.5 rounded-xl border transition-all cursor-pointer shadow-sm ${activeReport === 'rent'
+                          ? 'border-blue-500/80 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-400/60 ring-1 ring-blue-500/30'
+                          : 'border-slate-200/80 dark:border-slate-600/75 bg-white/85 dark:bg-slate-900/75 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                          }`}
+                        onClick={() => {
+                          setActiveReport('rent');
+                          setReportFrom(monthStartStr);
+                          setReportTo(todayStr);
+                        }}
+                      >
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                          <h4 className="text-xs font-semibold text-slate-900 dark:text-white leading-tight">
+                            {t('Generate Rent Report', 'வாடகை அறிக்கை உருவாக்கவும்')}
+                          </h4>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mb-1.5 leading-snug">
+                          {t('Summary + detailed rent collection.', 'சுருக்கம் + விரிவான வாடகை வசூல்.')}
+                        </p>
+                        <Button
+                          className="w-full py-1 rounded-full text-xs font-semibold"
+                          variant={activeReport === 'rent' ? 'default' : 'outline'}
+                          size="sm"
+                        >
+                          {activeReport === 'rent' ? t('Selected', 'தேர்ந்தெடுக்கப்பட்டது') : t('Generate', 'உருவாக்கு')}
+                        </Button>
                       </div>
 
-                      {aiInsights.length ? (
-                        <div className="space-y-2">
-                          <div className="text-sm font-semibold">{t('AI Insights', 'AI உள்ளுணர்வுகள்')}</div>
-                          {aiExecutiveSummary ? <div className="text-sm text-muted-foreground">{aiExecutiveSummary}</div> : null}
-                          <ul className="list-disc pl-5 text-sm text-muted-foreground">
-                            {aiInsights.map((ins, idx) => (
+                      <div
+                        className={`p-2.5 rounded-xl border transition-all cursor-pointer shadow-sm ${activeReport === 'occupancy'
+                          ? 'border-blue-500/80 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-400/60 ring-1 ring-blue-500/30'
+                          : 'border-slate-200/80 dark:border-slate-600/75 bg-white/85 dark:bg-slate-900/75 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                          }`}
+                        onClick={() => {
+                          setActiveReport('occupancy');
+                          setReportFrom(last90DaysStr);
+                          setReportTo(todayStr);
+                        }}
+                      >
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                          <h4 className="text-xs font-semibold text-slate-900 dark:text-white leading-tight">
+                            {t('Generate Occupancy Report', 'குடியேற்ற அறிக்கை உருவாக்கவும்')}
+                          </h4>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mb-1.5 leading-snug">
+                          {t('Occupied vs vacant properties.', 'குடியேற்றம் மற்றும் காலி சொத்துகள்.')}
+                        </p>
+                        <Button
+                          className="w-full py-1 rounded-full text-xs font-semibold"
+                          variant={activeReport === 'occupancy' ? 'default' : 'outline'}
+                          size="sm"
+                        >
+                          {activeReport === 'occupancy' ? t('Selected', 'தேர்ந்தெடுக்கப்பட்டது') : t('Generate', 'உருவாக்கு')}
+                        </Button>
+                      </div>
+
+                      <div
+                        className={`p-2.5 rounded-xl border transition-all cursor-pointer shadow-sm ${activeReport === 'maintenance'
+                          ? 'border-blue-500/80 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-400/60 ring-1 ring-blue-500/30'
+                          : 'border-slate-200/80 dark:border-slate-600/75 bg-white/85 dark:bg-slate-900/75 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                          }`}
+                        onClick={() => {
+                          setActiveReport('maintenance');
+                          setReportFrom(last180DaysStr);
+                          setReportTo(todayStr);
+                        }}
+                      >
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                          <h4 className="text-xs font-semibold text-slate-900 dark:text-white leading-tight">
+                            {t('Generate Maintenance Report', 'பராமரிப்பு அறிக்கை உருவாக்கவும்')}
+                          </h4>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mb-1.5 leading-snug">
+                          {t('Requests, status, and cost.', 'கோரிக்கைகள், நிலை, மற்றும் செலவு.')}
+                        </p>
+                        <Button
+                          className="w-full py-1 rounded-full text-xs font-semibold"
+                          variant={activeReport === 'maintenance' ? 'default' : 'outline'}
+                          size="sm"
+                        >
+                          {activeReport === 'maintenance' ? t('Selected', 'தேர்ந்தெடுக்கப்பட்டது') : t('Generate', 'உருவாக்கு')}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Bottom group: Insights Summary Card */}
+                    <div className="rounded-xl border border-slate-200/70 dark:border-slate-600/60 bg-slate-50/80 dark:bg-slate-800/60 p-2.5 shadow-sm space-y-1.5 mt-auto">
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                        <FileText className="h-3.5 w-3.5 text-blue-500" />
+                        {aiInsights.length && filteredRows.length > 0
+                          ? t('AI Insights', 'AI உள்ளுணர்வுகள்')
+                          : t('Insights', 'உள்ளுணர்வுகள்')}
+                      </div>
+                      {aiInsights.length && filteredRows.length > 0 ? (
+                        <div className="space-y-1">
+                          {aiExecutiveSummary ? (
+                            <div className="text-[11px] text-muted-foreground leading-relaxed line-clamp-3">
+                              {aiExecutiveSummary}
+                            </div>
+                          ) : null}
+                          <ul className="list-disc pl-4 text-[11px] text-muted-foreground space-y-0.5">
+                            {aiInsights.slice(0, 3).map((ins, idx) => (
                               <li key={`${idx}-${ins.slice(0, 20)}`}>{String(ins)}</li>
                             ))}
                           </ul>
                         </div>
                       ) : activeReport === 'rent' && rentDerived ? (
-                        <div className="space-y-2">
-                          <div className="text-sm font-semibold">{t('Insights', 'உள்ளுணர்வுகள்')}</div>
-                          <ul className="list-disc pl-5 text-sm text-muted-foreground">
-                            <li>{t(`${rentDerived.pendingTenants} tenant(s) have pending dues`, `${rentDerived.pendingTenants} குத்தகைதாரர்களுக்கு நிலுவை உள்ளது`)}</li>
-                            <li>{t(`Collection Efficiency: ${rentDerived.collectedPct}%`, `வசூல் திறன்: ${rentDerived.collectedPct}%`)}</li>
-                            <li>{t(`Defaulters identified: ${rentDerived.defaulters}`, `தவறியவர்கள்: ${rentDerived.defaulters}`)}</li>
-                          </ul>
+                        <ul className="list-disc pl-4 text-[11px] text-muted-foreground space-y-0.5">
+                          <li>{t(`${rentDerived.pendingTenants} tenant(s) have pending dues`, `${rentDerived.pendingTenants} குத்தகைதாரர்களுக்கு நிலுவை உள்ளது`)}</li>
+                          <li>{t(`Collection Efficiency: ${rentDerived.collectedPct}%`, `வசூல் திறன்: ${rentDerived.collectedPct}%`)}</li>
+                          <li>{t(`Defaulters identified: ${rentDerived.defaulters}`, `தவறியவர்கள்: ${rentDerived.defaulters}`)}</li>
+                        </ul>
+                      ) : activeReport === 'occupancy' && occupancyDerived ? (
+                        <ul className="list-disc pl-4 text-[11px] text-muted-foreground space-y-0.5">
+                          <li>{t(`Occupancy Rate: ${occupancyDerived.occupancyRate.toFixed(1)}%`, `குடியேற்ற விகிதம்: ${occupancyDerived.occupancyRate.toFixed(1)}%`)}</li>
+                          <li>{t(`Occupied units: ${occupancyDerived.occupied}`, `குடியேற்றப்பட்டவை: ${occupancyDerived.occupied}`)}</li>
+                          <li>{t(`Vacant units: ${occupancyDerived.vacant}`, `காலியாக உள்ளவை: ${occupancyDerived.vacant}`)}</li>
+                        </ul>
+                      ) : activeReport === 'maintenance' ? (
+                        <ul className="list-disc pl-4 text-[11px] text-muted-foreground space-y-0.5">
+                          <li>{t(`Total Requests: ${(filteredSummary as any)?.totalRequests ?? 0}`, `மொத்த கோரிக்கைகள்: ${(filteredSummary as any)?.totalRequests ?? 0}`)}</li>
+                          <li>{t(`Completed: ${(filteredSummary as any)?.completed ?? 0}`, `முடிந்தது: ${(filteredSummary as any)?.completed ?? 0}`)}</li>
+                          <li>{t(`Pending: ${(filteredSummary as any)?.pending ?? 0}`, `நிலுவையில்: ${(filteredSummary as any)?.pending ?? 0}`)}</li>
+                        </ul>
+                      ) : (
+                        <div className="text-[11px] text-muted-foreground">
+                          {t('Select filters and click Generate Report.', 'வடிகட்டிகளைத் தேர்ந்தெடுத்து “அறிக்கை உருவாக்கு” ஐ கிளிக் செய்யவும்.')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN (lg:col-span-9): ACTIVE GENERATED REPORT VIEW */}
+                <div className="lg:col-span-9 h-full">
+                  {activeReport ? (
+                    <Card className="h-full flex flex-col justify-between rounded-2xl border border-slate-200/80 dark:border-slate-600/75 bg-white/85 dark:bg-slate-900/75 backdrop-blur-md shadow-sm px-4 py-2.5">
+                      <div className="flex items-center justify-between gap-2 pb-1 m-0">
+                        <div className="space-y-0 min-w-0">
+                          <CardTitle className="text-base sm:text-lg">{buildReportTitle()}</CardTitle>
+                          <CardDescription className="text-xs">
+                            {t('Summary on top, detailed table below.', 'மேல் பகுதியில் சுருக்கம், கீழே விரிவான அட்டவணை.')}
+                          </CardDescription>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button
+                            className="h-8 px-3 py-1.5 text-xs whitespace-nowrap rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm"
+                            onClick={() => {
+                              if (!activeReport) return;
+                              if (activeReport === 'rent') rentReportQuery.refetch();
+                              if (activeReport === 'occupancy') occupancyReportQuery.refetch();
+                              if (activeReport === 'maintenance') maintenanceReportQuery.refetch();
+                            }}
+                            disabled={isGeneratingReport}
+                          >
+                            {isGeneratingReport ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                            {t('Generate Report', 'அறிக்கை உருவாக்கு')}
+                          </Button>
+                          <Button variant="outline" className="h-8 px-3 py-1.5 text-xs whitespace-nowrap rounded-xl" onClick={handleDownloadPdf} disabled={!currentReport || isGeneratingReport}>
+                            {isGeneratingReport ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1.5 h-3.5 w-3.5" />}
+                            {t('Download as PDF', 'PDF ஆக பதிவிறக்கவும்')}
+                          </Button>
+                          <Button variant="outline" className="h-8 px-3 py-1.5 text-xs whitespace-nowrap rounded-xl" onClick={handlePrint} disabled={!currentReport || isGeneratingReport}>
+                            <Printer className="mr-1.5 h-3.5 w-3.5" />
+                            {t('Print Report', 'அறிக்கையை அச்சிடு')}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="h-8 px-3 py-1.5 text-xs whitespace-nowrap rounded-xl"
+                            onClick={() => {
+                              if (!activeReport || !currentReport) return;
+                              const nowStamp = new Date().toISOString().slice(0, 10);
+                              const lines: string[] = [];
+                              lines.push(`RESIDE REPORT`);
+                              lines.push(`${escCsv(buildReportTitle())}`);
+                              lines.push(`Owner,${escCsv(userProfile?.name || 'Owner')}`);
+                              lines.push(`Range,${escCsv(reportFrom)} to ${escCsv(reportTo)}`);
+                              lines.push('');
+
+                              if (activeReport === 'rent') {
+                                const s = (filteredSummary as any) || {};
+                                lines.push(`Total Properties,${escCsv(s.totalProperties ?? 0)}`);
+                                lines.push(`Total Rent Expected,${escCsv(s.totalRentExpected ?? 0)}`);
+                                lines.push(`Total Rent Collected,${escCsv(s.totalRentCollected ?? 0)}`);
+                                lines.push(`Pending Amount,${escCsv(s.pendingAmount ?? 0)}`);
+                                lines.push('');
+                                lines.push('Property,Tenant Name,Rent,Paid,Pending,Payment Date,Status');
+                                filteredRows.forEach((r: any) => {
+                                  lines.push(
+                                    `${escCsv(r.propertyTitle || r.propertyId || '')},${escCsv(r.tenantName || '')},${escCsv(r.rent ?? 0)},${escCsv(r.paid ?? 0)},${escCsv(r.pending ?? 0)},${escCsv(formatShortDate(r.paymentDate || r.dueDate || r.month))},${escCsv(r.status || '')}`
+                                  );
+                                });
+                              }
+
+                              if (activeReport === 'occupancy') {
+                                const s = (filteredSummary as any) || {};
+                                lines.push(`Total Properties,${escCsv(s.totalProperties ?? 0)}`);
+                                lines.push(`Occupied,${escCsv(s.occupied ?? 0)}`);
+                                lines.push(`Vacant,${escCsv(s.vacant ?? 0)}`);
+                                lines.push(`Occupancy Rate,${escCsv(s.occupancyRate ?? 0)}`);
+                                lines.push('');
+                                lines.push('Property,Location,Status,Tenant Name');
+                                filteredRows.forEach((r: any) => {
+                                  lines.push(
+                                    `${escCsv(r.propertyTitle || r.propertyId || '')},${escCsv(r.location || '')},${escCsv(r.status || '')},${escCsv(r.tenantName || '')}`
+                                  );
+                                });
+                              }
+
+                              if (activeReport === 'maintenance') {
+                                const s = (filteredSummary as any) || {};
+                                lines.push(`Total Requests,${escCsv(s.totalRequests ?? 0)}`);
+                                lines.push(`Completed,${escCsv(s.completed ?? 0)}`);
+                                lines.push(`Pending,${escCsv(s.pending ?? 0)}`);
+                                lines.push('');
+                                lines.push('Maintenance Name,Property,Status');
+                                filteredRows.forEach((r: any) => {
+                                  lines.push(
+                                    `${escCsv(r.issue || '')},${escCsv(r.propertyTitle || '')},${escCsv(r.status || '')}`
+                                  );
+                                });
+                              }
+
+                              downloadCsv(`reside-${activeReport}-report-${nowStamp}.csv`, lines);
+                            }}
+                            disabled={!currentReport || isGeneratingReport}
+                          >
+                            <Download className="mr-1.5 h-3.5 w-3.5" />
+                            {t('Export CSV', 'CSV ஏற்றுமதி')}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {activeReport ? (
+                        <div className="py-1 my-1 border-y border-slate-200/80 dark:border-slate-600/60 flex flex-wrap items-center justify-between gap-x-4 text-[11px] leading-tight text-slate-600 dark:text-slate-300">
+                          <div className="flex flex-wrap items-center gap-x-4">
+                            <div>
+                              <span className="font-medium text-slate-700 dark:text-slate-200">{t('Owner Name', 'உரிமையாளர் பெயர்')}:</span>{' '}
+                              <span>{String(userProfile?.name || 'Owner')}</span>
+                            </div>
+                            <span>•</span>
+                            <div>
+                              <span className="font-medium text-slate-700 dark:text-slate-200">{t('Report Period', 'அறிக்கை காலம்')}:</span>{' '}
+                              <span>{reportFrom} → {reportTo}</span>
+                            </div>
+                            <span>•</span>
+                            <div>
+                              <span className="font-medium text-slate-700 dark:text-slate-200">{t('Generated On', 'உருவாக்கப்பட்ட தேதி')}:</span>{' '}
+                              <span>{formatShortDate(currentReport?.generatedAt || new Date().toISOString())}</span>
+                            </div>
+                          </div>
+                          <div className="italic text-[11px] text-slate-400 dark:text-slate-400">
+                            {aiIsGenerated
+                              ? t(
+                                'This report is AI-assisted and generated by Reside Management System.',
+                                'இந்த அறிக்கை AI உதவியுடன் Reside Management System மூலம் உருவாக்கப்படுகிறது.'
+                              )
+                              : t('This report is system-generated by Reside Management System.', 'இந்த அறிக்கை Reside Management System மூலம் உருவாக்கப்படுகிறது.')}
+                          </div>
                         </div>
                       ) : null}
 
-                      <div className="text-xs text-muted-foreground">
-                        {aiIsGenerated
-                          ? t('This is an AI-assisted report', 'இது AI உதவியுடன் உருவாக்கப்பட்ட அறிக்கை')
-                          : t('This is a system-generated report', 'இது அமைப்பால் உருவாக்கப்பட்ட அறிக்கை')}
-                      </div>
-                    </>
-                  ) : null}
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="py-10 text-center text-muted-foreground">
-                {t('Choose a report card above to generate.', 'உருவாக்க மேலே உள்ள அறிக்கை அட்டையைத் தேர்ந்தெடுக்கவும்.')}
+                      <CardContent className="p-0 space-y-2">
+                        {isGeneratingReport ? (
+                          <div className="flex items-center justify-center py-8 text-muted-foreground">
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            {t('Generating report...', 'அறிக்கை உருவாக்கப்படுகிறது...')}
+                          </div>
+                        ) : null}
+
+                        {!isGeneratingReport && !currentReport ? (
+                          <div className="py-8 text-center text-muted-foreground">
+                            {reportErrorMessage ? (
+                              <div className="space-y-2">
+                                <div className="text-sm font-medium text-red-600">
+                                  {t('Failed to generate report.', 'அறிக்கையை உருவாக்க முடியவில்லை.')}
+                                </div>
+                                <div className="text-xs text-red-600">{reportErrorMessage}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {t(
+                                    'If you just updated the backend, restart the server and click Generate Report.',
+                                    'நீங்கள் இப்போதுதான் backend-ஐ புதுப்பித்திருந்தால், server-ஐ மீண்டும் தொடங்கி “அறிக்கை உருவாக்கு” ஐ கிளிக் செய்யவும்.'
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="space-y-1.5">
+                                <div>{t('Click Generate Report to load the report.', 'அறிக்கையை பார்க்க “அறிக்கை உருவாக்கு” ஐ கிளிக் செய்யவும்.')}</div>
+                                <div className="text-xs">{t('Adjust filters if needed.', 'தேவைப்பட்டால் வடிப்பான்களை மாற்றவும்.')}</div>
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+
+                        {!isGeneratingReport && currentReport ? (
+                          <>
+                            <div className={`grid ${activeReport === 'maintenance' ? 'grid-cols-3' : 'grid-cols-2 xl:grid-cols-4'} gap-2 mt-1.5 mb-2`}>
+                              {activeReport === 'rent' ? (
+                                <>
+                                  <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                                    <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Total Properties', 'மொத்த சொத்துக்கள்')}</div>
+                                    <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{Number((filteredSummary as any)?.totalProperties ?? 0).toLocaleString()}</div>
+                                  </div>
+                                  <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                                    <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Total Rent Expected', 'மொத்த எதிர்பார்க்கப்படும் வாடகை')}</div>
+                                    <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{money((filteredSummary as any)?.totalRentExpected ?? 0)}</div>
+                                  </div>
+                                  <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                                    <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Total Rent Collected', 'மொத்த வசூலிக்கப்பட்ட வாடகை')}</div>
+                                    <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{money((filteredSummary as any)?.totalRentCollected ?? 0)}</div>
+                                  </div>
+                                  <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                                    <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Pending Amount', 'நிலுவை தொகை')}</div>
+                                    <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{money((filteredSummary as any)?.pendingAmount ?? 0)}</div>
+                                  </div>
+                                </>
+                              ) : null}
+
+                              {activeReport === 'occupancy' ? (
+                                <>
+                                  <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                                    <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Total Properties', 'மொத்த சொத்துக்கள்')}</div>
+                                    <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{Number((filteredSummary as any)?.totalProperties ?? 0).toLocaleString()}</div>
+                                  </div>
+                                  <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                                    <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Occupied', 'குடியேற்றப்பட்டது')}</div>
+                                    <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{Number((filteredSummary as any)?.occupied ?? 0).toLocaleString()}</div>
+                                  </div>
+                                  <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                                    <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Vacant', 'காலி')}</div>
+                                    <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{Number((filteredSummary as any)?.vacant ?? 0).toLocaleString()}</div>
+                                  </div>
+                                  <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                                    <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Occupancy Rate', 'குடியேற்ற விகிதம்')}</div>
+                                    <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{Number((filteredSummary as any)?.occupancyRate ?? 0).toFixed(2)}%</div>
+                                  </div>
+                                </>
+                              ) : null}
+
+                              {activeReport === 'maintenance' ? (
+                                <>
+                                  <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                                    <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Total Requests', 'மொத்த கோரிக்கைகள்')}</div>
+                                    <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{Number((filteredSummary as any)?.totalRequests ?? 0).toLocaleString()}</div>
+                                  </div>
+                                  <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                                    <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Completed', 'முடிந்தது')}</div>
+                                    <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{Number((filteredSummary as any)?.completed ?? 0).toLocaleString()}</div>
+                                  </div>
+                                  <div className="px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/90 dark:bg-slate-900/75 flex flex-col justify-center">
+                                    <div className="text-[11px] font-medium text-slate-500 dark:text-slate-300 leading-tight">{t('Pending', 'நிலுவையில்')}</div>
+                                    <div className="text-base font-bold text-slate-900 dark:text-white mt-0 leading-snug">{Number((filteredSummary as any)?.pending ?? 0).toLocaleString()}</div>
+                                  </div>
+                                </>
+                              ) : null}
+                            </div>
+
+                            {activeReport === 'rent' && rentDerived ? (
+                              <div className="grid gap-2.5 mb-2 md:grid-cols-2">
+                                <Card className="rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/60 dark:bg-slate-800/60 p-2.5">
+                                  <CardHeader className="p-0 pb-1">
+                                    <CardTitle className="text-xs font-semibold">{t('Payment Status', 'கட்டண நிலை')}</CardTitle>
+                                  </CardHeader>
+                                  <CardContent className="p-0">
+                                    <div ref={paymentStatusChartRef} className="h-32 w-full">
+                                      {rentDerived.paymentStatusData.some((d) => Number(d?.value ?? 0) > 0) ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                          <PieChart>
+                                            <Pie data={rentDerived.paymentStatusData} dataKey="value" nameKey="name" innerRadius={36} outerRadius={48} paddingAngle={2}>
+                                              <Cell fill="#16a34a" />
+                                              <Cell fill="#ef4444" />
+                                            </Pie>
+                                            <Tooltip formatter={(v: any) => money(v)} />
+                                          </PieChart>
+                                        </ResponsiveContainer>
+                                      ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-xs text-slate-500">
+                                          {t('No data for selected range', 'தேர்ந்தெடுக்கப்பட்ட காலத்திற்கு தரவு இல்லை')}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="mt-1 flex flex-wrap gap-1.5">
+                                      <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-[11px] px-2 py-0.5">
+                                        {t('Collected', 'வசூலிக்கப்பட்டது')} {rentDerived.collectedPct}%
+                                      </Badge>
+                                      <Badge className="bg-red-100 text-red-700 hover:bg-red-100 text-[11px] px-2 py-0.5">
+                                        {t('Pending', 'நிலுவையில்')} {rentDerived.pendingPct}%
+                                      </Badge>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+
+                                <Card className="rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/60 dark:bg-slate-800/60 p-2.5">
+                                  <CardHeader className="p-0 pb-1">
+                                    <CardTitle className="text-xs font-semibold">{t('Monthly Rent Collection', 'மாதாந்திர வாடகை வசூல்')}</CardTitle>
+                                  </CardHeader>
+                                  <CardContent className="p-0">
+                                    <div ref={monthlyCollectionChartRef} className="h-32 w-full">
+                                      {rentDerived.monthlyCollection.some((d) => Number(d?.amount ?? 0) > 0) ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                          <BarChart data={rentDerived.monthlyCollection}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.35} />
+                                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} height={20} />
+                                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${Number(v || 0) / 1000}k`} />
+                                            <Tooltip formatter={(v: any) => money(v)} />
+                                            <Bar dataKey="amount" radius={[6, 6, 0, 0]} maxBarSize={44} fill="#2563eb" />
+                                          </BarChart>
+                                        </ResponsiveContainer>
+                                      ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-xs text-slate-500">
+                                          {t('No data for selected range', 'தேர்ந்தெடுக்கப்பட்ட காலத்திற்கு தரவு இல்லை')}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              </div>
+                            ) : null}
+
+                            {activeReport === 'occupancy' && occupancyDerived ? (
+                              <div className="grid gap-2.5 mb-2 md:grid-cols-2">
+                                <Card className="rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/60 dark:bg-slate-800/60 p-2.5">
+                                  <CardHeader className="p-0 pb-1">
+                                    <CardTitle className="text-xs font-semibold">{t('Occupancy Status', 'குடியேற்ற நிலை')}</CardTitle>
+                                  </CardHeader>
+                                  <CardContent className="p-0">
+                                    <div ref={occupancyStatusChartRef} className="h-32 w-full">
+                                      {occupancyDerived.statusData.some((d) => Number(d?.value ?? 0) > 0) ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                          <PieChart>
+                                            <Pie data={occupancyDerived.statusData} dataKey="value" nameKey="name" innerRadius={36} outerRadius={48} paddingAngle={2}>
+                                              <Cell fill="#2563eb" />
+                                              <Cell fill="#94a3b8" />
+                                            </Pie>
+                                            <Tooltip />
+                                          </PieChart>
+                                        </ResponsiveContainer>
+                                      ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-xs text-slate-500">
+                                          {t('No data for selected range', 'தேர்ந்தெடுக்கப்பட்ட காலத்திற்கு தரவு இல்லை')}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="mt-1 flex flex-wrap gap-1.5">
+                                      <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 text-[11px] px-2 py-0.5">
+                                        {t('Occupied', 'குடியேற்றப்பட்டது')} {occupancyDerived.occupiedPct}%
+                                      </Badge>
+                                      <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 text-[11px] px-2 py-0.5">
+                                        {t('Vacant', 'காலி')} {occupancyDerived.vacantPct}%
+                                      </Badge>
+                                      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-[11px] px-2 py-0.5">
+                                        {t('Rate', 'விகிதம்')} {occupancyDerived.occupancyRate.toFixed(2)}%
+                                      </Badge>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+
+                                <Card className="rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/60 dark:bg-slate-800/60 p-2.5">
+                                  <CardHeader className="p-0 pb-1">
+                                    <CardTitle className="text-xs font-semibold">{t('Occupancy Breakdown', 'குடியேற்ற விவரம்')}</CardTitle>
+                                  </CardHeader>
+                                  <CardContent className="p-0">
+                                    <div ref={occupancyBreakdownChartRef} className="h-32 w-full">
+                                      {occupancyDerived.breakdownData.some((d) => Number(d?.count ?? 0) > 0) ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                          <BarChart data={occupancyDerived.breakdownData}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.35} />
+                                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} height={20} />
+                                            <YAxis axisLine={false} tickLine={false} allowDecimals={false} tick={{ fontSize: 11 }} />
+                                            <Tooltip />
+                                            <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={44}>
+                                              <Cell fill="#2563eb" />
+                                              <Cell fill="#94a3b8" />
+                                            </Bar>
+                                          </BarChart>
+                                        </ResponsiveContainer>
+                                      ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-xs text-slate-500">
+                                          {t('No data for selected range', 'தேர்ந்தெடுக்கப்பட்ட காலத்திற்கு தரவு இல்லை')}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              </div>
+                            ) : null}
+
+                            {activeReport === 'maintenance' && maintenanceDerived ? (
+                              <div className="grid gap-2.5 mb-2 md:grid-cols-2">
+                                <Card className="rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/60 dark:bg-slate-800/60 p-2.5">
+                                  <CardHeader className="p-0 pb-1">
+                                    <CardTitle className="text-xs font-semibold">{t('Request Status', 'கோரிக்கை நிலை')}</CardTitle>
+                                  </CardHeader>
+                                  <CardContent className="p-0">
+                                    <div ref={maintenanceStatusChartRef} className="h-32 w-full">
+                                      {maintenanceDerived.statusData.some((d) => Number(d?.value ?? 0) > 0) ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                          <PieChart>
+                                            <Pie data={maintenanceDerived.statusData} dataKey="value" nameKey="name" innerRadius={36} outerRadius={48} paddingAngle={2}>
+                                              <Cell fill="#16a34a" />
+                                              <Cell fill="#f59e0b" />
+                                              <Cell fill="#ef4444" />
+                                            </Pie>
+                                            <Tooltip />
+                                          </PieChart>
+                                        </ResponsiveContainer>
+                                      ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-xs text-slate-500">
+                                          {t('No data for selected range', 'தேர்ந்தெடுக்கப்பட்ட காலத்திற்கு தரவு இல்லை')}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+
+                                <Card className="rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/60 dark:bg-slate-800/60 p-2.5">
+                                  <CardHeader className="p-0 pb-1">
+                                    <CardTitle className="text-xs font-semibold">{t('Top Maintenance Types', 'முக்கிய பராமரிப்பு வகைகள்')}</CardTitle>
+                                  </CardHeader>
+                                  <CardContent className="p-0">
+                                    <div ref={maintenanceIssueChartRef} className="h-32 w-full">
+                                      {maintenanceDerived.topIssues.some((d) => Number(d?.count ?? 0) > 0) ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                          <BarChart data={maintenanceDerived.topIssues}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.35} />
+                                            <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} textAnchor="middle" tick={{ fontSize: 11 }} height={20} />
+                                            <YAxis axisLine={false} tickLine={false} allowDecimals={false} tick={{ fontSize: 11 }} />
+                                            <Tooltip />
+                                            <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={44} fill="#7c3aed" />
+                                          </BarChart>
+                                        </ResponsiveContainer>
+                                      ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-xs text-slate-500">
+                                          {t('No data for selected range', 'தேர்ந்தெடுக்கப்பட்ட காலத்திற்கு தரவு இல்லை')}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              </div>
+                            ) : null}
+
+                            <div className="overflow-auto rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/40 dark:bg-slate-800/40">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="h-8">
+                                    {activeReport === 'rent' ? (
+                                      <>
+                                        <TableHead className="py-1.5 px-2.5 text-xs">{t('Property', 'சொத்து')}</TableHead>
+                                        <TableHead className="py-1.5 px-2.5 text-xs">{t('Tenant Name', 'குத்தகைதாரர் பெயர்')}</TableHead>
+                                        <TableHead className="py-1.5 px-2.5 text-xs text-right">{t('Rent', 'வாடகை')}</TableHead>
+                                        <TableHead className="py-1.5 px-2.5 text-xs text-right">{t('Paid', 'செலுத்தப்பட்டது')}</TableHead>
+                                        <TableHead className="py-1.5 px-2.5 text-xs text-right">{t('Pending', 'நிலுவை')}</TableHead>
+                                        <TableHead className="py-1.5 px-2.5 text-xs">{t('Payment Date', 'கட்டண தேதி')}</TableHead>
+                                        <TableHead className="py-1.5 px-2.5 text-xs">{t('Payment Status', 'கட்டண நிலை')}</TableHead>
+                                      </>
+                                    ) : null}
+
+                                    {activeReport === 'occupancy' ? (
+                                      <>
+                                        <TableHead className="py-1.5 px-2.5 text-xs">{t('Property', 'சொத்து')}</TableHead>
+                                        <TableHead className="py-1.5 px-2.5 text-xs">{t('Location', 'இடம்')}</TableHead>
+                                        <TableHead className="py-1.5 px-2.5 text-xs">{t('Status', 'நிலை')}</TableHead>
+                                        <TableHead className="py-1.5 px-2.5 text-xs">{t('Tenant Name', 'குத்தகைதாரர் பெயர்')}</TableHead>
+                                      </>
+                                    ) : null}
+
+                                    {activeReport === 'maintenance' ? (
+                                      <>
+                                        <TableHead className="py-1.5 px-2.5 text-xs">{t('Maintenance Name', 'பராமரிப்பு பெயர்')}</TableHead>
+                                        <TableHead className="py-1.5 px-2.5 text-xs">{t('Property', 'சொத்து')}</TableHead>
+                                        <TableHead className="py-1.5 px-2.5 text-xs">{t('Status', 'நிலை')}</TableHead>
+                                      </>
+                                    ) : null}
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {filteredRows.length === 0 ? (
+                                    <TableRow>
+                                      <TableCell
+                                        colSpan={activeReport === 'rent' ? 7 : activeReport === 'occupancy' ? 4 : 3}
+                                        className="text-center py-6 text-xs text-muted-foreground"
+                                      >
+                                        {t('No records found for the selected date range and property.', 'தேர்ந்தெடுக்கப்பட்ட தேதி வரம்பு மற்றும் சொத்திற்கு பதிவுகள் எதுவும் இல்லை.')}
+                                      </TableCell>
+                                    </TableRow>
+                                  ) : (
+                                    filteredRows.map((r: any) => (
+                                      <TableRow key={String(r.rentRecordId || r.propertyId || r.requestId)}>
+                                        {activeReport === 'rent' ? (
+                                          <>
+                                            <TableCell className="py-1.5 px-2.5 text-xs font-medium">{String(r.propertyTitle || r.propertyId || '')}</TableCell>
+                                            <TableCell className="py-1.5 px-2.5 text-xs">{String(r.tenantName || '')}</TableCell>
+                                            <TableCell className="py-1.5 px-2.5 text-xs text-right">{money(r.rent ?? 0)}</TableCell>
+                                            <TableCell className="py-1.5 px-2.5 text-xs text-right">{money(r.paid ?? 0)}</TableCell>
+                                            <TableCell className="py-1.5 px-2.5 text-xs text-right">{money(r.pending ?? 0)}</TableCell>
+                                            <TableCell className="py-1.5 px-2.5 text-xs">{formatShortDate(r.paymentDate || r.dueDate || r.month)}</TableCell>
+                                            <TableCell className="py-1.5 px-2.5 text-xs">
+                                              {(() => {
+                                                const st = String(r.status || '');
+                                                const cls =
+                                                  st === 'paid'
+                                                    ? 'bg-green-100 text-green-700 hover:bg-green-100 text-[11px] px-2 py-0.5'
+                                                    : st === 'partially_paid'
+                                                      ? 'bg-amber-100 text-amber-700 hover:bg-amber-100 text-[11px] px-2 py-0.5'
+                                                      : st === 'overdue'
+                                                        ? 'bg-red-100 text-red-700 hover:bg-red-100 text-[11px] px-2 py-0.5'
+                                                        : 'bg-slate-100 text-slate-700 hover:bg-slate-100 text-[11px] px-2 py-0.5';
+                                                return <Badge className={cls}>{st || t('pending', 'நிலுவையில்')}</Badge>;
+                                              })()}
+                                            </TableCell>
+                                          </>
+                                        ) : null}
+
+                                        {activeReport === 'occupancy' ? (
+                                          <>
+                                            <TableCell className="py-1.5 px-2.5 text-xs font-medium">{String(r.propertyTitle || r.propertyId || '')}</TableCell>
+                                            <TableCell className="py-1.5 px-2.5 text-xs">{String(r.location || '')}</TableCell>
+                                            <TableCell className="py-1.5 px-2.5 text-xs">{String(r.status || '')}</TableCell>
+                                            <TableCell className="py-1.5 px-2.5 text-xs">{String(r.tenantName || '')}</TableCell>
+                                          </>
+                                        ) : null}
+
+                                        {activeReport === 'maintenance' ? (
+                                          <>
+                                            <TableCell className="py-1.5 px-2.5 text-xs font-medium">{String(r.issue || '')}</TableCell>
+                                            <TableCell className="py-1.5 px-2.5 text-xs">{String(r.propertyTitle || '')}</TableCell>
+                                            <TableCell className="py-1.5 px-2.5 text-xs">{String(r.status || '')}</TableCell>
+                                          </>
+                                        ) : null}
+                                      </TableRow>
+                                    ))
+                                  )}
+                                </TableBody>
+                              </Table>
+                            </div>
+
+                            <div className="text-[11px] text-muted-foreground pt-1">
+                              {aiIsGenerated
+                                ? t('This is an AI-assisted report', 'இது AI உதவியுடன் உருவாக்கப்பட்ட அறிக்கை')
+                                : t('This is a system-generated report', 'இது அமைப்பால் உருவாக்கப்பட்ட அறிக்கை')}
+                            </div>
+                          </>
+                        ) : null}
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="py-10 text-center text-muted-foreground">
+                      {t('Choose a report card above to generate.', 'உருவாக்க மேலே உள்ள அறிக்கை அட்டையைத் தேர்ந்தெடுக்கவும்.')}
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-          </TabsContent>
+            </TabsContent>
 
-          {/* Settings Tab */}
-          <TabsContent value="settings" className="mt-4">
-            <ProfileSettingsView
-              userProfile={userProfile}
-              refetchUserProfile={refetchUserProfile}
-            />
-          </TabsContent>
-        </Tabs>
+            {/* Settings Tab */}
+            <TabsContent value="settings" className="mt-4">
+              <ProfileSettingsView
+                userProfile={userProfile}
+                refetchUserProfile={refetchUserProfile}
+              />
+            </TabsContent>
+          </Tabs>
 
-        {/* Add/Edit Property Modal */}
-        <PropertyForm
-          open={isPropertyFormOpen}
-          onOpenChange={(open) => {
-            setIsPropertyFormOpen(open);
-            if (!open) setEditingProperty(null);
-          }}
-          initialData={editingProperty}
-        />
+          {/* Add/Edit Property Modal */}
+          <PropertyForm
+            open={isPropertyFormOpen}
+            onOpenChange={(open) => {
+              setIsPropertyFormOpen(open);
+              if (!open) setEditingProperty(null);
+            }}
+            initialData={editingProperty}
+          />
 
-        {/* Listing Control Dialog */}
-        <ListingControlDialog
-          property={listingDialogProperty}
-          open={isListingDialogOpen}
-          onOpenChange={setIsListingDialogOpen}
-          defaultAction={listingDefaultAction}
-        />
+          {/* Listing Control Dialog */}
+          <ListingControlDialog
+            property={listingDialogProperty}
+            open={isListingDialogOpen}
+            onOpenChange={setIsListingDialogOpen}
+            defaultAction={listingDefaultAction}
+          />
 
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog open={!!deletingProperty} onOpenChange={(open) => !open && setDeletingProperty(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t('Are you sure?', 'நிச்சயமாகவா?')}</AlertDialogTitle>
-              <AlertDialogDescription>
-                {t(
-                  'This action cannot be undone. This will permanently delete the property.',
-                  'இந்தச் செயலைத் தவிர்க்க முடியாது. இது சொத்தை நிரந்தரமாக நீக்கும்.'
-                )}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>{t('Cancel', 'ரத்து')}</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDeleteProperty} className="bg-red-600 hover:bg-red-700">
-                {t('Delete', 'நீக்கு')}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
+          {/* Delete Confirmation Dialog */}
+          <AlertDialog open={!!deletingProperty} onOpenChange={(open) => !open && setDeletingProperty(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t('Are you sure?', 'நிச்சயமாகவா?')}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {t(
+                    'This action cannot be undone. This will permanently delete the property.',
+                    'இந்தச் செயலைத் தவிர்க்க முடியாது. இது சொத்தை நிரந்தரமாக நீக்கும்.'
+                  )}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t('Cancel', 'ரத்து')}</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmDeleteProperty} className="bg-red-600 hover:bg-red-700">
+                  {t('Delete', 'நீக்கு')}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
 
       <Dialog open={tenantRequestsModalType !== null} onOpenChange={(open) => !open && setTenantRequestsModalType(null)}>
@@ -2792,7 +2951,7 @@ export default function OwnerDashboard({
           </div>
         </DialogContent>
       </Dialog>
-      
+
       <RequestDetailsModal
         request={selectedRequest}
         open={!!selectedRequest}

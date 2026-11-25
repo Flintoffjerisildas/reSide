@@ -274,6 +274,13 @@ export interface UserProfile {
   idProofImage?: string;
   notificationsEnabled?: boolean;
   profileCompletion?: number;
+  isEmailVerified?: boolean;
+  isPhoneVerified?: boolean;
+  isAadhaarVerified?: boolean;
+  idProofType?: string;
+  idDocumentNumber?: string;
+  aadhaarRefId?: string;
+  aadhaarVerifiedName?: string;
 }
 
 export enum PropertyStatus {

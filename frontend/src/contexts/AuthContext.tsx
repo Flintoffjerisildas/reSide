@@ -14,6 +14,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
+  token: string | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string, registrationPurpose: string, tamilRole?: string) => Promise<any>;
@@ -29,9 +30,45 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [initializing, setInitializing] = useState(true);
+  // Synchronously hydrate token and user from localStorage so refresh never flashes logged-out
+  const [token, setToken] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('token');
+    } catch {
+      return null;
+    }
+  });
+
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const storedToken = localStorage.getItem('token');
+      const storedUser = localStorage.getItem('user');
+      if (storedToken && storedUser) {
+        return JSON.parse(storedUser) as User;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Keep loading true while background validation runs if token exists
+  const [loading, setLoading] = useState<boolean>(() => {
+    try {
+      return Boolean(localStorage.getItem('token'));
+    } catch {
+      return false;
+    }
+  });
+
+  const [initializing, setInitializing] = useState<boolean>(() => {
+    try {
+      return Boolean(localStorage.getItem('token'));
+    } catch {
+      return false;
+    }
+  });
+
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -39,17 +76,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loadUser = async () => {
-    const token = localStorage.getItem('token');
+    const currentToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
 
-    if (!token) {
+    if (!currentToken) {
       localStorage.removeItem('user');
       setUser(null);
+      setToken(null);
+      setLoading(false);
       setInitializing(false);
       return;
     }
 
-    if (storedUser) {
+    if (storedUser && !user) {
       try {
         const parsed = JSON.parse(storedUser) as User;
         setUser(parsed);
@@ -66,21 +105,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: u.name,
         email: u.email,
         role: u.tamilRole,
+        registrationPurpose: u.registrationPurpose,
+        tamilRole: u.tamilRole,
         internalRole: u.role,
       };
       setUser(normalizedUser);
+      setToken(currentToken);
       localStorage.setItem('user', JSON.stringify(normalizedUser));
     } catch (err: any) {
       const status = err?.response?.status;
+      // Only clear credentials if the server explicitly returns 401 Unauthorized or 403
       if (status === 401 || status === 403) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         setUser(null);
+        setToken(null);
         queryClient.clear();
+      } else {
+        // Preserve user session on transient network/server errors
+        console.warn('[AuthContext] Background /api/auth/me validation hit non-auth error; preserving session:', err?.message);
       }
+    } finally {
+      setLoading(false);
+      setInitializing(false);
     }
-
-    setInitializing(false);
   };
 
   const login = async (email: string, password: string) => {
@@ -99,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(normalizedUser));
+      setToken(res.data.token);
       setUser(normalizedUser);
       queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
       queryClient.invalidateQueries({ queryKey: ['approvalStatus'] });
@@ -140,6 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(normalizedUser));
+      setToken(res.data.token);
       setUser(normalizedUser);
       queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
       queryClient.invalidateQueries({ queryKey: ['approvalStatus'] });
@@ -171,12 +221,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    setToken(null);
     setUser(null);
     queryClient.clear();
   };
 
   useEffect(() => {
     const onForcedLogout = () => {
+      setToken(null);
       setUser(null);
       queryClient.clear();
     };
@@ -195,6 +247,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{ 
       user, 
+      token,
       loading, 
       login, 
       register, 
@@ -202,7 +255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       forgotPasswordStart,
       resetPasswordWithOtp,
       logout,
-      isAuthenticated: !!user,
+      isAuthenticated: Boolean(token && user) || Boolean(user),
       identity,
       isInitializing: initializing
     }}>

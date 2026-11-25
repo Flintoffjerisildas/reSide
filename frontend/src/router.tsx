@@ -8,6 +8,7 @@ import {
   useParams,
   useSearch,
   useLocation,
+  Navigate,
 } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './contexts/AuthContext';
@@ -26,6 +27,8 @@ import PendingApprovalScreen from './components/PendingApprovalScreen';
 import LoginPage, { LoginView } from './components/LoginPage';
 import LoadingScreen from './components/LoadingScreen';
 import NotFoundPage from './components/NotFoundPage';
+import GlobalMessengerDrawer from './components/GlobalMessengerDrawer';
+import { useMessenger } from './hooks/useMessenger';
 
 // --- Root Layout ---
 function RootLayout() {
@@ -34,6 +37,7 @@ function RootLayout() {
   const queryClient = useQueryClient();
   const { user, isInitializing: authInitializing, logout } = useAuth();
   const { data: userProfile, isLoading: profileLoading } = useGetCallerUserProfile();
+  const { isOpen: isMessengerOpen, closeMessenger, targetUserId, targetPropertyId } = useMessenger();
 
   const isAuthenticated = !!user;
   const roleToCheck = userProfile?.role || user?.role;
@@ -102,6 +106,14 @@ function RootLayout() {
         <FloatingChat />
       </main>
       <Footer />
+      {isAuthenticated && (
+        <GlobalMessengerDrawer
+          isOpen={isMessengerOpen}
+          onClose={closeMessenger}
+          initialTargetUserId={targetUserId}
+          initialPropertyId={targetPropertyId}
+        />
+      )}
     </div>
   );
 }
@@ -166,9 +178,36 @@ function PropertyDetailWrapper() {
   );
 }
 
+// Helper to safely extract a clean string return path from location without [object Object] leaks
+function getCleanReturnPath(loc: any): string {
+  if (!loc) return '/dashboard';
+  const pathname = typeof loc.pathname === 'string' ? loc.pathname : '/dashboard';
+  let searchStr = '';
+  if (typeof loc.searchStr === 'string' && loc.searchStr.length > 0) {
+    searchStr = loc.searchStr.startsWith('?') ? loc.searchStr : `?${loc.searchStr}`;
+  } else if (typeof loc.search === 'string' && loc.search.length > 0) {
+    searchStr = loc.search.startsWith('?') ? loc.search : `?${loc.search}`;
+  } else if (loc.search && typeof loc.search === 'object' && Object.keys(loc.search).length > 0) {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(loc.search)) {
+      if (v !== undefined && v !== null && typeof v !== 'object') {
+        params.set(k, String(v));
+      }
+    }
+    const qs = params.toString();
+    if (qs) searchStr = `?${qs}`;
+  }
+  const clean = `${pathname}${searchStr}`.replace(/\[object%20Object\]|\[object Object\]/g, '').trim();
+  if (!clean || clean === '/login' || clean.startsWith('/login') || clean === '/register' || clean.startsWith('/register')) {
+    return '/dashboard';
+  }
+  return clean;
+}
+
 function LoginPageWrapper({ defaultView }: { defaultView: LoginView }) {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const location = useLocation();
+  const { user, token } = useAuth();
   const { data: userProfile } = useGetCallerUserProfile();
   const search = useSearch({ strict: false }) as { redirect?: string };
   const redirectTarget = search?.redirect;
@@ -177,29 +216,39 @@ function LoginPageWrapper({ defaultView }: { defaultView: LoginView }) {
   const internalRoleToCheck = (userProfile as any)?.internalRole || (user as any)?.internalRole;
   const isAdmin = internalRoleToCheck === 'admin' || roleToCheck === 'admin' || roleToCheck === TamilRole.admin;
 
-  useEffect(() => {
-    if (user) {
-      if (redirectTarget && redirectTarget.startsWith('/') && !redirectTarget.startsWith('//')) {
-        navigate({ to: redirectTarget as any });
-      } else if (isAdmin) {
-        navigate({ to: '/admin' });
-      } else {
-        navigate({ to: '/dashboard' });
-      }
+  const getRedirectDestination = () => {
+    const rawTarget = redirectTarget || (location.state as any)?.from;
+    let cleanTarget = typeof rawTarget === 'string' ? rawTarget : (rawTarget?.pathname || '');
+    if (typeof cleanTarget === 'string') {
+      cleanTarget = cleanTarget.replace(/\[object%20Object\]|\[object Object\]/g, '').trim();
     }
-  }, [user, redirectTarget, isAdmin, navigate]);
+    if (
+      !cleanTarget ||
+      cleanTarget === '/login' ||
+      cleanTarget.startsWith('/login') ||
+      cleanTarget === '/register' ||
+      cleanTarget.startsWith('/register') ||
+      !cleanTarget.startsWith('/') ||
+      cleanTarget.startsWith('//')
+    ) {
+      return isAdmin ? '/admin' : '/dashboard';
+    }
+    return cleanTarget;
+  };
+
+  useEffect(() => {
+    if (user || token) {
+      const dest = getRedirectDestination();
+      navigate({ to: dest as any, replace: true });
+    }
+  }, [user, token, isAdmin, navigate]);
 
   return (
     <LoginPage
       defaultView={defaultView}
       onSuccess={() => {
-        if (redirectTarget && redirectTarget.startsWith('/') && !redirectTarget.startsWith('//')) {
-          navigate({ to: redirectTarget as any });
-        } else if (isAdmin) {
-          navigate({ to: '/admin' });
-        } else {
-          navigate({ to: '/dashboard' });
-        }
+        const dest = getRedirectDestination();
+        navigate({ to: dest as any, replace: true });
       }}
       onNavigateView={(v) => {
         if (v === 'register') {
@@ -216,9 +265,8 @@ function LoginPageWrapper({ defaultView }: { defaultView: LoginView }) {
 
 // --- Protected Dashboard Guard & Layout ---
 function DashboardLayoutWrapper() {
-  const { user, isInitializing } = useAuth();
+  const { user, token, loading, isInitializing } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
   const { data: userProfile, isLoading: profileLoading } = useGetCallerUserProfile();
   const { data: isApproved, isLoading: approvalLoading } = useIsCallerApproved();
 
@@ -226,21 +274,13 @@ function DashboardLayoutWrapper() {
   const internalRoleToCheck = (userProfile as any)?.internalRole || (user as any)?.internalRole;
   const isAdmin = internalRoleToCheck === 'admin' || roleToCheck === 'admin' || roleToCheck === TamilRole.admin;
 
-  useEffect(() => {
-    if (!isInitializing && !user) {
-      navigate({
-        to: '/login',
-        search: { redirect: location.pathname + location.search },
-      });
-    }
-  }, [user, isInitializing, location.pathname, location.search, navigate]);
-
-  if (isInitializing || (user && profileLoading)) {
+  if (isInitializing || loading || (user && profileLoading)) {
     return <LoadingScreen />;
   }
 
-  if (!user) {
-    return null;
+  if (!token && !user) {
+    const returnPath = getCleanReturnPath(location);
+    return <Navigate to="/login" search={{ redirect: returnPath }} replace />;
   }
 
   if (isAdmin && !approvalLoading && isApproved === false) {
@@ -367,9 +407,8 @@ function DashboardPropertyManageWrapper() {
 
 // --- Protected Admin Guard & Layout ---
 function AdminLayoutWrapper() {
-  const { user, isInitializing } = useAuth();
+  const { user, token, loading, isInitializing } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
   const { data: userProfile, isLoading: profileLoading } = useGetCallerUserProfile();
   const { data: isApproved, isLoading: approvalLoading } = useIsCallerApproved();
 
@@ -377,23 +416,17 @@ function AdminLayoutWrapper() {
   const internalRoleToCheck = (userProfile as any)?.internalRole || (user as any)?.internalRole;
   const isAdmin = internalRoleToCheck === 'admin' || roleToCheck === 'admin' || roleToCheck === TamilRole.admin;
 
-  useEffect(() => {
-    if (!isInitializing && !user) {
-      navigate({
-        to: '/login',
-        search: { redirect: location.pathname + location.search },
-      });
-    } else if (!isInitializing && user && !profileLoading && !isAdmin) {
-      navigate({ to: '/dashboard' });
-    }
-  }, [user, isInitializing, profileLoading, isAdmin, location.pathname, location.search, navigate]);
-
-  if (isInitializing || (user && profileLoading)) {
+  if (isInitializing || loading || (user && profileLoading)) {
     return <LoadingScreen />;
   }
 
-  if (!user || !isAdmin) {
-    return null;
+  if (!token && !user) {
+    const returnPath = getCleanReturnPath(location);
+    return <Navigate to="/login" search={{ redirect: returnPath }} replace />;
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   if (!approvalLoading && isApproved === false) {
@@ -411,7 +444,7 @@ function AdminIndexWrapper() {
 
 export const rootRoute = createRootRoute({
   component: RootLayout,
-  notFoundComponent: NotFoundPage,
+  notFoundComponent: () => <Navigate to="/" replace />,
 });
 
 export const indexRoute = createRoute({
@@ -537,6 +570,12 @@ export const adminTabRoute = createRoute({
   component: AdminIndexWrapper,
 });
 
+export const fallbackRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '*',
+  component: () => <Navigate to="/" replace />,
+});
+
 // --- Route Tree & Router ---
 
 const routeTree = rootRoute.addChildren([
@@ -555,11 +594,12 @@ const routeTree = rootRoute.addChildren([
     dashboardTabRoute,
   ]),
   adminBaseRoute.addChildren([adminIndexRoute, adminTabRoute]),
+  fallbackRoute,
 ]);
 
 export const router = createRouter({
   routeTree,
-  defaultNotFoundComponent: NotFoundPage,
+  defaultNotFoundComponent: () => <Navigate to="/" replace />,
 });
 
 declare module '@tanstack/react-router' {

@@ -1,17 +1,29 @@
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const fs = require('fs');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
+
+// Explicitly load server/.env regardless of process.cwd()
+const envPath = path.resolve(__dirname, '.env');
+const parentEnvPath = path.resolve(__dirname, '../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+} else if (fs.existsSync(parentEnvPath)) {
+  dotenv.config({ path: parentEnvPath });
+} else {
+  dotenv.config();
+}
+
 const multer = require('multer');
 const FormData = require('form-data');
 const axios = require('axios');
+const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
 const User = require('./models/User');
 const Property = require('./models/Property');
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -27,6 +39,10 @@ const io = new Server(server, {
 });
 
 app.set('io', io);
+
+// Map of online users: userId -> Set of socket.ids
+const onlineUsers = new Map();
+app.set('onlineUsers', onlineUsers);
 
 // Middleware
 app.use(cors());
@@ -189,6 +205,54 @@ const { upsertAgreementDocument, verifyAgreementDocument } = require('./services
 io.on('connection', (socket) => {
   console.log('Socket.IO client connected:', socket.id);
 
+  // Authenticate user on connection if token provided in auth handshake
+  let initialUserId = null;
+  const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, 'secret');
+      initialUserId = decoded.user?.id || decoded.user?._id;
+    } catch (e) {
+      // Invalid/expired token in handshake
+    }
+  }
+  if (!initialUserId) {
+    initialUserId = socket.handshake.auth?.userId || socket.handshake.query?.userId;
+  }
+
+  const registerUser = (uId) => {
+    if (!uId) return;
+    const uidStr = String(uId);
+    socket.userId = uidStr;
+    socket.join(`user_${uidStr}`);
+    if (!onlineUsers.has(uidStr)) {
+      onlineUsers.set(uidStr, new Set());
+    }
+    onlineUsers.get(uidStr).add(socket.id);
+    io.emit('online_users_updated', Array.from(onlineUsers.keys()));
+    console.log(`Socket ${socket.id} joined room user_${uidStr}. Total online: ${onlineUsers.size}`);
+  };
+
+  if (initialUserId) {
+    registerUser(initialUserId);
+  }
+
+  socket.on('register_user', (uId) => {
+    registerUser(uId);
+  });
+
+  socket.on('typing', ({ senderId, receiverId }) => {
+    if (receiverId) {
+      io.to(`user_${receiverId}`).emit('typing', { senderId, receiverId });
+    }
+  });
+
+  socket.on('stop_typing', ({ senderId, receiverId }) => {
+    if (receiverId) {
+      io.to(`user_${receiverId}`).emit('stop_typing', { senderId, receiverId });
+    }
+  });
+
   socket.on('agreement:upload', async (data, callback) => {
     try {
       const savedAgreement = await upsertAgreementDocument({
@@ -223,6 +287,14 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('Socket.IO client disconnected:', socket.id);
+    if (socket.userId && onlineUsers.has(socket.userId)) {
+      const set = onlineUsers.get(socket.userId);
+      set.delete(socket.id);
+      if (set.size === 0) {
+        onlineUsers.delete(socket.userId);
+      }
+      io.emit('online_users_updated', Array.from(onlineUsers.keys()));
+    }
   });
 });
 
@@ -347,6 +419,8 @@ app.use('/api/conversations', conversationRoutes);
 app.use('/api/visits', visitRoutes);
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/self-managed-rentals', require('./routes/selfManagedRentals'));
+app.use('/api/messages', require('./routes/messages'));
+app.use('/api/profile', require('./routes/profile'));
 
 app.get('/', (req, res) => {
   res.send('ReSideAI API is running');
@@ -354,6 +428,16 @@ app.get('/', (req, res) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
+  console.log('[SMTP Config] Active SMTP_HOST:', process.env.SMTP_HOST || '(not set)');
+  console.log('[SMTP Config] Active SMTP_USER:', process.env.SMTP_USER || '(not set)');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Unhandled Rejection]', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[Uncaught Exception]', err);
 });
 
 server.on('error', (err) => {

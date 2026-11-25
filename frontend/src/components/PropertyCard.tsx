@@ -14,16 +14,22 @@ import {
   Globe,
   EyeOff,
   Lock,
-  Users
+  Users,
+  MessageSquare,
+  Check
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { Property } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useCreateRequest } from '../hooks/useQueries';
 import { toast } from 'sonner';
-import { translateText } from '../lib/api';
+import { translateText, API_BASE_URL } from '../lib/api';
+import api from '../lib/api';
+import axios from 'axios';
+import { dispatchOpenMessenger } from '../hooks/useMessenger';
 import RequestPropertyDialog from './RequestPropertyDialog';
 
 interface PropertyCardProps {
@@ -50,12 +56,145 @@ export default function PropertyCard({
   onClick
 }: PropertyCardProps) {
   const { t, language } = useLanguage();
+  const { user } = useAuth();
+  const currentUserId = (user as any)?._id || (user as any)?.id;
+  const rawOwner = (property as any).owner;
+  const ownerId = String(
+    (property as any).ownerId?._id ||
+    (property as any).ownerId ||
+    (property as any).owner?._id ||
+    (property as any).owner ||
+    (property as any).userId?._id ||
+    (property as any).userId ||
+    (property as any).landlordId?._id ||
+    (property as any).landlordId ||
+    ''
+  );
+  const isCurrentOwner = isOwnerView || (!!currentUserId && !!ownerId && String(currentUserId) === String(ownerId));
+
   const createRequest = useCreateRequest();
   const [translatedTitle, setTranslatedTitle] = useState<string | null>(null);
   const [translatedLocation, setTranslatedLocation] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
   const [showRequestDialog, setShowRequestDialog] = useState(false);
+  const [sendingIds, setSendingIds] = useState<Set<string>>(new Set());
+  const [sentRequestIds, setSentRequestIds] = useState<Set<string>>(new Set());
+
+  const handleConnectClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      toast.error(
+        t('Please log in to message or connect with the owner', 'உரிமையாளருடன் பேச தயவுசெய்து உள்நுழையவும்'),
+        { id: 'connect-toast' }
+      );
+      return;
+    }
+    if (!ownerId) {
+      toast.error(
+        t('Owner information is not available for this property', 'இந்த சொத்தின் உரிமையாளர் தகவல் கிடைக்கவில்லை'),
+        { id: 'connect-toast' }
+      );
+      return;
+    }
+
+    if (isCurrentOwner || (currentUserId && ownerId && String(currentUserId) === String(ownerId))) {
+      toast.info(
+        t('This is your own property listing', 'இது உங்கள் சொந்த சொத்து பட்டியல்'),
+        { id: 'connect-toast' }
+      );
+      return;
+    }
+
+    const propId = String((property as any)._id || property.id || '');
+    if (sendingIds.has(propId)) {
+      return;
+    }
+
+    const ownerName = typeof rawOwner === 'object' && rawOwner?.name
+      ? rawOwner.name
+      : (property as any).ownerName || t('Owner', 'உரிமையாளர்');
+
+    setSendingIds((prev) => new Set(prev).add(propId));
+
+    const token = localStorage.getItem('token') || (user as any)?.token;
+    const requestHeaders: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (token) {
+      requestHeaders['x-auth-token'] = token;
+      requestHeaders['Authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+      const payload = {
+        receiverId: ownerId,
+        recipientId: ownerId,
+        targetUserId: ownerId,
+        ownerId: ownerId,
+        propertyId: propId,
+        propertyTitle: property.title || (property as any).name || ''
+      };
+
+      let res;
+      try {
+        res = await api.post('/messages/friend-request', payload);
+      } catch (firstErr: any) {
+        if (firstErr.response?.status === 404) {
+          const endpoint = API_BASE_URL
+            ? `${API_BASE_URL.replace(/\/$/, '')}/api/messages/friend-request`
+            : '/api/messages/friend-request';
+          res = await axios.post(endpoint, payload, { headers: requestHeaders });
+        } else {
+          throw firstErr;
+        }
+      }
+
+      if (res.data?.connected || res.data?.status === 'already_connected' || res.data?.status === 'connected') {
+        dispatchOpenMessenger(ownerId, propId);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('open-reside-messenger', {
+              detail: { userId: ownerId, targetUserId: ownerId, propertyId: propId }
+            })
+          );
+        }
+      } else if (res.data?.status === 'accepted') {
+        setSentRequestIds((prev) => new Set(prev).add(propId));
+        toast.success(
+          t(`Connected with ${ownerName}! Opening chat...`, `${ownerName} உடன் இணைக்கப்பட்டது! அரட்டை திறக்கிறது...`),
+          { id: 'connect-toast' }
+        );
+        dispatchOpenMessenger(ownerId, propId);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('open-reside-messenger', {
+              detail: { userId: ownerId, targetUserId: ownerId, propertyId: propId }
+            })
+          );
+        }
+      } else {
+        setSentRequestIds((prev) => new Set(prev).add(propId));
+        toast.success(
+          t(`Friend & chat request sent to ${ownerName}`, `நண்பர் மற்றும் அரட்டை கோரிக்கை ${ownerName} க்கு அனுப்பப்பட்டது`),
+          { id: 'connect-toast' }
+        );
+      }
+    } catch (err: any) {
+      const errMsg =
+        err.response?.data?.message ||
+        err.response?.data?.msg ||
+        (err.response?.status ? `Request failed (${err.response.status})` : err.message) ||
+        'Failed to send connect request';
+      toast.error(errMsg, { id: 'connect-toast' });
+    } finally {
+      setSendingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(propId);
+        return next;
+      });
+    }
+  };
 
   const rawImage = property.images && property.images.length > 0 ? property.images[0] : null;
   const imageSrc = typeof rawImage === 'string' && rawImage.trim() ? rawImage.trim() : null;
@@ -334,19 +473,28 @@ export default function PropertyCard({
           ✓ {t('Verified', 'சரிபார்க்கப்பட்டது')}
         </div>
 
-        {/* Save / Favorite Button - customer view only */}
-        {!isOwnerView && (
+        {/* Message / Connect Button - customer view only (hidden for owner) */}
+        {!isCurrentOwner && (
           <button
             type="button"
-            aria-label={t('Save property', 'சொத்தை சேமிக்கவும்')}
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsFavorite((value) => !value);
-            }}
-            className={`glass-pill absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full shadow-sm transition duration-200 hover:scale-110 active:scale-95 motion-reduce:transition-none backdrop-blur-md ${isFavorite ? 'text-rose-500' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }`}
+            aria-label={t('Message or connect with property owner', 'உரிமையாளருடன் பேசவும்')}
+            title={
+              sentRequestIds.has(String((property as any)._id || property.id || ''))
+                ? t('Request Sent', 'கோரிக்கை அனுப்பப்பட்டது')
+                : t('Message / Send Friend Request to Owner', 'உரிமையாளருடன் அரட்டை / நண்பர் கோரிக்கை')
+            }
+            onClick={handleConnectClick}
+            className={`w-8 h-8 rounded-full shadow-md flex items-center justify-center transition absolute right-2 top-2 backdrop-blur-md cursor-pointer group z-10 border ${
+              sentRequestIds.has(String((property as any)._id || property.id || ''))
+                ? 'bg-emerald-50/95 dark:bg-emerald-950/80 border-emerald-300 dark:border-emerald-600 text-emerald-600 dark:text-emerald-400'
+                : 'bg-white/95 dark:bg-slate-900/85 hover:bg-blue-600 text-slate-700 hover:text-white border-white/60 dark:border-slate-700/60'
+            }`}
           >
-            <Heart className={`h-3 w-3 ${isFavorite ? 'fill-current' : ''}`} />
+            {sentRequestIds.has(String((property as any)._id || property.id || '')) ? (
+              <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400 animate-in zoom-in-75 duration-200" />
+            ) : (
+              <MessageSquare className="h-4 w-4 transition-transform group-hover:scale-110" />
+            )}
           </button>
         )}
       </div>

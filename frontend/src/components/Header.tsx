@@ -1,4 +1,4 @@
-import { Building2, Moon, Sun, LogIn, LogOut, User, Menu, LayoutDashboard, Home, Globe2, Grid2X2, Bell, ChevronDown } from 'lucide-react';
+import { Building2, Moon, Sun, LogIn, LogOut, User, Menu, LayoutDashboard, Home, Globe2, Grid2X2, Bell, ChevronDown, MessageSquare } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useGetCallerUserProfile, useGetNotifications } from '../hooks/useQueries';
 import { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useMessenger, dispatchOpenMessenger } from '../hooks/useMessenger';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,8 +43,8 @@ interface HeaderProps {
   onAccountClick?: () => void;
 }
 
-export default function Header({ 
-  onLogout, 
+export default function Header({
+  onLogout,
   onDashboardClick,
   onHomeClick,
   onAboutClick,
@@ -62,6 +63,7 @@ export default function Header({
   const notifications = notificationsData?.notifications || [];
   const unreadNotifications = notifications.filter((n: any) => !n.isRead && !n.read);
   const unreadCount = notifications.length > 0 ? unreadNotifications.length : 0;
+  const { unreadCount: messengerUnreadCount } = useMessenger();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const { language, setLanguage, t } = useLanguage();
@@ -111,7 +113,7 @@ export default function Header({
   return (
     <header className="sticky top-0 z-50 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 shadow-2xs transition-colors">
       <div className="w-full px-3 sm:px-5 lg:px-6 flex h-14 sm:h-[58px] items-center justify-between gap-4">
-        <div 
+        <div
           className="flex shrink-0 items-center gap-2.5 text-xl font-bold tracking-tight text-[#0B1736] transition-all hover:text-blue-600 dark:text-white dark:hover:text-blue-300 cursor-pointer"
           onClick={handleHomeNavigation}
         >
@@ -157,6 +159,23 @@ export default function Header({
               {notifications && notifications.length > 0 && unreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white shadow-xs">
                   {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </Button>
+          )}
+
+          {isAuthenticated && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => dispatchOpenMessenger()}
+              title={t('Messenger', 'செய்தியாளர்')}
+              className="relative h-8.5 w-8.5 rounded-full border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-600 dark:text-slate-300 shadow-2xs"
+            >
+              <MessageSquare className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              {messengerUnreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white shadow-xs">
+                  {messengerUnreadCount > 9 ? '9+' : messengerUnreadCount}
                 </span>
               )}
             </Button>
@@ -297,6 +316,24 @@ export default function Header({
                         </div>
                         <span className="text-[11px] text-muted-foreground">{t('Manage profile & settings', 'சுயவிவரம் & அமைப்புகளை நிர்வகிக்க')}</span>
                       </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        dispatchOpenMessenger();
+                      }}
+                      className="flex items-center justify-between px-3 py-2 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-700 dark:text-blue-300 font-medium text-left"
+                    >
+                      <span className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        {t('Messenger', 'செய்தியாளர்')}
+                      </span>
+                      {messengerUnreadCount > 0 && (
+                        <span className="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                          {messengerUnreadCount > 9 ? '9+' : messengerUnreadCount}
+                        </span>
+                      )}
                     </button>
                     {unreadCount > 0 && (
                       <button

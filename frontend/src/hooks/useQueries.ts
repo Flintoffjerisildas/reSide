@@ -67,7 +67,14 @@ export function useGetCallerUserProfile() {
             idNumber: primaryUser.idNumber,
             idProofImage: primaryUser.idProofImage,
             notificationsEnabled: primaryUser.notificationsEnabled,
-            profileCompletion: primaryUser.profileCompletion
+            profileCompletion: primaryUser.profileCompletion,
+            isEmailVerified: Boolean(primaryUser.isEmailVerified),
+            isPhoneVerified: Boolean(primaryUser.isPhoneVerified),
+            isAadhaarVerified: Boolean(primaryUser.isAadhaarVerified),
+            idProofType: primaryUser.idProofType || primaryUser.idType || 'Aadhaar Card',
+            idDocumentNumber: primaryUser.idDocumentNumber || primaryUser.idNumber || primaryUser.aadhar || '',
+            aadhaarRefId: primaryUser.aadhaarRefId,
+            aadhaarVerifiedName: primaryUser.aadhaarVerifiedName,
           };
           return profile;
         }

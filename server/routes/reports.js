@@ -11,39 +11,42 @@ const User = require('../models/User');
 const aiCache = new Map();
 
 function normalizeStartOfDay(value) {
-  const d = new Date(value);
+  if (!value) return undefined;
+  const raw = String(value).trim();
+  const d = new Date(raw.length === 10 ? `${raw}T00:00:00` : raw);
   if (isNaN(d.getTime())) return undefined;
   d.setHours(0, 0, 0, 0);
   return d;
 }
 
-function normalizeEndOfDay(value, original) {
-  const d = new Date(value);
+function normalizeEndOfDay(value) {
+  if (!value) return undefined;
+  const raw = String(value).trim();
+  const d = new Date(raw.length === 10 ? `${raw}T23:59:59.999` : raw);
   if (isNaN(d.getTime())) return undefined;
-  const raw = String(original || '').trim();
-  if (raw.length <= 10) {
-    d.setHours(23, 59, 59, 999);
-  }
+  d.setHours(23, 59, 59, 999);
   return d;
 }
 
 function parseDateRange(query, { defaultDays = 30 } = {}) {
-  const now = new Date();
   const fromRaw = query?.from;
   const toRaw = query?.to;
 
   const defaultFrom = (() => {
-    const d = new Date(now);
+    const d = new Date();
     d.setDate(d.getDate() - defaultDays);
     d.setHours(0, 0, 0, 0);
     return d;
   })();
 
-  const normalizedTo = toRaw ? normalizeEndOfDay(toRaw, toRaw) : undefined;
-  const to = normalizedTo || now;
+  const defaultTo = (() => {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
+    return d;
+  })();
 
-  const normalizedFrom = fromRaw ? normalizeStartOfDay(fromRaw) : undefined;
-  const from = normalizedFrom || defaultFrom;
+  const from = fromRaw ? normalizeStartOfDay(fromRaw) : defaultFrom;
+  const to = toRaw ? normalizeEndOfDay(toRaw) : defaultTo;
 
   return { from, to };
 }
@@ -158,20 +161,8 @@ router.get('/rent', auth, auth.requireOwner, async (req, res) => {
     const aiRequested = isTruthyQueryFlag(req.query?.ai);
     const locale = req.query?.locale ? String(req.query.locale) : 'en';
 
-    const propertyFilter = { owner: req.user.id };
-    if (propertyId) propertyFilter._id = propertyId;
-
-    const totalProperties = await Property.countDocuments(propertyFilter);
-
     const recordFilter = { owner: req.user.id };
-    if (propertyId) recordFilter.property = propertyId;
-    if (from || to) {
-      const fromMonth = from ? new Date(from.getFullYear(), from.getMonth(), 1) : undefined;
-      const toMonth = to ? new Date(to.getFullYear(), to.getMonth(), 1) : undefined;
-      recordFilter.month = {};
-      if (fromMonth) recordFilter.month.$gte = fromMonth;
-      if (toMonth) recordFilter.month.$lte = toMonth;
-    }
+    if (propertyId && propertyId !== 'all') recordFilter.property = propertyId;
 
     const recordsRaw = await RentRecord.find(recordFilter)
       .populate('property', 'title location')
@@ -179,15 +170,46 @@ router.get('/rent', auth, auth.requireOwner, async (req, res) => {
       .sort({ dueDate: -1 })
       .lean();
 
-    const records = recordsRaw.filter((r) => {
-      const property = r?.property;
-      if (!property) return false;
-      if (typeof property === 'string') return false;
-      return Boolean(property?._id);
+    const rentRecordIds = recordsRaw.map((r) => r._id);
+    const payments = await Payment.find({ rentRecord: { $in: rentRecordIds } })
+      .select('rentRecord date approvedDate status amount')
+      .sort({ date: -1 })
+      .lean();
+
+    const paymentMap = new Map();
+    payments.forEach((p) => {
+      const rid = String(p.rentRecord);
+      if (!paymentMap.has(rid)) {
+        paymentMap.set(rid, p);
+      }
     });
 
+    const startTime = from ? from.getTime() : -Infinity;
+    const endTime = to ? to.getTime() : Infinity;
+
+    const records = recordsRaw.filter((r) => {
+      const property = r?.property;
+      if (!property || typeof property === 'string' || !property?._id) return false;
+      if (propertyId && propertyId !== 'all') {
+        const pid = String(property._id);
+        if (pid !== String(propertyId)) return false;
+      }
+
+      const lastPayment = paymentMap.get(String(r._id));
+      const paymentDate = lastPayment?.date || lastPayment?.approvedDate;
+      const recordDate = paymentDate || r?.dueDate || r?.paidAt || r?.createdAt || r?.month;
+      if (recordDate) {
+        const recordTime = new Date(recordDate).getTime();
+        if (!isNaN(recordTime)) {
+          if (recordTime < startTime || recordTime > endTime) return false;
+        }
+      }
+      return true;
+    });
+
+    const distinctProps = new Set(records.map((r) => String(r?.property?._id || '')).filter(Boolean));
     const summary = {
-      totalProperties,
+      totalProperties: distinctProps.size,
       totalRentExpected: 0,
       totalRentCollected: 0,
       pendingAmount: 0
@@ -201,6 +223,9 @@ router.get('/rent', auth, auth.requireOwner, async (req, res) => {
       summary.totalRentCollected += paid;
       summary.pendingAmount += pending;
 
+      const lastPayment = paymentMap.get(String(r._id));
+      const paymentDate = lastPayment?.date || lastPayment?.approvedDate || null;
+
       return {
         rentRecordId: String(r?._id || ''),
         propertyId: String(r?.property?._id || r?.property || ''),
@@ -209,6 +234,8 @@ router.get('/rent', auth, auth.requireOwner, async (req, res) => {
         tenantEmail: String(r?.tenant?.email || ''),
         month: toIsoOrNull(r?.month),
         dueDate: toIsoOrNull(r?.dueDate),
+        paymentDate: toIsoOrNull(paymentDate),
+        paidAt: toIsoOrNull(paymentDate),
         rent: rentAmount,
         paid,
         pending,
@@ -435,13 +462,13 @@ router.get('/tenant/payment-history', auth, async (req, res) => {
       .sort({ date: -1 })
       .lean();
 
-    const payments = propertyId
-      ? paymentsRaw.filter((p) => String(p?.rentRecord?.property?._id || '') === String(propertyId))
+    const payments = propertyId && propertyId !== 'all'
+      ? paymentsRaw.filter((p) => String(p?.rentRecord?.property?._id || p?.property || '') === String(propertyId))
       : paymentsRaw;
 
     const rows = payments.map((p) => ({
       paymentId: String(p?._id || ''),
-      propertyId: String(p?.rentRecord?.property?._id || ''),
+      propertyId: String(p?.rentRecord?.property?._id || p?.property || ''),
       propertyTitle: String(p?.rentRecord?.property?.title || ''),
       month: toIsoOrNull(p?.rentRecord?.month),
       dueDate: toIsoOrNull(p?.rentRecord?.dueDate),
@@ -459,7 +486,7 @@ router.get('/tenant/payment-history', auth, async (req, res) => {
     const failedPayments = rows.filter((r) => r.status === 'rejected').length;
 
     const rentRecordFilter = { tenant: req.user.id };
-    if (propertyId) rentRecordFilter.property = propertyId;
+    if (propertyId && propertyId !== 'all') rentRecordFilter.property = propertyId;
     if (from || to) {
       rentRecordFilter.month = {};
       if (from) rentRecordFilter.month.$gte = new Date(from.getFullYear(), from.getMonth(), 1);
@@ -557,12 +584,12 @@ router.get('/tenant/expense-summary', auth, async (req, res) => {
       .sort({ date: 1 })
       .lean();
 
-    const payments = propertyId
-      ? paymentsRaw.filter((p) => String(p?.rentRecord?.property?._id || '') === String(propertyId))
+    const payments = propertyId && propertyId !== 'all'
+      ? paymentsRaw.filter((p) => String(p?.rentRecord?.property?._id || p?.property || '') === String(propertyId))
       : paymentsRaw;
 
     const maintenanceFilter = { tenant: req.user.id };
-    if (propertyId) maintenanceFilter.property = propertyId;
+    if (propertyId && propertyId !== 'all') maintenanceFilter.property = propertyId;
     if (from || to) {
       maintenanceFilter.createdAt = {};
       if (from) maintenanceFilter.createdAt.$gte = from;
@@ -653,7 +680,7 @@ router.get('/tenant/maintenance', auth, async (req, res) => {
     const locale = req.query?.locale ? String(req.query.locale) : 'en';
 
     const filter = { tenant: req.user.id };
-    if (propertyId) filter.property = propertyId;
+    if (propertyId && propertyId !== 'all') filter.property = propertyId;
     if (from || to) {
       filter.createdAt = {};
       if (from) filter.createdAt.$gte = from;

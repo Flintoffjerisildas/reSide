@@ -909,10 +909,40 @@ router.put('/profile', auth, async (req, res) => {
     if (!user) return res.status(404).json({ msg: 'User not found' });
 
     if (name) user.name = name;
-    if (phone) user.phone = phone;
+    if (phone !== undefined) {
+      const cleanPhone = String(phone).trim();
+      if (cleanPhone !== String(user.phone || '').trim()) {
+        user.phone = cleanPhone;
+        user.isPhoneVerified = false;
+      }
+    }
     if (address) user.address = address;
-    if (aadhar) user.aadhar = aadhar;
     if (gender) user.gender = gender;
+
+    // Handle ID Document updates and reset verification on change
+    const newDocNum = req.body.idDocumentNumber !== undefined
+      ? String(req.body.idDocumentNumber).trim()
+      : (req.body.idNumber !== undefined
+        ? String(req.body.idNumber).trim()
+        : (req.body.aadhar !== undefined ? String(req.body.aadhar).trim() : undefined));
+
+    if (newDocNum !== undefined) {
+      const currentDoc = String(user.idDocumentNumber || user.idNumber || user.aadhar || '').trim();
+      if (newDocNum !== currentDoc) {
+        user.idDocumentNumber = newDocNum;
+        user.idNumber = newDocNum;
+        user.aadhar = newDocNum;
+        user.isAadhaarVerified = false;
+      }
+    }
+
+    if (req.body.idProofType) {
+      user.idProofType = req.body.idProofType;
+      user.idType = req.body.idProofType;
+    } else if (idType) {
+      user.idProofType = idType;
+      user.idType = idType;
+    }
     // Optional tenant/owner profile fields
     if (age !== undefined) user.age = age;
     if (dateOfBirth) user.dateOfBirth = new Date(dateOfBirth);

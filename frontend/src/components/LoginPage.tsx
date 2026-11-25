@@ -109,17 +109,16 @@ export default function LoginPage({
       return;
     }
     try {
-      const data = await register(name, email, password, registrationPurpose);
+      await register(name, email, password, registrationPurpose);
       setOtpEmail(email);
-      if (data?.devOtp) {
-        setDevOtp(data.devOtp);
-        setOtp(data.devOtp);
-        toast.info(t(`OTP: ${data.devOtp}`, `OTP: ${data.devOtp}`), { duration: 10000 });
-      } else {
-        setDevOtp(null);
-        setOtp('');
-      }
-      toast.success(t('OTP sent to your email', 'OTP உங்கள் மின்னஞ்சலுக்கு அனுப்பப்பட்டது'));
+      setDevOtp(null);
+      setOtp('');
+      toast.success(
+        t(
+          `Verification code sent to ${email}. Please check your inbox or spam folder.`,
+          `சரிபார்ப்புக் குறியீடு ${email} க்கு அனுப்பப்பட்டது. உங்கள் இன்பாக்ஸ் அல்லது ஸ்பேம் கோப்புறையை சரிபார்க்கவும்.`
+        )
+      );
       switchView('register-otp');
     } catch (error: any) {
       const msg =
@@ -224,12 +223,23 @@ export default function LoginPage({
         body: JSON.stringify({ email: otpEmail, purpose }),
       });
       const data = await response.json();
-      if (data?.devOtp) {
-        setDevOtp(data.devOtp);
-        setOtp(data.devOtp);
-        toast.info(t(`OTP: ${data.devOtp}`, `OTP: ${data.devOtp}`), { duration: 10000 });
+      if (purpose === 'register') {
+        setDevOtp(null);
+        setOtp('');
+        toast.success(
+          t(
+            `Verification code sent to ${otpEmail}. Please check your inbox or spam folder.`,
+            `சரிபார்ப்புக் குறியீடு ${otpEmail} க்கு அனுப்பப்பட்டது. உங்கள் இன்பாக்ஸ் அல்லது ஸ்பேம் கோப்புறையை சரிபார்க்கவும்.`
+          )
+        );
+      } else {
+        if (data?.devOtp) {
+          setDevOtp(data.devOtp);
+          setOtp(data.devOtp);
+          toast.info(t(`OTP: ${data.devOtp}`, `OTP: ${data.devOtp}`), { duration: 10000 });
+        }
+        toast.success(t('OTP resent successfully', 'OTP மீண்டும் அனுப்பப்பட்டது'));
       }
-      toast.success(t('OTP resent successfully', 'OTP மீண்டும் அனுப்பப்பட்டது'));
       setOtpCountdown(60);
     } catch (error: any) {
       toast.error(t('Failed to resend OTP', 'OTP-ஐ மீண்டும் அனுப்ப முடியவில்லை'));
@@ -464,21 +474,6 @@ export default function LoginPage({
                   <Label htmlFor="register-otp">
                     {t('OTP', 'OTP')} <span className="text-destructive">*</span>
                   </Label>
-                  {devOtp && (
-                    <div className="rounded-md bg-blue-500/10 border border-blue-500/30 p-2.5 text-xs text-blue-400 flex items-center justify-between">
-                      <span>
-                        {t('OTP Code:', 'OTP குறியீடு:')}{' '}
-                        <strong className="font-mono text-sm tracking-widest">{devOtp}</strong>
-                      </span>
-                      <button
-                        type="button"
-                        className="text-xs underline font-medium hover:text-blue-300"
-                        onClick={() => setOtp(devOtp)}
-                      >
-                        {t('Autofill', 'தானாக நிரப்பு')}
-                      </button>
-                    </div>
-                  )}
                   <Input
                     id="register-otp"
                     type="text"
@@ -486,8 +481,9 @@ export default function LoginPage({
                     maxLength={6}
                     placeholder="123456"
                     value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     disabled={loading}
+                    autoFocus
                   />
                   <p className="text-xs text-muted-foreground">
                     {otpCountdown > 0

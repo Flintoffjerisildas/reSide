@@ -13,9 +13,9 @@ export default function FloatingChat() {
   const { user } = useAuth();
   const { data: userProfile } = useGetCallerUserProfile();
   const { data: isApproved } = useIsCallerApproved();
-  
+
   const isAuthenticated = !!user;
-  
+
   const handleToggle = () => {
     setIsOpen(true);
     setIsMinimized(false);

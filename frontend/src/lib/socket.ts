@@ -10,6 +10,30 @@ export const socket = io(socketUrl, {
   reconnection: true,
   reconnectionAttempts: Infinity,
   reconnectionDelay: 1000,
+  auth: (cb) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    cb({ token });
+  }
 });
+
+if (typeof window !== 'undefined') {
+  const tryRegister = () => {
+    try {
+      const rawUser = localStorage.getItem('user');
+      if (rawUser) {
+        const u = JSON.parse(rawUser);
+        const uid = u._id || u.id;
+        if (uid) {
+          socket.emit('register_user', uid);
+        }
+      }
+    } catch (e) {}
+  };
+
+  socket.on('connect', tryRegister);
+  if (socket.connected) {
+    tryRegister();
+  }
+}
 
 export default socket;

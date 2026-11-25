@@ -13,9 +13,11 @@ import {
   Briefcase, 
   Plus,
   Phone,
-  MessageCircle
+  MessageCircle,
+  MessageSquare
 } from 'lucide-react';
 import PropertyForm from './PropertyForm';
+import { useMessenger } from '../hooks/useMessenger';
 
 interface BrokerDashboardProps {
   onBrowseProperties?: (transactionType: 'rent' | 'buy') => void;
@@ -26,6 +28,7 @@ export default function BrokerDashboard({ onBrowseProperties }: BrokerDashboardP
   const { data: userProfile } = useGetCallerUserProfile();
   const { data: allProperties = [] } = useGetAllProperties();
   const [isPropertyFormOpen, setIsPropertyFormOpen] = useState(false);
+  const { unreadCount: messengerUnreadCount, openMessenger } = useMessenger();
 
   // Mock Data for Broker
   const myListings = allProperties; // In real app: filter by broker
@@ -70,7 +73,7 @@ export default function BrokerDashboard({ onBrowseProperties }: BrokerDashboardP
           </Button>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
           <Button variant="outline" className="h-11 justify-start rounded-xl" onClick={() => onBrowseProperties?.('rent')}>
             <Home className="mr-2 h-4 w-4" />
             {t('Rent', 'வாடகை')}
@@ -82,6 +85,19 @@ export default function BrokerDashboard({ onBrowseProperties }: BrokerDashboardP
           <Button className="h-11 justify-start rounded-xl" onClick={() => setIsPropertyFormOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             {t('List Property', 'சொத்தை பட்டியலிடுங்கள்')}
+          </Button>
+          <Button
+            variant="outline"
+            className="relative h-11 justify-start rounded-xl border-slate-200/90 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+            onClick={() => openMessenger()}
+          >
+            <MessageSquare className="mr-2 h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <span>{t('Messenger', 'செய்தியாளர்')}</span>
+            {messengerUnreadCount > 0 && (
+              <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white shadow-xs">
+                {messengerUnreadCount > 9 ? '9+' : messengerUnreadCount}
+              </span>
+            )}
           </Button>
         </div>
 

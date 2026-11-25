@@ -10,14 +10,16 @@ const {
   login,
   forgotPassword,
   resetPasswordWithOtp,
-  resendOtp
+  resendOtp,
+  sendOtp
 } = require('../controllers/authController');
 
 // Register with email OTP
 router.post('/register', register);
 
-// Verify registration OTP
+// Verify registration OTP (both /verify-register-otp and /verify-otp)
 router.post('/verify-register-otp', verifyRegistrationOtp);
+router.post('/verify-otp', verifyRegistrationOtp);
 
 // Login with verified account
 router.post('/login', login);
@@ -75,6 +77,9 @@ router.post('/forgot-password', forgotPassword);
 
 // Forgot Password - verify OTP and reset
 router.post('/reset-password-otp', resetPasswordWithOtp);
+
+// Send OTP (alias)
+router.post('/send-otp', sendOtp);
 
 // Resend OTP (register or forgot)
 router.post('/resend-otp', resendOtp);

@@ -1,8 +1,10 @@
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { generateNumericOtp, isOtpExpired, canResendOtp } = require('../utilities/otp');
 const { sendOtpEmail } = require('../utilities/mailer');
+const { sendVerificationEmail } = require('../utils/sendEmail');
 
 const OTP_VALIDITY_MS = 5 * 60_000;
 
@@ -64,8 +66,9 @@ async function register(req, res) {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const otp = generateNumericOtp(6);
-    const otpExpiry = new Date(Date.now() + OTP_VALIDITY_MS);
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const emailOtpHash = crypto.createHash('sha256').update(otp).digest('hex');
+    const emailOtpExpires = new Date(Date.now() + OTP_VALIDITY_MS);
 
     const legacyTamilRole = isAdminRegistration
       ? 'admin'
@@ -84,11 +87,14 @@ async function register(req, res) {
       user.approved = true;
       user.blocked = false;
       user.role = isAdminRegistration ? 'admin' : 'user';
+      user.emailOtpHash = emailOtpHash;
+      user.emailOtpExpires = emailOtpExpires;
       user.otp = otp;
-      user.otpExpiry = otpExpiry;
+      user.otpExpiry = emailOtpExpires;
       user.otpPurpose = 'register';
       user.otpAttempts = 0;
       user.isVerified = false;
+      user.isEmailVerified = false;
     } else if (!user) {
       user = new User({
         name,
@@ -99,45 +105,60 @@ async function register(req, res) {
         approved: true,
         role: isAdminRegistration ? 'admin' : 'user',
         isVerified: false,
+        isEmailVerified: false,
+        emailOtpHash,
+        emailOtpExpires,
         otp,
-        otpExpiry,
+        otpExpiry: emailOtpExpires,
         otpPurpose: 'register',
         otpAttempts: 0
       });
     }
 
     await user.save();
-    const mailResult = await sendOtpEmail(normalizedEmail, otp, 'register');
+
+    try {
+      await sendVerificationEmail(normalizedEmail, otp, user.name || 'User');
+    } catch (mailErr) {
+      console.error('[Registration Mailer Error]', mailErr.message);
+      return res.status(500).json({
+        success: false,
+        msg: mailErr.message || 'Failed to send verification email',
+        message: mailErr.message || 'Failed to send verification email'
+      });
+    }
 
     return res.json({
-      msg: mailResult.success
-        ? 'OTP sent to your email for verification'
-        : 'OTP generated. Note: Email service could not deliver OTP; use dev OTP code.',
-      devOtp: process.env.NODE_ENV !== 'production' || !mailResult.success ? otp : undefined
+      success: true,
+      message: 'Verification code sent to ' + normalizedEmail,
+      msg: 'Verification code sent to ' + normalizedEmail
     });
   } catch (err) {
     console.error('Registration error:', err.message);
-    return res.status(500).send('Server error');
+    return res.status(500).json({ success: false, msg: 'Server error', message: 'Server error' });
   }
 }
 
 async function verifyRegistrationOtp(req, res) {
   try {
-    const { email, otp } = req.body;
+    const { email, otp, code } = req.body;
+    const submittedOtp = String(otp || code || '').trim();
 
-    if (!email || !otp) {
-      return res.status(400).json({ msg: 'Email and OTP are required' });
+    if (!email || !submittedOtp) {
+      return res.status(400).json({ success: false, msg: 'Email and OTP are required', message: 'Email and OTP are required' });
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
     const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
-      return res.status(400).json({ msg: 'Invalid OTP or email' });
+      return res.status(400).json({ success: false, msg: 'Invalid OTP or email', message: 'Invalid OTP or email' });
     }
 
-    if (user.isVerified && !user.otp) {
+    if (user.isVerified && user.isEmailVerified && !user.emailOtpHash && !user.otp) {
       const token = createTokenForUser(user);
       return res.json({
+        success: true,
+        message: 'Account already verified',
         msg: 'Account already verified',
         token,
         user: {
@@ -146,35 +167,40 @@ async function verifyRegistrationOtp(req, res) {
           email: user.email,
           role: user.tamilRole,
           tamilRole: user.tamilRole,
-          internalRole: user.role
+          internalRole: user.role,
+          isEmailVerified: true
         }
       });
     }
 
-    if (user.otpPurpose !== 'register') {
-      return res.status(400).json({ msg: 'Invalid OTP purpose' });
+    const now = new Date();
+    const expiry = user.emailOtpExpires || user.otpExpiry;
+    if (!expiry || expiry < now) {
+      return res.status(400).json({ success: false, msg: 'OTP has expired', message: 'OTP has expired' });
     }
 
-    if (isOtpExpired(user.otpExpiry)) {
-      return res.status(400).json({ msg: 'OTP has expired' });
-    }
-
-    if (user.otpAttempts >= 3) {
+    if (user.otpAttempts >= 5) {
       return res
         .status(400)
-        .json({ msg: 'Maximum OTP attempts exceeded. Please request a new OTP.' });
+        .json({ success: false, msg: 'Maximum OTP attempts exceeded. Please request a new OTP.', message: 'Maximum OTP attempts exceeded. Please request a new OTP.' });
     }
 
-    if (user.otp !== otp) {
-      user.otpAttempts += 1;
+    const hashedSubmitted = crypto.createHash('sha256').update(submittedOtp).digest('hex');
+    const isMatch = (user.emailOtpHash && user.emailOtpHash === hashedSubmitted) || (user.otp && user.otp === submittedOtp);
+
+    if (!isMatch) {
+      user.otpAttempts = (user.otpAttempts || 0) + 1;
       await user.save();
-      return res.status(400).json({ msg: 'Invalid OTP' });
+      return res.status(400).json({ success: false, msg: 'Invalid OTP', message: 'Invalid OTP' });
     }
 
+    user.isEmailVerified = true;
     user.isVerified = true;
     if (user.role === 'user') {
       user.approved = true;
     }
+    user.emailOtpHash = undefined;
+    user.emailOtpExpires = undefined;
     user.otp = undefined;
     user.otpExpiry = undefined;
     user.otpPurpose = undefined;
@@ -184,7 +210,9 @@ async function verifyRegistrationOtp(req, res) {
     const token = createTokenForUser(user);
 
     return res.json({
-      msg: 'Account verified successfully',
+      success: true,
+      message: 'Email verified successfully!',
+      msg: 'Email verified successfully!',
       token,
       user: {
         id: user.id,
@@ -193,12 +221,13 @@ async function verifyRegistrationOtp(req, res) {
         role: user.role,
         registrationPurpose: user.registrationPurpose || (user.tamilRole === 'owners' ? 'Owner' : user.tamilRole === 'brokersBuilders' ? 'Builder' : 'Customer'),
         tamilRole: user.tamilRole,
-        internalRole: user.role
+        internalRole: user.role,
+        isEmailVerified: true
       }
     });
   } catch (err) {
-    console.error(err.message);
-    return res.status(500).send('Server error');
+    console.error('Verify registration OTP error:', err.message);
+    return res.status(500).json({ success: false, msg: 'Server error', message: 'Server error' });
   }
 }
 
@@ -341,45 +370,127 @@ async function resetPasswordWithOtp(req, res) {
   }
 }
 
+async function sendOtp(req, res) {
+  try {
+    const { email, purpose } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, msg: 'Email is required', message: 'Email is required' });
+    }
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      return res.status(404).json({ success: false, msg: 'User not found', message: 'User not found' });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const emailOtpHash = crypto.createHash('sha256').update(otp).digest('hex');
+    const emailOtpExpires = new Date(Date.now() + OTP_VALIDITY_MS);
+
+    user.emailOtpHash = emailOtpHash;
+    user.emailOtpExpires = emailOtpExpires;
+    user.otp = otp;
+    user.otpExpiry = emailOtpExpires;
+    user.otpPurpose = purpose || 'register';
+    user.otpAttempts = 0;
+    await user.save();
+
+    try {
+      await sendVerificationEmail(normalizedEmail, otp, user.name || 'User');
+    } catch (mailErr) {
+      console.error('[Send OTP Mailer Error]', mailErr.message);
+      return res.status(500).json({
+        success: false,
+        msg: mailErr.message || 'Failed to send verification email',
+        message: mailErr.message || 'Failed to send verification email'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Verification code sent to ' + normalizedEmail,
+      msg: 'Verification code sent to ' + normalizedEmail
+    });
+  } catch (err) {
+    console.error('sendOtp error:', err.message);
+    return res.status(500).json({ success: false, msg: 'Server error', message: 'Server error' });
+  }
+}
+
 async function resendOtp(req, res) {
   try {
     const { email, purpose } = req.body;
 
-    if (!email || !purpose) {
-      return res.status(400).json({ msg: 'Email and purpose are required' });
+    if (!email) {
+      return res.status(400).json({ success: false, msg: 'Email is required', message: 'Email is required' });
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
     const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
-      return res.json({ msg: 'If this email is registered, a new OTP has been sent.' });
+      return res.json({
+        success: true,
+        message: 'If this email is registered, a new OTP has been sent.',
+        msg: 'If this email is registered, a new OTP has been sent.'
+      });
     }
 
-    if (!canResendOtp(user.otpExpiry)) {
+    const expiry = user.emailOtpExpires || user.otpExpiry;
+    if (expiry && !canResendOtp(expiry)) {
       return res
         .status(429)
-        .json({ msg: 'Please wait before requesting a new OTP.' });
+        .json({ success: false, msg: 'Please wait before requesting a new OTP.', message: 'Please wait before requesting a new OTP.' });
     }
 
-    const otp = generateNumericOtp(6);
-    const otpExpiry = new Date(Date.now() + OTP_VALIDITY_MS);
+    // If purpose is forgot password, maintain password reset flow untouched
+    if (purpose === 'forgot') {
+      const otp = generateNumericOtp(6);
+      const otpExpiry = new Date(Date.now() + OTP_VALIDITY_MS);
+      user.otp = otp;
+      user.otpExpiry = otpExpiry;
+      user.otpPurpose = 'forgot';
+      user.otpAttempts = 0;
+      await user.save();
 
+      const mailResult = await sendOtpEmail(normalizedEmail, otp, 'forgot');
+      return res.json({
+        msg: 'A new OTP has been sent if the email is registered.',
+        devOtp: process.env.NODE_ENV !== 'production' || !mailResult.success ? otp : undefined
+      });
+    }
+
+    // For email verification (signup / profile)
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const emailOtpHash = crypto.createHash('sha256').update(otp).digest('hex');
+    const emailOtpExpires = new Date(Date.now() + OTP_VALIDITY_MS);
+
+    user.emailOtpHash = emailOtpHash;
+    user.emailOtpExpires = emailOtpExpires;
     user.otp = otp;
-    user.otpExpiry = otpExpiry;
-    user.otpPurpose = purpose;
+    user.otpExpiry = emailOtpExpires;
+    user.otpPurpose = purpose || 'register';
     user.otpAttempts = 0;
     await user.save();
 
-    const mailResult = await sendOtpEmail(normalizedEmail, otp, purpose);
+    try {
+      await sendVerificationEmail(normalizedEmail, otp, user.name || 'User');
+    } catch (mailErr) {
+      console.error('[Resend OTP Mailer Error]', mailErr.message);
+      return res.status(500).json({
+        success: false,
+        msg: mailErr.message || 'Failed to send verification email',
+        message: mailErr.message || 'Failed to send verification email'
+      });
+    }
 
     return res.json({
-      msg: 'A new OTP has been sent if the email is registered.',
-      devOtp: process.env.NODE_ENV !== 'production' || !mailResult.success ? otp : undefined
+      success: true,
+      message: 'Verification code sent to ' + normalizedEmail,
+      msg: 'Verification code sent to ' + normalizedEmail
     });
   } catch (err) {
     console.error('Resend OTP error:', err.message);
-    return res.status(500).send('Server error');
+    return res.status(500).json({ success: false, msg: 'Server error', message: 'Server error' });
   }
 }
 
@@ -389,5 +500,6 @@ module.exports = {
   login,
   forgotPassword,
   resetPasswordWithOtp,
-  resendOtp
+  resendOtp,
+  sendOtp
 };

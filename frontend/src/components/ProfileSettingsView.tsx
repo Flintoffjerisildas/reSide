@@ -16,6 +16,15 @@ import { toast } from 'sonner';
 import api from '../lib/api';
 import { useLanguage } from '../contexts/LanguageContext';
 
+declare global {
+  interface Window {
+    initSendOTP?: (configuration: any) => void;
+    sendOtp?: (identifier: string, success?: (data: any) => void, failure?: (error: any) => void) => void;
+    verifyOtp?: (otp: number, success?: (data: any) => void, failure?: (error: any) => void) => void;
+    retryOtp?: (retryType?: number, success?: (data: any) => void, failure?: (error: any) => void) => void;
+  }
+}
+
 interface ProfileSettingsViewProps {
   userProfile: any;
   refetchUserProfile?: () => Promise<any> | void;
@@ -41,7 +50,7 @@ export default function ProfileSettingsView({
     monthlyIncome: '',
     maritalStatus: '',
     familyMembers: '',
-    idType: '',
+    idType: 'Aadhaar Card',
     idNumber: '',
   });
 
@@ -60,6 +69,320 @@ export default function ProfileSettingsView({
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+
+  // Profile Email Verification State
+  const [profileEmailOtp, setProfileEmailOtp] = useState('');
+  const [profileOtpSent, setProfileOtpSent] = useState(false);
+  const [profileOtpSending, setProfileOtpSending] = useState(false);
+  const [profileOtpVerifying, setProfileOtpVerifying] = useState(false);
+  const [profileOtpCountdown, setProfileOtpCountdown] = useState(0);
+  const [isEmailVerified, setIsEmailVerified] = useState<boolean>(
+    Boolean(userProfile?.isEmailVerified)
+  );
+
+  // Phone Number Verification State
+  const [phoneOtp, setPhoneOtp] = useState('');
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [phoneOtpSending, setPhoneOtpSending] = useState(false);
+  const [phoneOtpVerifying, setPhoneOtpVerifying] = useState(false);
+  const [phoneOtpCountdown, setPhoneOtpCountdown] = useState(0);
+  const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(
+    Boolean(userProfile?.isPhoneVerified)
+  );
+
+  // Aadhaar Card KYC Verification State
+  const [aadhaarRefId, setAadhaarRefId] = useState<string | null>(userProfile?.aadhaarRefId || null);
+  const [aadhaarOtp, setAadhaarOtp] = useState('');
+  const [aadhaarOtpSent, setAadhaarOtpSent] = useState(false);
+  const [aadhaarOtpSending, setAadhaarOtpSending] = useState(false);
+  const [aadhaarOtpVerifying, setAadhaarOtpVerifying] = useState(false);
+  const [aadhaarOtpCountdown, setAadhaarOtpCountdown] = useState(0);
+  const [isAadhaarVerified, setIsAadhaarVerified] = useState<boolean>(
+    Boolean(userProfile?.isAadhaarVerified)
+  );
+
+  useEffect(() => {
+    if (userProfile) {
+      setIsEmailVerified(Boolean(userProfile.isEmailVerified));
+      setIsPhoneVerified(Boolean(userProfile.isPhoneVerified));
+      setIsAadhaarVerified(Boolean(userProfile.isAadhaarVerified));
+      if (userProfile.aadhaarRefId) setAadhaarRefId(userProfile.aadhaarRefId);
+    }
+  }, [userProfile?.isEmailVerified, userProfile?.isPhoneVerified, userProfile?.isAadhaarVerified, userProfile?.aadhaarRefId]);
+
+  useEffect(() => {
+    let timer: any;
+    if (profileOtpCountdown > 0) {
+      timer = setInterval(() => setProfileOtpCountdown((c) => c - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [profileOtpCountdown]);
+
+  useEffect(() => {
+    let timer: any;
+    if (phoneOtpCountdown > 0) {
+      timer = setInterval(() => setPhoneOtpCountdown((c) => c - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [phoneOtpCountdown]);
+
+  useEffect(() => {
+    let timer: any;
+    if (aadhaarOtpCountdown > 0) {
+      timer = setInterval(() => setAadhaarOtpCountdown((c) => c - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [aadhaarOtpCountdown]);
+
+  // Initialize MSG91 OTP Widget SDK
+  useEffect(() => {
+    const SCRIPT_ID = 'msg91-otp-script';
+    const initWidget = () => {
+      if (typeof window.initSendOTP === 'function') {
+        window.initSendOTP({
+          widgetId: import.meta.env.VITE_MSG91_WIDGET_ID || '366b786c5678333534383935',
+          tokenAuth: import.meta.env.VITE_MSG91_TOKEN_AUTH || '593275Tq36iHGjcmZ6b0672b9P1',
+          exposeMethods: true,
+          success: (data: any) => console.log('MSG91 widget initialized/verified', data),
+          failure: (error: any) => console.error('MSG91 widget error', error),
+        });
+      }
+    };
+
+    if (!document.getElementById(SCRIPT_ID)) {
+      const script = document.createElement('script');
+      script.id = SCRIPT_ID;
+      script.src = 'https://verify.msg91.com/otp-provider.js';
+      script.async = true;
+      script.onload = () => {
+        initWidget();
+      };
+      script.onerror = () => {
+        console.warn('Primary MSG91 script failed, trying fallback...');
+        const fallbackScript = document.createElement('script');
+        fallbackScript.id = 'msg91-otp-script-fallback';
+        fallbackScript.src = 'https://verify.phone91.com/otp-provider.js';
+        fallbackScript.async = true;
+        fallbackScript.onload = () => {
+          initWidget();
+        };
+        fallbackScript.onerror = (e) => {
+          console.error('Failed to load MSG91 fallback script', e);
+        };
+        document.body.appendChild(fallbackScript);
+      };
+      document.body.appendChild(script);
+    } else {
+      initWidget();
+    }
+  }, []);
+
+  const handleSendProfileVerificationOtp = async () => {
+    const targetEmail = userProfile?.email;
+    if (!targetEmail) return;
+    setProfileOtpSending(true);
+    try {
+      await api.post('/profile/send-verification-otp', { email: targetEmail });
+      setProfileOtpSent(true);
+      setProfileEmailOtp('');
+      setProfileOtpCountdown(60);
+      toast.success(
+        t(
+          `Verification code sent to ${targetEmail}. Please check your inbox or spam folder.`,
+          `சரிபார்ப்புக் குறியீடு ${targetEmail} க்கு அனுப்பப்பட்டது. உங்கள் இன்பாக்ஸ் அல்லது ஸ்பேம் கோப்புறையை சரிபார்க்கவும்.`
+        )
+      );
+    } catch (err: any) {
+      const msg =
+        err.response?.data?.msg ||
+        err.response?.data?.message ||
+        err.message ||
+        t('Failed to send verification code', 'சரிபார்ப்புக் குறியீடு அனுப்ப முடியவில்லை');
+      toast.error(msg);
+    } finally {
+      setProfileOtpSending(false);
+    }
+  };
+
+  const handleVerifyProfileEmailOtp = async () => {
+    if (!profileEmailOtp.trim()) {
+      toast.error(t('Please enter the verification code', 'சரிபார்ப்புக் குறியீட்டை உள்ளிடவும்'));
+      return;
+    }
+    setProfileOtpVerifying(true);
+    try {
+      await api.post('/profile/verify-otp', { otp: profileEmailOtp.trim() });
+      setIsEmailVerified(true);
+      setProfileOtpSent(false);
+      setProfileEmailOtp('');
+      toast.success(t('Email verified successfully!', 'மின்னஞ்சல் வெற்றிகரமாக சரிபார்க்கப்பட்டது!'));
+      refetchUserProfile?.();
+    } catch (err: any) {
+      const msg =
+        err.response?.data?.msg ||
+        err.response?.data?.message ||
+        err.message ||
+        t('Invalid OTP', 'தவறான OTP');
+      toast.error(msg);
+    } finally {
+      setProfileOtpVerifying(false);
+    }
+  };
+
+  // Phone OTP Handlers (MSG91 OTP Widget SDK)
+  const handleSendPhoneOtp = () => {
+    const rawPhone = formData.phone || '';
+    const digitsOnly = rawPhone.replace(/\D/g, '');
+    if (!digitsOnly || digitsOnly.length < 10) {
+      toast.error(t('Please enter a valid 10-digit phone number', 'சரியான 10 இலக்க தொலைபேசி எண்ணை உள்ளிடவும்'));
+      return;
+    }
+    const tenDigits = digitsOnly.slice(-10);
+    const identifier = '91' + tenDigits;
+
+    if (typeof window.sendOtp !== 'function') {
+      toast.error(t('OTP service is initializing. Please wait a moment...', 'OTP சேவை தொடங்குகிறது. சிறிது நேரம் காத்திருக்கவும்...'));
+      return;
+    }
+
+    setPhoneOtpSending(true);
+    window.sendOtp(
+      identifier,
+      (data: any) => {
+        setPhoneOtpSending(false);
+        setPhoneOtpSent(true);
+        setPhoneOtp('');
+        setPhoneOtpCountdown(60);
+        console.log('MSG91 sendOtp success:', data);
+        toast.success(t(`OTP sent to +91 ${tenDigits}`, `+91 ${tenDigits} க்கு OTP அனுப்பப்பட்டது`));
+      },
+      (err: any) => {
+        setPhoneOtpSending(false);
+        console.error('MSG91 sendOtp error:', err);
+        const msg = typeof err === 'string' ? err : err?.message || err?.msg || t('Failed to send phone OTP', 'தொலைபேசி OTP அனுப்ப முடியவில்லை');
+        toast.error(msg);
+      }
+    );
+  };
+
+  const handleVerifyPhoneOtp = () => {
+    const trimmedOtp = phoneOtp.trim();
+    if (!trimmedOtp || trimmedOtp.length !== 4) {
+      toast.error(t('Please enter the 4-digit OTP', '4 இலக்க OTP-ஐ உள்ளிடவும்'));
+      return;
+    }
+
+    const rawPhone = formData.phone || '';
+    const digitsOnly = rawPhone.replace(/\D/g, '');
+    const tenDigits = digitsOnly.slice(-10);
+    const formattedPhone = `+91${tenDigits}`;
+
+    if (typeof window.verifyOtp !== 'function') {
+      toast.error(t('OTP service is not available', 'OTP சேவை கிடைக்கவில்லை'));
+      return;
+    }
+
+    setPhoneOtpVerifying(true);
+    window.verifyOtp(
+      Number(trimmedOtp),
+      async (data: any) => {
+        try {
+          console.log('MSG91 verifyOtp raw data:', data);
+          const jwtToken = typeof data === 'string' ? data : (data?.message || data?.token || data?.data);
+          if (!jwtToken) {
+            throw new Error('No access token returned from verification');
+          }
+
+          const res = await api.post('/profile/verify-msg91-phone', {
+            phone: formattedPhone,
+            accessToken: jwtToken
+          });
+
+          setIsPhoneVerified(true);
+          setPhoneOtpSent(false);
+          setPhoneOtp('');
+          if (res.data?.user?.phone) {
+            setFormData((prev) => ({ ...prev, phone: res.data.user.phone }));
+          }
+          toast.success(t('Phone number verified successfully!', 'தொலைபேசி எண் வெற்றிகரமாக சரிபார்க்கப்பட்டது!'));
+          refetchUserProfile?.();
+        } catch (postErr: any) {
+          console.error('verify-msg91-phone backend error:', postErr);
+          const msg = postErr.response?.data?.message || postErr.response?.data?.msg || postErr.message || t('Phone verification failed', 'தொலைபேசி சரிபார்ப்பு தோல்வியடைந்தது');
+          toast.error(msg);
+        } finally {
+          setPhoneOtpVerifying(false);
+        }
+      },
+      (err: any) => {
+        setPhoneOtpVerifying(false);
+        console.error('MSG91 verifyOtp error:', err);
+        const msg = typeof err === 'string' ? err : err?.message || err?.msg || t('Invalid OTP', 'தவறான OTP');
+        toast.error(msg);
+      }
+    );
+  };
+
+  // Aadhaar KYC Handlers
+  const handleSendAadhaarOtp = async () => {
+    const cleanAadhaar = formData.idNumber.replace(/[\s\-]/g, '');
+    if (!/^\d{12}$/.test(cleanAadhaar)) {
+      toast.error(t('Please enter a valid 12-digit Aadhaar number', 'சரியான 12 இலக்க ஆதார் எண்ணை உள்ளிடவும்'));
+      return;
+    }
+
+    setAadhaarOtpSending(true);
+    try {
+      const res = await api.post('/profile/aadhaar/send-otp', { aadhaarNumber: cleanAadhaar });
+      setAadhaarRefId(res.data?.refId || null);
+      setAadhaarOtpSent(true);
+      setAadhaarOtp('');
+      setAadhaarOtpCountdown(60);
+      toast.success(t('OTP sent to Aadhaar-linked mobile number', 'ஆதார் இணைக்கப்பட்ட மொபைலுக்கு OTP அனுப்பப்பட்டது'));
+    } catch (err: any) {
+      const msg =
+        err.response?.data?.message ||
+        err.response?.data?.msg ||
+        err.message ||
+        t('Failed to send Aadhaar OTP', 'ஆதார் OTP அனுப்ப முடியவில்லை');
+      toast.error(msg);
+    } finally {
+      setAadhaarOtpSending(false);
+    }
+  };
+
+  const handleVerifyAadhaarOtp = async () => {
+    if (!aadhaarOtp.trim()) {
+      toast.error(t('Please enter the 6-digit OTP', '6 இலக்க OTP-ஐ உள்ளிடவும்'));
+      return;
+    }
+    setAadhaarOtpVerifying(true);
+    try {
+      const cleanAadhaar = formData.idNumber.replace(/[\s\-]/g, '');
+      const res = await api.post('/profile/aadhaar/verify-otp', {
+        aadhaarNumber: cleanAadhaar,
+        otp: aadhaarOtp.trim(),
+        refId: aadhaarRefId
+      });
+      setIsAadhaarVerified(true);
+      setAadhaarOtpSent(false);
+      setAadhaarOtp('');
+      if (res.data?.user?.idDocumentNumber) {
+        setFormData((prev) => ({ ...prev, idNumber: res.data.user.idDocumentNumber }));
+      }
+      toast.success(t('Aadhaar KYC verified successfully!', 'ஆதார் KYC வெற்றிகரமாக சரிபார்க்கப்பட்டது!'));
+      refetchUserProfile?.();
+    } catch (err: any) {
+      const msg =
+        err.response?.data?.message ||
+        err.response?.data?.msg ||
+        err.message ||
+        t('Aadhaar verification failed', 'ஆதார் சரிபார்ப்பு தோல்வியடைந்தது');
+      toast.error(msg);
+    } finally {
+      setAadhaarOtpVerifying(false);
+    }
+  };
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const idProofInputRef = useRef<HTMLInputElement>(null);
@@ -86,8 +409,8 @@ export default function ProfileSettingsView({
           userProfile.familyMembers !== undefined && userProfile.familyMembers !== null
             ? String(userProfile.familyMembers)
             : '',
-        idType: userProfile.idType || '',
-        idNumber: userProfile.idNumber || userProfile.aadhar || '',
+        idType: userProfile.idProofType || userProfile.idType || 'Aadhaar Card',
+        idNumber: userProfile.idDocumentNumber || userProfile.idNumber || userProfile.aadhar || '',
       });
 
       setNotificationsEnabled(userProfile.notificationsEnabled ?? true);
@@ -159,6 +482,34 @@ export default function ProfileSettingsView({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setFormData((prev) => ({ ...prev, phone: val }));
+    const currentPhone = String(userProfile?.phone || '').trim();
+    if (currentPhone && val.trim() !== currentPhone) {
+      setIsPhoneVerified(false);
+    }
+  };
+
+  const handleIdNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value;
+    const isAadhaar = !formData.idType || formData.idType.toLowerCase().includes('aadhaar');
+    if (isAadhaar) {
+      const rawDigits = val.replace(/\D/g, '').slice(0, 12);
+      const parts: string[] = [];
+      for (let i = 0; i < rawDigits.length; i += 4) {
+        parts.push(rawDigits.slice(i, i + 4));
+      }
+      val = parts.join(' ');
+    }
+    setFormData((prev) => ({ ...prev, idNumber: val }));
+    const currentDoc = String(userProfile?.idDocumentNumber || userProfile?.idNumber || userProfile?.aadhar || '').replace(/\s+/g, '');
+    const newDoc = val.replace(/\s+/g, '');
+    if (currentDoc && newDoc !== currentDoc) {
+      setIsAadhaarVerified(false);
+    }
+  };
+
   const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -213,9 +564,13 @@ export default function ProfileSettingsView({
           userProfile.familyMembers !== undefined && userProfile.familyMembers !== null
             ? String(userProfile.familyMembers)
             : '',
-        idType: userProfile.idType || '',
-        idNumber: userProfile.idNumber || userProfile.aadhar || '',
+        idType: userProfile.idProofType || userProfile.idType || 'Aadhaar Card',
+        idNumber: userProfile.idDocumentNumber || userProfile.idNumber || userProfile.aadhar || '',
       });
+      setIsPhoneVerified(Boolean(userProfile.isPhoneVerified));
+      setIsAadhaarVerified(Boolean(userProfile.isAadhaarVerified));
+      setPhoneOtpSent(false);
+      setAadhaarOtpSent(false);
       setNotificationsEnabled(userProfile.notificationsEnabled ?? true);
       toast.info(t('Form reset to saved details', 'படிவம் மீட்டமைக்கப்பட்டது'));
     }
@@ -239,6 +594,8 @@ export default function ProfileSettingsView({
         familyMembers: formData.familyMembers ? parseInt(formData.familyMembers) : undefined,
         idType: formData.idType,
         idNumber: formData.idNumber,
+        idProofType: formData.idType,
+        idDocumentNumber: formData.idNumber,
         idProofImage: idProofImage || undefined,
         notificationsEnabled: notificationsEnabled,
       };
@@ -339,6 +696,50 @@ export default function ProfileSettingsView({
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
               <span>{roleDisplay}</span>
             </div>
+
+            {/* Individual Verification Status Indicators */}
+            <div className="mt-3 flex flex-wrap gap-1.5 justify-center max-w-[270px]">
+              {/* Email Status */}
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${isEmailVerified
+                  ? 'border-emerald-200 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300'
+                  : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400'
+                  }`}
+              >
+                {isEmailVerified ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <ShieldAlert className="w-2.5 h-2.5 text-slate-400" />}
+                <span>{isEmailVerified ? t('Email Verified ✓', 'மின்னஞ்சல் சரிபார்க்கப்பட்டது ✓') : t('Email Pending', 'மின்னஞ்சல் நிலுவை')}</span>
+              </span>
+
+              {/* Phone Status */}
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${isPhoneVerified
+                  ? 'border-emerald-200 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300'
+                  : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400'
+                  }`}
+              >
+                {isPhoneVerified ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <ShieldAlert className="w-2.5 h-2.5 text-slate-400" />}
+                <span>{isPhoneVerified ? t('Phone Verified ✓', 'தொலைபேசி சரிபார்க்கப்பட்டது ✓') : t('Phone Pending', 'தொலைபேசி நிலுவை')}</span>
+              </span>
+
+              {/* Aadhaar Status */}
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${isAadhaarVerified
+                  ? 'border-emerald-200 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300'
+                  : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400'
+                  }`}
+              >
+                {isAadhaarVerified ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <ShieldAlert className="w-2.5 h-2.5 text-slate-400" />}
+                <span>{isAadhaarVerified ? t('Aadhaar KYC Verified ✓', 'ஆதார் KYC சரிபார்க்கப்பட்டது ✓') : t('Aadhaar Pending', 'ஆதார் நிலுவை')}</span>
+              </span>
+            </div>
+
+            {/* Overall Verified Account Badge (when Email, Phone, and Aadhaar KYC are all verified) */}
+            {isEmailVerified && isPhoneVerified && isAadhaarVerified && (
+              <div className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border border-emerald-300 dark:border-emerald-800 bg-emerald-100/80 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-200 shadow-xs">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>{t('✓ Verified Account', '✓ சரிபார்க்கப்பட்ட கணக்கு')}</span>
+              </div>
+            )}
           </div>
 
           {/* Middle Profile Completion Ring */}
@@ -390,9 +791,9 @@ export default function ProfileSettingsView({
                   {percent === 100
                     ? t('All required personal & KYC details verified.', 'அனைத்து விவரங்களும் நிரப்பப்பட்டுள்ளன.')
                     : t(
-                        `${missingFields.length} field${missingFields.length > 1 ? 's' : ''} remaining to complete verification.`,
-                        `${missingFields.length} புலங்கள் பூர்த்தி செய்யப்பட வேண்டும்.`
-                      )}
+                      `${missingFields.length} field${missingFields.length > 1 ? 's' : ''} remaining to complete verification.`,
+                      `${missingFields.length} புலங்கள் பூர்த்தி செய்யப்பட வேண்டும்.`
+                    )}
                 </p>
               </div>
             </div>
@@ -422,10 +823,17 @@ export default function ProfileSettingsView({
               </div>
             ) : (
               <div className="w-full mt-3 pt-2 border-t border-slate-100/80 dark:border-slate-800/60 text-center">
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-900/40 px-3 py-1 rounded-full">
-                  <Sparkles className="h-3 w-3" />
-                  {t('Profile is fully verified', 'சுயவிவரம் முழுமையாக பூர்த்தி செய்யப்பட்டது')}
-                </span>
+                {isEmailVerified && isPhoneVerified && isAadhaarVerified ? (
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-900/40 px-3 py-1 rounded-full">
+                    <Sparkles className="h-3 w-3" />
+                    {t('✓ Profile is fully verified', '✓ சுயவிவரம் முழுமையாக சரிபார்க்கப்பட்டது')}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/40 px-3 py-1 rounded-full">
+                    <Check className="h-3 w-3" />
+                    {t('Details filled — Complete verification above', 'விவரங்கள் நிரப்பப்பட்டன — மேலே சரிபார்க்கவும்')}
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -450,14 +858,12 @@ export default function ProfileSettingsView({
               role="switch"
               aria-checked={notificationsEnabled}
               onClick={() => setNotificationsEnabled((prev) => !prev)}
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                notificationsEnabled ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'
-              }`}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${notificationsEnabled ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'
+                }`}
             >
               <span
-                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                  notificationsEnabled ? 'translate-x-4' : 'translate-x-0'
-                }`}
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${notificationsEnabled ? 'translate-x-4' : 'translate-x-0'
+                  }`}
               />
             </button>
           </div>
@@ -483,22 +889,20 @@ export default function ProfileSettingsView({
               <button
                 type="button"
                 onClick={() => setActiveSubTab('personal')}
-                className={`px-3 py-1 rounded-full text-xs transition-all cursor-pointer ${
-                  activeSubTab === 'personal'
-                    ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-bold shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
-                }`}
+                className={`px-3 py-1 rounded-full text-xs transition-all cursor-pointer ${activeSubTab === 'personal'
+                  ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-bold shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
+                  }`}
               >
                 {t('Personal & KYC', 'தனிப்பட்ட & KYC')}
               </button>
               <button
                 type="button"
                 onClick={() => setActiveSubTab('security')}
-                className={`px-3 py-1 rounded-full text-xs transition-all cursor-pointer ${
-                  activeSubTab === 'security'
-                    ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-bold shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
-                }`}
+                className={`px-3 py-1 rounded-full text-xs transition-all cursor-pointer ${activeSubTab === 'security'
+                  ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-bold shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
+                  }`}
               >
                 {t('Security & Password', 'பாதுகாப்பு & கடவுச்சொல்')}
               </button>
@@ -527,9 +931,25 @@ export default function ProfileSettingsView({
                   </div>
 
                   <div>
-                    <label htmlFor="email" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                      {t('Email Address', 'மின்னஞ்சல் முகவரி')}
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label htmlFor="email" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block">
+                        {t('Email Address', 'மின்னஞ்சல் முகவரி')}
+                      </label>
+                      {isEmailVerified ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-md">
+                          <Check className="w-3 h-3" /> {t('Verified', 'சரிபார்க்கப்பட்டது')}
+                        </span>
+                      ) : !profileOtpSent ? (
+                        <button
+                          type="button"
+                          onClick={handleSendProfileVerificationOtp}
+                          disabled={profileOtpSending}
+                          className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-semibold"
+                        >
+                          {profileOtpSending ? t('Sending...', 'அனுப்புகிறது...') : t('Verify Email', 'மின்னஞ்சலை சரிபார்')}
+                        </button>
+                      ) : null}
+                    </div>
                     <div className="relative">
                       <input
                         id="email"
@@ -541,21 +961,145 @@ export default function ProfileSettingsView({
                       />
                       <Lock className="h-3.5 w-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" />
                     </div>
+
+                    {!isEmailVerified && profileOtpSent && (
+                      <div className="mt-2 p-2.5 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                            {t('Enter 6-digit code sent to your email', 'உங்கள் மின்னஞ்சலுக்கு அனுப்பப்பட்ட 6 இலக்க குறியீட்டை உள்ளிடவும்')}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setProfileOtpSent(false)}
+                            className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                          >
+                            {t('Cancel', 'ரத்துசெய்')}
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={6}
+                            placeholder="123456"
+                            value={profileEmailOtp}
+                            onChange={(e) => setProfileEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            className="h-8 flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-xs text-center font-mono tracking-widest text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleVerifyProfileEmailOtp}
+                            disabled={profileOtpVerifying || profileEmailOtp.length !== 6}
+                            className="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold disabled:opacity-50 transition-colors"
+                          >
+                            {profileOtpVerifying ? t('Verifying...', 'சரிபார்க்கிறது...') : t('Verify', 'சரிபார்')}
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+                          <span>
+                            {profileOtpCountdown > 0
+                              ? t('Resend in', 'மீண்டும் அனுப்ப') + ` ${profileOtpCountdown}s`
+                              : t('Didn\'t receive code?', 'குறியீடு கிடைக்கவில்லையா?')}
+                          </span>
+                          {profileOtpCountdown === 0 && (
+                            <button
+                              type="button"
+                              onClick={handleSendProfileVerificationOtp}
+                              disabled={profileOtpSending}
+                              className="text-blue-600 dark:text-blue-400 font-medium hover:underline"
+                            >
+                              {t('Resend code', 'குறியீட்டை மீண்டும் அனுப்பு')}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div>
-                    <label htmlFor="phone" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                      {t('Phone Number', 'தொலைபேசி எண்')}
-                    </label>
-                    <input
-                      id="phone"
-                      name="phone"
-                      type="tel"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      placeholder={t('+91 98765 43210', '+91 98765 43210')}
-                      className="h-9 w-full rounded-xl border border-slate-200/70 dark:border-white/10 bg-white dark:bg-slate-900/60 text-xs text-slate-900 dark:text-white px-3 focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
-                    />
+                    <div className="flex items-center justify-between mb-1">
+                      <label htmlFor="phone" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block">
+                        {t('Phone Number', 'தொலைபேசி எண்')}
+                      </label>
+                      {isPhoneVerified ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-md">
+                          <Check className="w-3 h-3" /> {t('Verified', 'சரிபார்க்கப்பட்டது')}
+                        </span>
+                      ) : !phoneOtpSent ? (
+                        <button
+                          type="button"
+                          onClick={handleSendPhoneOtp}
+                          disabled={phoneOtpSending || !formData.phone.trim()}
+                          className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-semibold disabled:opacity-50"
+                        >
+                          {phoneOtpSending ? t('Sending...', 'அனுப்புகிறது...') : t('Verify', 'சரிபார்')}
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="relative">
+                      <input
+                        id="phone"
+                        name="phone"
+                        type="tel"
+                        value={formData.phone}
+                        onChange={handlePhoneChange}
+                        placeholder={t('+91 98765 43210', '+91 98765 43210')}
+                        className="h-9 w-full rounded-xl border border-slate-200/70 dark:border-white/10 bg-white dark:bg-slate-900/60 text-xs text-slate-900 dark:text-white px-3 focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
+                      />
+                    </div>
+
+                    {!isPhoneVerified && phoneOtpSent && (
+                      <div className="mt-2 p-2.5 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                            {t('Enter 4-digit code sent to your phone', 'உங்கள் தொலைபேசிக்கு அனுப்பப்பட்ட 4 இலக்க குறியீட்டை உள்ளிடவும்')}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setPhoneOtpSent(false)}
+                            className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                          >
+                            {t('Cancel', 'ரத்துசெய்')}
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={4}
+                            placeholder="1234"
+                            value={phoneOtp}
+                            onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                            className="h-8 flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-xs text-center font-mono tracking-widest text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleVerifyPhoneOtp}
+                            disabled={phoneOtpVerifying || phoneOtp.length !== 4}
+                            className="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold disabled:opacity-50 transition-colors"
+                          >
+                            {phoneOtpVerifying ? t('Verifying...', 'சரிபார்க்கிறது...') : t('Confirm OTP', 'OTP உறுதிசெய்')}
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+                          <span>
+                            {phoneOtpCountdown > 0
+                              ? t('Resend in', 'மீண்டும் அனுப்ப') + ` ${phoneOtpCountdown}s`
+                              : t("Didn't receive code?", 'குறியீடு கிடைக்கவில்லையா?')}
+                          </span>
+                          {phoneOtpCountdown === 0 && (
+                            <button
+                              type="button"
+                              onClick={handleSendPhoneOtp}
+                              disabled={phoneOtpSending}
+                              className="text-blue-600 dark:text-blue-400 font-medium hover:underline"
+                            >
+                              {t('Resend code', 'குறியீட்டை மீண்டும் அனுப்பு')}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -706,27 +1250,103 @@ export default function ProfileSettingsView({
                       onChange={handleInputChange}
                       className="h-9 w-full rounded-xl border border-slate-200/70 dark:border-white/10 bg-white dark:bg-slate-900/60 text-xs text-slate-900 dark:text-white px-2.5 focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 transition-colors cursor-pointer"
                     >
-                      <option value="">{t('Select ID Document', 'ஆவண வகை தேர்வு')}</option>
-                      <option value="Aadhaar">Aadhaar Card</option>
-                      <option value="PAN">PAN Card</option>
-                      <option value="Passport">Passport</option>
-                      <option value="Driving License">Driving License</option>
+                      <option value="Aadhaar Card">{t('Aadhaar Card', 'ஆதார் அட்டை')}</option>
+                      <option value="PAN Card">{t('PAN Card', 'பான் அட்டை')}</option>
+                      <option value="Passport">{t('Passport', 'பாஸ்போர்ட்')}</option>
+                      <option value="Driving License">{t('Driving License', 'ஓட்டுநர் உரிமம்')}</option>
                     </select>
                   </div>
 
                   <div>
-                    <label htmlFor="idNumber" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                      {t('ID Document Number', 'அடையாள எண்')}
-                    </label>
-                    <input
-                      id="idNumber"
-                      name="idNumber"
-                      type="text"
-                      value={formData.idNumber}
-                      onChange={handleInputChange}
-                      placeholder={t('XXXX XXXX XXXX', 'XXXX XXXX XXXX')}
-                      className="h-9 w-full rounded-xl border border-slate-200/70 dark:border-white/10 bg-white dark:bg-slate-900/60 text-xs text-slate-900 dark:text-white px-3 focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
-                    />
+                    <div className="flex items-center justify-between mb-1">
+                      <label htmlFor="idNumber" className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block">
+                        {t('ID Document Number', 'அடையாள எண்')}
+                      </label>
+                      {(!formData.idType || formData.idType.toLowerCase().includes('aadhaar')) ? (
+                        isAadhaarVerified ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-md">
+                            <Check className="w-3 h-3" /> {t('Verified', 'சரிபார்க்கப்பட்டது')}
+                          </span>
+                        ) : !aadhaarOtpSent ? (
+                          <button
+                            type="button"
+                            onClick={handleSendAadhaarOtp}
+                            disabled={aadhaarOtpSending || !formData.idNumber.trim()}
+                            className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-semibold disabled:opacity-50"
+                          >
+                            {aadhaarOtpSending ? t('Sending...', 'அனுப்புகிறது...') : t('Verify Aadhaar', 'ஆதார் சரிபார்')}
+                          </button>
+                        ) : null
+                      ) : null}
+                    </div>
+                    <div className="relative">
+                      <input
+                        id="idNumber"
+                        name="idNumber"
+                        type="text"
+                        value={formData.idNumber}
+                        onChange={handleIdNumberChange}
+                        placeholder={
+                          !formData.idType || formData.idType.toLowerCase().includes('aadhaar')
+                            ? t('XXXX XXXX XXXX', 'XXXX XXXX XXXX')
+                            : t('Enter ID Document Number', 'அடையாள எண்ணை உள்ளிடவும்')
+                        }
+                        className="h-9 w-full rounded-xl border border-slate-200/70 dark:border-white/10 bg-white dark:bg-slate-900/60 text-xs text-slate-900 dark:text-white px-3 focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
+                      />
+                    </div>
+
+                    {!isAadhaarVerified && (!formData.idType || formData.idType.toLowerCase().includes('aadhaar')) && aadhaarOtpSent && (
+                      <div className="mt-2 p-2.5 rounded-xl border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/50 dark:bg-indigo-950/20 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                            {t('Enter 6-digit OTP sent to Aadhaar-linked mobile', 'ஆதார் இணைக்கப்பட்ட மொபைலுக்கு அனுப்பப்பட்ட 6 இலக்க OTP-ஐ உள்ளிடவும்')}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setAadhaarOtpSent(false)}
+                            className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                          >
+                            {t('Cancel', 'ரத்துசெய்')}
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={6}
+                            placeholder="123456"
+                            value={aadhaarOtp}
+                            onChange={(e) => setAadhaarOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            className="h-8 flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-xs text-center font-mono tracking-widest text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleVerifyAadhaarOtp}
+                            disabled={aadhaarOtpVerifying || aadhaarOtp.length !== 6}
+                            className="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold disabled:opacity-50 transition-colors"
+                          >
+                            {aadhaarOtpVerifying ? t('Verifying...', 'சரிபார்க்கிறது...') : t('Verify KYC', 'KYC சரிபார்')}
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+                          <span>
+                            {aadhaarOtpCountdown > 0
+                              ? t('Resend in', 'மீண்டும் அனுப்ப') + ` ${aadhaarOtpCountdown}s`
+                              : t("Didn't receive OTP?", 'OTP கிடைக்கவில்லையா?')}
+                          </span>
+                          {aadhaarOtpCountdown === 0 && (
+                            <button
+                              type="button"
+                              onClick={handleSendAadhaarOtp}
+                              disabled={aadhaarOtpSending}
+                              className="text-blue-600 dark:text-blue-400 font-medium hover:underline"
+                            >
+                              {t('Resend OTP', 'OTP மீண்டும் அனுப்பு')}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div>
