@@ -225,12 +225,13 @@ io.on('connection', (socket) => {
     const uidStr = String(uId);
     socket.userId = uidStr;
     socket.join(`user_${uidStr}`);
+    socket.join(uidStr);
     if (!onlineUsers.has(uidStr)) {
       onlineUsers.set(uidStr, new Set());
     }
     onlineUsers.get(uidStr).add(socket.id);
     io.emit('online_users_updated', Array.from(onlineUsers.keys()));
-    console.log(`Socket ${socket.id} joined room user_${uidStr}. Total online: ${onlineUsers.size}`);
+    console.log(`Socket ${socket.id} joined rooms user_${uidStr} and ${uidStr}. Total online: ${onlineUsers.size}`);
   };
 
   if (initialUserId) {
@@ -238,6 +239,16 @@ io.on('connection', (socket) => {
   }
 
   socket.on('register_user', (uId) => {
+    registerUser(uId);
+  });
+
+  socket.on('join', (room) => {
+    if (room) {
+      socket.join(String(room));
+    }
+  });
+
+  socket.on('join_user', (uId) => {
     registerUser(uId);
   });
 
@@ -421,6 +432,27 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/self-managed-rentals', require('./routes/selfManagedRentals'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/profile', require('./routes/profile'));
+app.use('/api/superadmin', require('./routes/superadmin'));
+
+app.get('/api/system-status', async (req, res) => {
+  try {
+    const SystemConfig = require('./models/SystemConfig');
+    const config = await SystemConfig.getSingleton();
+    return res.json({
+      maintenanceMode: Boolean(config.maintenanceMode),
+      allowNewRegistrations: config.allowNewRegistrations !== false,
+      requirePhoneVerificationForListing: Boolean(config.requirePhoneVerificationForListing),
+      globalBannerMessage: config.globalBannerMessage || '',
+    });
+  } catch (err) {
+    return res.json({
+      maintenanceMode: false,
+      allowNewRegistrations: true,
+      requirePhoneVerificationForListing: false,
+      globalBannerMessage: '',
+    });
+  }
+});
 
 app.get('/', (req, res) => {
   res.send('ReSideAI API is running');

@@ -16,7 +16,8 @@ import {
   Lock,
   Users,
   MessageSquare,
-  Check
+  Check,
+  Phone
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -71,6 +72,19 @@ export default function PropertyCard({
     ''
   );
   const isCurrentOwner = isOwnerView || (!!currentUserId && !!ownerId && String(currentUserId) === String(ownerId));
+  const isOwnProperty = Boolean(isCurrentOwner || (!!currentUserId && !!ownerId && String(currentUserId) === String(ownerId)));
+
+  const ownerObj = typeof rawOwner === 'object' && rawOwner !== null ? rawOwner : null;
+  const ownerPhone =
+    ownerObj?.phone ||
+    (property as any).ownerPhone ||
+    (property as any).ownerId?.phone ||
+    '';
+  const ownerName =
+    ownerObj?.name ||
+    ownerObj?.fullName ||
+    (property as any).ownerName ||
+    'Owner';
 
   const createRequest = useCreateRequest();
   const [translatedTitle, setTranslatedTitle] = useState<string | null>(null);
@@ -468,10 +482,18 @@ export default function PropertyCard({
           </div>
         )}
 
-        {/* Verified Badge */}
-        <div className="glass-pill absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold text-emerald-600 border-emerald-400/40 dark:text-emerald-400 shadow-sm backdrop-blur-md">
-          ✓ {t('Verified', 'சரிபார்க்கப்பட்டது')}
-        </div>
+        {/* Call Owner Phone Icon */}
+        {ownerPhone && !isOwnProperty && (
+          <a
+            href={`tel:${ownerPhone.replace(/\s+/g, '')}`}
+            onClick={(e) => e.stopPropagation()}
+            title={`Call ${ownerName || 'Owner'}: ${ownerPhone}`}
+            aria-label="Call Owner"
+            className="absolute top-3 left-3 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-white/95 text-blue-600 shadow-md hover:bg-blue-600 hover:text-white transition-colors"
+          >
+            <Phone className="w-4 h-4" />
+          </a>
+        )}
 
         {/* Message / Connect Button - customer view only (hidden for owner) */}
         {!isCurrentOwner && (

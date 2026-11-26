@@ -540,7 +540,10 @@ router.post('/admin/create-user', auth, auth.requireAdmin, async (req, res) => {
     let role = 'user';
 
     const pLower = purposeStr.toLowerCase();
-    if (pLower === 'admin') {
+    if (pLower === 'admin' || pLower === 'superadmin') {
+      if (req.user?.role !== 'superadmin') {
+        return res.status(403).json({ msg: 'Only Super Admin can create Admin accounts' });
+      }
       tamilRole = 'admin';
       role = 'admin';
       normalizedPurpose = 'Owner';
@@ -629,6 +632,12 @@ router.put('/:id/approve', auth, auth.requireAdmin, async (req, res) => {
     if (!user) {
       return res.status(404).json({ msg: 'User not found' });
     }
+    if (user.role === 'superadmin') {
+      return res.status(403).json({ msg: 'Super Admin accounts cannot be modified' });
+    }
+    if (req.user?.role !== 'superadmin' && user.role === 'admin') {
+      return res.status(403).json({ msg: 'Only Super Admin can modify Admin accounts' });
+    }
 
     user.approved = true;
     await user.save();
@@ -646,12 +655,19 @@ router.put('/:id/block', auth, auth.requireAdmin, async (req, res) => {
     if (!user) {
       return res.status(404).json({ msg: 'User not found' });
     }
+    if (user.role === 'superadmin') {
+      return res.status(403).json({ msg: 'Super Admin accounts cannot be blocked or suspended' });
+    }
+    if (req.user?.role !== 'superadmin' && user.role === 'admin') {
+      return res.status(403).json({ msg: 'Only Super Admin can suspend or block Admin accounts' });
+    }
 
     const blockedRaw = req.body?.blocked;
     const blocked =
       typeof blockedRaw === 'boolean' ? blockedRaw : blockedRaw === 'true' || blockedRaw === 'on';
 
     user.blocked = blocked;
+    user.isSuspended = blocked;
     await user.save();
 
     res.json(user);
@@ -667,8 +683,15 @@ router.put('/:id/unblock', auth, auth.requireAdmin, async (req, res) => {
     if (!user) {
       return res.status(404).json({ msg: 'User not found' });
     }
+    if (user.role === 'superadmin') {
+      return res.status(403).json({ msg: 'Super Admin accounts cannot be modified' });
+    }
+    if (req.user?.role !== 'superadmin' && user.role === 'admin') {
+      return res.status(403).json({ msg: 'Only Super Admin can activate or unblock Admin accounts' });
+    }
 
     user.blocked = false;
+    user.isSuspended = false;
     await user.save();
 
     res.json(user);
@@ -684,6 +707,12 @@ router.put('/:id/role', auth, auth.requireAdmin, async (req, res) => {
     if (!user) {
       return res.status(404).json({ msg: 'User not found' });
     }
+    if (user.role === 'superadmin') {
+      return res.status(403).json({ msg: 'Super Admin accounts cannot be modified or downgraded' });
+    }
+    if (req.user?.role !== 'superadmin' && user.role === 'admin') {
+      return res.status(403).json({ msg: 'Only Super Admin can modify Admin roles' });
+    }
 
     const internalRole = req.body?.internalRole ?? req.body?.role;
     const tamilRole = req.body?.tamilRole;
@@ -693,6 +722,9 @@ router.put('/:id/role', auth, auth.requireAdmin, async (req, res) => {
       if (!['admin', 'user'].includes(normalizedInternalRole)) {
         return res.status(400).json({ msg: 'Invalid internalRole' });
       }
+      if (normalizedInternalRole === 'admin' && req.user?.role !== 'superadmin') {
+        return res.status(403).json({ msg: 'Only Super Admin can promote users to Admin' });
+      }
       user.role = normalizedInternalRole;
     }
 
@@ -700,6 +732,9 @@ router.put('/:id/role', auth, auth.requireAdmin, async (req, res) => {
       const normalizedTamilRole = String(tamilRole).trim();
       if (!['owners', 'brokersBuilders', 'customers', 'admin'].includes(normalizedTamilRole)) {
         return res.status(400).json({ msg: 'Invalid tamilRole' });
+      }
+      if (normalizedTamilRole === 'admin' && req.user?.role !== 'superadmin') {
+        return res.status(403).json({ msg: 'Only Super Admin can assign Admin role' });
       }
       user.tamilRole = normalizedTamilRole;
     }
@@ -718,10 +753,19 @@ router.put('/:id/tamilRole', auth, auth.requireAdmin, async (req, res) => {
     if (!user) {
       return res.status(404).json({ msg: 'User not found' });
     }
+    if (user.role === 'superadmin') {
+      return res.status(403).json({ msg: 'Super Admin accounts cannot be modified' });
+    }
+    if (req.user?.role !== 'superadmin' && user.role === 'admin') {
+      return res.status(403).json({ msg: 'Only Super Admin can modify Admin roles' });
+    }
 
     const tamilRole = String(req.body?.tamilRole || '').trim();
     if (!['owners', 'brokersBuilders', 'customers', 'admin'].includes(tamilRole)) {
       return res.status(400).json({ msg: 'Invalid tamilRole' });
+    }
+    if (tamilRole === 'admin' && req.user?.role !== 'superadmin') {
+      return res.status(403).json({ msg: 'Only Super Admin can assign Admin role' });
     }
 
     user.tamilRole = tamilRole;

@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-function auth(req, res, next) {
+async function auth(req, res, next) {
   // Get token from header (x-auth-token or Authorization: Bearer <token>)
   let token = req.header('x-auth-token');
 
@@ -27,6 +27,21 @@ function auth(req, res, next) {
       req.user.id = req.user._id;
     }
     req.userId = req.user?.id || req.user?._id;
+
+    // Enforce suspension/block checks on all protected routes
+    const dbUser = await User.findById(req.userId).select('role isSuspended blocked');
+    if (!dbUser) {
+      return res.status(401).json({ success: false, msg: 'User not found', message: 'User not found' });
+    }
+    if (dbUser.isSuspended || dbUser.blocked) {
+      return res.status(403).json({
+        success: false,
+        msg: 'Your account has been suspended. Please contact support.',
+        message: 'Your account has been suspended. Please contact support.'
+      });
+    }
+    req.user.role = dbUser.role;
+
     next();
   } catch (err) {
     res.status(401).json({ success: false, msg: 'Token is not valid', message: 'Token is not valid' });
@@ -35,17 +50,39 @@ function auth(req, res, next) {
 
 auth.requireAdmin = async function requireAdmin(req, res, next) {
   try {
-    const user = await User.findById(req.user?.id).select('role blocked approved');
+    const user = await User.findById(req.user?.id).select('role blocked isSuspended approved');
     if (!user) {
       return res.status(401).json({ msg: 'User not found' });
     }
 
-    if (user.blocked) {
-      return res.status(403).json({ msg: 'Account is blocked' });
+    if (user.isSuspended || user.blocked) {
+      return res.status(403).json({ msg: 'Account is suspended or blocked' });
     }
 
-    if (user.role !== 'admin') {
+    if (user.role !== 'admin' && user.role !== 'superadmin') {
       return res.status(403).json({ msg: 'Admin access required' });
+    }
+
+    next();
+  } catch (err) {
+    console.error(err?.message || err);
+    return res.status(500).send('Server Error');
+  }
+};
+
+auth.requireSuperAdmin = async function requireSuperAdmin(req, res, next) {
+  try {
+    const user = await User.findById(req.user?.id).select('role blocked isSuspended');
+    if (!user) {
+      return res.status(401).json({ msg: 'User not found' });
+    }
+
+    if (user.isSuspended || user.blocked) {
+      return res.status(403).json({ msg: 'Account is suspended or blocked' });
+    }
+
+    if (user.role !== 'superadmin') {
+      return res.status(403).json({ msg: 'Super Admin access required' });
     }
 
     next();

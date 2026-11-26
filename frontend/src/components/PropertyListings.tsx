@@ -4,7 +4,7 @@ import PropertyCard from './PropertyCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { X, ChevronLeft, ChevronRight, Send, ArrowUpRight, Home, Search, Mic2, Building2, CheckCircle2 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Send, ArrowUpRight, Home, Search, Mic2, Building2, CheckCircle2, User, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Property } from '../types';
 import AuthDialog from './AuthDialog';
@@ -31,7 +31,7 @@ export default function PropertyListings({
 }: PropertyListingsProps) {
   const { data: properties = [], isLoading } = useGetAllProperties();
   const { t, language } = useLanguage();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const createRequest = useCreateRequest();
 
   useEffect(() => {
@@ -215,6 +215,30 @@ export default function PropertyListings({
 
   // Navigation for property details view
   const selectedProperty = selectedPropertyIndex !== null ? filteredProperties[selectedPropertyIndex] : directProperty;
+  const ownerObj = typeof selectedProperty?.owner === 'object' ? selectedProperty.owner : null;
+  const rawOwnerId = String(
+    ownerObj?._id ||
+    ownerObj?.id ||
+    (selectedProperty as any)?.owner ||
+    (selectedProperty as any)?.ownerId ||
+    ''
+  );
+  const currentUserIdStr = String((user as any)?._id || (user as any)?.id || '');
+  const isOwnerOfSelected = Boolean(currentUserIdStr && rawOwnerId && currentUserIdStr === rawOwnerId);
+
+  const displayOwnerName =
+    ownerObj?.name ||
+    ownerObj?.fullName ||
+    (selectedProperty as any)?.ownerName ||
+    (isOwnerOfSelected ? ((user as any)?.name || (user as any)?.fullName) : null) ||
+    'Property Owner';
+
+  const rawOwnerPhone =
+    ownerObj?.phone ||
+    (selectedProperty as any)?.ownerPhone ||
+    (isOwnerOfSelected ? (user as any)?.phone : null) ||
+    '';
+
   const [selectedTitleTa, setSelectedTitleTa] = useState<string | null>(null);
   const [selectedLocationTa, setSelectedLocationTa] = useState<string | null>(null);
   const selectedImages = useMemo(() => {
@@ -311,6 +335,11 @@ export default function PropertyListings({
     }
 
     if (!selectedProperty) return;
+
+    if (isOwnerOfSelected) {
+      toast.info(t('You cannot send a request on your own property.', 'உங்கள் சொந்த சொத்தில் நீங்கள் கோரிக்கை அனுப்ப முடியாது.'));
+      return;
+    }
 
     setShowRequestDialog(true);
   };
@@ -712,6 +741,52 @@ export default function PropertyListings({
                       : t('No description provided.', 'விவரம் வழங்கப்படவில்லை.')}
                   </p>
                 </div>
+
+                {/* Owner Details Card */}
+                <div className="p-4 rounded-xl border border-border/60 bg-muted/40 dark:bg-muted/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                      <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      {t('Owner Details', 'உரிமையாளர் விவரங்கள்')}
+                    </h3>
+                    {isOwnerOfSelected && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-100/80 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-2 py-0.5 rounded-full">
+                        {t('Your Property', 'உங்கள் சொத்து')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div className="p-3 rounded-lg bg-muted">
+                      <div className="text-sm text-muted-foreground">{t('Owner Name', 'உரிமையாளர் பெயர்')}</div>
+                      <div className="font-semibold flex items-center gap-2 text-sm mt-0.5">
+                        <span>{displayOwnerName}</span>
+                        {isOwnerOfSelected && (
+                          <span className="sm:hidden inline-flex text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">
+                            {t('You', 'நீங்கள்')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted">
+                      <div className="text-sm text-muted-foreground">{t('Phone Number', 'தொலைபேசி எண்')}</div>
+                      <div className="font-semibold text-sm mt-0.5">
+                        {rawOwnerPhone ? (
+                          <a
+                            href={`tel:${rawOwnerPhone.replace(/\s+/g, '')}`}
+                            className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1.5"
+                          >
+                            <Phone className="h-3.5 w-3.5 shrink-0" />
+                            <span>{rawOwnerPhone}</span>
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground font-normal">
+                            {t('Not provided', 'வழங்கப்படவில்லை')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Footer Navigation */}
@@ -729,12 +804,14 @@ export default function PropertyListings({
 
                 <Button
                   onClick={handleRequestProperty}
-                  disabled={createRequest.isPending}
-                  className="gap-2 bg-blue-600 hover:bg-blue-700 text-white sm:flex-shrink-0"
+                  disabled={createRequest.isPending || isOwnerOfSelected}
+                  className="gap-2 bg-blue-600 hover:bg-blue-700 text-white sm:flex-shrink-0 disabled:opacity-50"
                   size="sm"
                 >
                   <Send className="h-4 w-4" />
-                  {selectedProperty.transactionType?.toLowerCase() === 'buy' || selectedProperty.transactionType?.toLowerCase() === 'purchase'
+                  {isOwnerOfSelected
+                    ? t('Your Property', 'உங்கள் சொத்து')
+                    : selectedProperty.transactionType?.toLowerCase() === 'buy' || selectedProperty.transactionType?.toLowerCase() === 'purchase'
                     ? t('Buy / Express Interest', 'வாங்க / விருப்பம் தெரிவிக்க')
                     : t('Rent / Apply', 'வாடகைக்கு விண்ணப்பிக்க')}
                 </Button>

@@ -40,7 +40,17 @@ export interface Property {
   transactionType: TransactionType;
   images?: string[];
   status?: string;
-  owner?: string;
+  owner?: string | {
+    _id?: string;
+    id?: string;
+    name?: string;
+    fullName?: string;
+    phone?: string;
+    isPhoneVerified?: boolean;
+    email?: string;
+  };
+  ownerName?: string;
+  ownerPhone?: string;
   description?: string;
   amenities?: string[];
   totalArea?: number;

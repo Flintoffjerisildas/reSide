@@ -134,7 +134,7 @@ router.put('/:id/approve', auth, async (req, res) => {
         if (!payment) return res.status(404).json({ msg: 'Payment not found' });
 
         const currentUser = await User.findById(req.user?.id).select('role');
-        const isAdmin = currentUser?.role === 'admin';
+        const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin';
 
         if (payment.owner && payment.owner.toString() !== req.user.id && !isAdmin) {
             return res.status(401).json({ msg: 'Not authorized' });
@@ -184,7 +184,7 @@ router.put('/:id/reject', auth, async (req, res) => {
         if (!payment) return res.status(404).json({ msg: 'Payment not found' });
 
         const currentUser = await User.findById(req.user?.id).select('role');
-        const isAdmin = currentUser?.role === 'admin';
+        const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin';
 
         if (payment.owner && payment.owner.toString() !== req.user.id && !isAdmin) {
             return res.status(401).json({ msg: 'Not authorized' });

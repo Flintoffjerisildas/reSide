@@ -599,11 +599,23 @@ router.get('/users', async (req, res) => {
 router.get('/unread-count', async (req, res) => {
   try {
     const currentUserId = req.currentUserId;
-    const count = await Message.countDocuments({
-      receiverId: currentUserId,
-      read: false
+    const [unreadMessages, pendingRequests] = await Promise.all([
+      Message.countDocuments({
+        receiverId: currentUserId,
+        read: false
+      }),
+      FriendRequest.countDocuments({
+        receiverId: currentUserId,
+        status: 'pending'
+      })
+    ]);
+    const totalCount = unreadMessages + pendingRequests;
+    return res.json({
+      success: true,
+      unreadCount: totalCount,
+      unreadMessages,
+      pendingRequests
     });
-    return res.json({ unreadCount: count });
   } catch (err) {
     console.error('Error fetching unread count:', err);
     return res.status(500).json({ msg: 'Server error' });
@@ -841,24 +853,56 @@ router.post(['/friend-request', '/friend-requests', '/request'], async (req, res
       await existingReq.populate('propertyId', '_id title name location price images');
     }
 
-    const senderUser = await User.findById(currentUserId).select('name fullName username email');
+    const senderUser = await User.findById(currentUserId).select(
+      '_id name fullName username email role avatar phone'
+    );
+    const senderName = normalizeName(senderUser) || senderUser?.name || 'Someone';
     const propSuffix = propertyTitle ? ` regarding "${propertyTitle}"` : '';
+    let notificationDoc = null;
     try {
-      await Notification.create({
+      notificationDoc = await Notification.create({
         recipient: targetReceiverId,
         sender: currentUserId,
         type: 'friend_request_received',
         title: 'New Friend & Chat Request',
-        message: `${normalizeName(senderUser)} sent you a friend request to chat${propSuffix}.`,
+        message: `${senderName} sent you a friend request to chat${propSuffix}.`,
         property: propertyId && mongoose.Types.ObjectId.isValid(propertyId) ? propertyId : null,
-        propertyTitle: propertyTitle || ''
+        propertyTitle: propertyTitle || '',
+        read: false,
+        isRead: false
       });
     } catch (notifErr) {
       console.error('Failed to create notification on request send:', notifErr);
     }
 
+    const senderSummary = {
+      _id: String(senderUser?._id || currentUserId),
+      id: String(senderUser?._id || currentUserId),
+      name: senderName,
+      email: senderUser?.email || '',
+      role: senderUser?.role || '',
+      avatar: senderUser?.avatar || null,
+      phone: senderUser?.phone || null
+    };
+
+    const recipientIdStr = String(targetReceiverId);
+    const populatedRequest = existingReq.toObject ? existingReq.toObject() : existingReq;
+
     if (io) {
-      io.to(`user_${targetReceiverId}`).emit('friend_request_received', existingReq);
+      const payload = {
+        request: existingReq,
+        sender: senderSummary,
+        notification: notificationDoc,
+        ...populatedRequest
+      };
+
+      // Emit to recipient using both normalized string ID and user_${recipientIdStr}
+      io.to(recipientIdStr).to(`user_${recipientIdStr}`).emit('friend_request_received', payload);
+
+      if (notificationDoc) {
+        io.to(recipientIdStr).to(`user_${recipientIdStr}`).emit('notification', notificationDoc);
+        io.to(recipientIdStr).to(`user_${recipientIdStr}`).emit('new_notification', notificationDoc);
+      }
     }
 
     return res.status(201).json({
@@ -925,12 +969,14 @@ const handleRespond = async (req, res) => {
     }
 
     if (io) {
-      io.to(`user_${request.senderId}`).emit('friend_request_updated', {
+      const senderIdStr = String(request.senderId);
+      const currentIdStr = String(currentUserId);
+      io.to(senderIdStr).to(`user_${senderIdStr}`).emit('friend_request_updated', {
         requestId: request._id,
         status: newStatus,
         partner: currentUserDoc
       });
-      io.to(`user_${currentUserId}`).emit('friend_request_updated', {
+      io.to(currentIdStr).to(`user_${currentIdStr}`).emit('friend_request_updated', {
         requestId: request._id,
         status: newStatus
       });

@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true, trim: true, lowercase: true },
+  email: { type: String, required: false, unique: true, sparse: true, trim: true, lowercase: true },
+  username: { type: String, trim: true, unique: true, sparse: true },
   password: { type: String, required: true }, // For MERN simple auth
   name: { type: String, required: true },
   tamilRole: {
@@ -16,7 +17,9 @@ const userSchema = new mongoose.Schema({
   },
   approved: { type: Boolean, default: false },
   blocked: { type: Boolean, default: false },
-  role: { type: String, enum: ['admin', 'user'], default: 'user' }, // System role: 'admin' | 'user'
+  isSuspended: { type: Boolean, default: false },
+  securityPinHash: { type: String, select: false },
+  role: { type: String, enum: ['user', 'tenant', 'landlord', 'admin', 'superadmin'], default: 'user' }, // System role
   phone: { type: String, trim: true, default: '' },
   isPhoneVerified: { type: Boolean, default: false },
   phoneOtpHash: { type: String, default: null },
@@ -79,10 +82,12 @@ userSchema.pre('save', function () {
     else if (this.tamilRole === 'customers') this.registrationPurpose = 'Customer';
   }
 
-  // Ensure system role is strictly 'admin' or 'user'
-  if (this.tamilRole === 'admin') {
+  // Preserve explicit superadmin/admin/landlord/tenant roles; only default when missing
+  if (this.role === 'superadmin') {
+    this.role = 'superadmin';
+  } else if (this.tamilRole === 'admin') {
     this.role = 'admin';
-  } else if (!this.role || this.role !== 'admin') {
+  } else if (!this.role || !['user', 'tenant', 'landlord', 'admin', 'superadmin'].includes(this.role)) {
     this.role = 'user';
   }
 });

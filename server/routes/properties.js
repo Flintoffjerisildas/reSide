@@ -82,7 +82,7 @@ router.get('/', async (req, res) => {
     }
 
     const properties = await Property.find(filter)
-      .populate('owner', 'name email phone')
+      .populate('owner', 'name fullName phone isPhoneVerified email')
       .populate('tenant', 'name') // Allow identifying occupancy without exposing sensitive tenant data
       .sort({ listedAt: -1, createdAt: -1 });
 
@@ -132,6 +132,17 @@ router.get('/sold-history', auth, async (req, res) => {
 // Add Property
 router.post('/', auth, async (req, res) => {
   try {
+    const SystemConfig = require('../models/SystemConfig');
+    const config = await SystemConfig.getSingleton();
+    if (config && config.requirePhoneVerificationForListing) {
+      const poster = await User.findById(req.user.id).select('isPhoneVerified role').lean();
+      if (poster && poster.role !== 'superadmin' && !poster.isPhoneVerified) {
+        return res.status(403).json({
+          msg: 'Phone verification is required before posting a property.',
+          message: 'Phone verification is required before posting a property.',
+        });
+      }
+    }
     const {
       title,
       propertyType,
@@ -228,7 +239,7 @@ router.put('/:id/listing-status', auth, async (req, res) => {
 
     // Authorization: Must be authenticated owner or admin
     const isOwner = property.owner.toString() === req.user.id;
-    const isAdmin = req.user && req.user.role === 'admin';
+    const isAdmin = req.user && (req.user.role === 'admin' || req.user.role === 'superadmin');
     if (!isOwner && !isAdmin) {
       return res.status(403).json({ msg: 'Not authorized: only property owner can change listing status' });
     }
@@ -381,7 +392,7 @@ router.put('/:id', auth, async (req, res) => {
 
     // Make sure user owns property or is admin
     const isOwner = property.owner.toString() === req.user.id;
-    const isAdmin = req.user && req.user.role === 'admin';
+    const isAdmin = req.user && (req.user.role === 'admin' || req.user.role === 'superadmin');
     if (!isOwner && !isAdmin) {
       console.log(`[DEBUG] Authorization failed. Owner: ${property.owner}, User: ${req.user.id}`);
       return res.status(403).json({ msg: 'Not authorized' });
@@ -624,13 +635,23 @@ router.delete('/:id', auth, async (req, res) => {
 
     const isOwner = property.owner && property.owner.toString() === req.user.id;
     const currentUser = await User.findById(req.user.id).select('role');
-    const isAdmin = currentUser?.role === 'admin';
+    const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin';
 
     if (!isOwner && !isAdmin) {
       return res.status(403).json({ msg: 'Not authorized to delete this property' });
     }
 
     await cascadeDeleteProperty(property._id);
+    if (currentUser?.role === 'superadmin' && !isOwner) {
+      const { logAudit } = require('../utils/auditLogger');
+      await logAudit({
+        req,
+        action: 'PROPERTY_FORCE_DELETED',
+        targetType: 'property',
+        targetId: property._id,
+        details: { title: property.title, location: property.location },
+      });
+    }
     res.json({ msg: 'Property and associated records removed' });
   } catch (err) {
     console.error('Error deleting property:', err.message);
@@ -644,6 +665,16 @@ router.delete('/admin/:id', auth, auth.requireAdmin, async (req, res) => {
     if (!property) return res.status(404).json({ msg: 'Property not found' });
 
     await cascadeDeleteProperty(property._id);
+    if (currentUser?.role === 'superadmin' && !isOwner) {
+      const { logAudit } = require('../utils/auditLogger');
+      await logAudit({
+        req,
+        action: 'PROPERTY_FORCE_DELETED',
+        targetType: 'property',
+        targetId: property._id,
+        details: { title: property.title, location: property.location },
+      });
+    }
     res.json({ msg: 'Property and associated records removed' });
   } catch (err) {
     console.error(err.message);
@@ -655,7 +686,7 @@ router.delete('/admin/:id', auth, auth.requireAdmin, async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const property = await Property.findById(req.params.id)
-      .populate('owner', 'name email phone')
+      .populate('owner', 'name fullName phone isPhoneVerified email')
       .populate('tenant', 'name email phone')
       .populate('buyer', 'name email phone');
     if (!property) {

@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const SystemConfig = require('../models/SystemConfig');
 const { generateNumericOtp, isOtpExpired, canResendOtp } = require('../utilities/otp');
 const { sendOtpEmail } = require('../utilities/mailer');
 const { sendVerificationEmail } = require('../utils/sendEmail');
@@ -19,12 +20,20 @@ function parseInitialAdminEmails() {
 }
 
 function createTokenForUser(user) {
-  const payload = { user: { id: user.id } };
+  const payload = { user: { id: user.id || user._id, role: user.role } };
   return jwt.sign(payload, 'secret', { expiresIn: '1d' });
 }
 
 async function register(req, res) {
   try {
+    const config = await SystemConfig.getSingleton();
+    if (config && config.allowNewRegistrations === false) {
+      return res.status(403).json({
+        msg: 'New user registrations are currently paused by the platform administrator.',
+        message: 'New user registrations are currently paused by the platform administrator.',
+      });
+    }
+
     const { name, email, password, tamilRole, registrationPurpose } = req.body;
 
     // Support either registrationPurpose or legacy tamilRole
@@ -233,24 +242,51 @@ async function verifyRegistrationOtp(req, res) {
 
 async function login(req, res) {
   try {
-    const { email, password } = req.body;
-    const normalizedEmail = String(email).trim().toLowerCase();
-    const user = await User.findOne({ email: normalizedEmail });
-
-    if (!user) {
-      return res.status(400).json({ msg: 'Invalid Credentials' });
+    const rawIdentifier = String(
+      req.body.username ||
+      req.body.identifier ||
+      req.body.email ||
+      req.body.name ||
+      ''
+    ).trim();
+    const password = String(req.body.password ?? '');
+    if (!rawIdentifier || !password) {
+      return res.status(400).json({ msg: 'Please provide credentials and password', message: 'Please provide credentials and password' });
     }
 
-    if (user.blocked) {
-      return res.status(403).json({ msg: 'Your account has been blocked. Please contact support.' });
+    const escaped = rawIdentifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`^${escaped}$`, 'i');
+
+    const user = await User.findOne({
+      $or: [{ username: regex }, { email: regex }, { name: regex }]
+    }).select('+password +securityPinHash');
+
+    if (!user) {
+      console.warn('[Auth] Login failed:', {
+        identifier: rawIdentifier,
+        foundUser: false,
+        role: null,
+        hashPrefix: null,
+      });
+      return res.status(401).json({ msg: 'Invalid Credentials', message: 'Invalid Credentials' });
+    }
+
+    if (user.isSuspended || user.blocked) {
+      return res.status(403).json({ msg: 'Your account has been suspended or blocked. Please contact support.', message: 'Your account has been suspended or blocked. Please contact support.' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(400).json({ msg: 'Invalid Credentials' });
+      console.warn('[Auth] Login failed:', {
+        identifier: rawIdentifier,
+        foundUser: true,
+        role: user.role,
+        hashPrefix: user.password ? user.password.slice(0, 4) : null,
+      });
+      return res.status(401).json({ msg: 'Invalid Credentials', message: 'Invalid Credentials' });
     }
 
-    if (!user.isVerified) {
+    if (user.role !== 'superadmin' && !user.isVerified) {
       return res.status(403).json({ msg: 'Please verify your email before logging in.' });
     }
 
@@ -263,14 +299,30 @@ async function login(req, res) {
       return res.status(403).json({ msg: 'Account pending approval. Please wait for admin approval.' });
     }
 
+    // Dual-authentication step-up check for superadmin
+    if (user.role === 'superadmin' && user.securityPinHash) {
+      const tempToken = jwt.sign(
+        { userId: String(user._id), role: user.role, step: 'pin_pending' },
+        'secret',
+        { expiresIn: '5m' }
+      );
+      return res.json({
+        requiresDualAuth: true,
+        tempToken,
+        username: user.username || user.name || 'Super Admin',
+        message: 'Security PIN verification required'
+      });
+    }
+
     const token = createTokenForUser(user);
 
     return res.json({
       token,
       user: {
-        id: user.id,
+        id: user.id || user._id,
         name: user.name,
-        email: user.email,
+        username: user.username,
+        email: user.email || '',
         role: user.role,
         registrationPurpose: user.registrationPurpose || (user.tamilRole === 'owners' ? 'Owner' : user.tamilRole === 'brokersBuilders' ? 'Builder' : 'Customer'),
         tamilRole: user.tamilRole,
@@ -494,10 +546,71 @@ async function resendOtp(req, res) {
   }
 }
 
+async function verifySuperAdminPin(req, res) {
+  try {
+    const { tempToken, pin } = req.body;
+    const submittedPin = String(pin || '').trim();
+
+    if (!tempToken || !submittedPin) {
+      return res.status(400).json({ msg: 'Security PIN and verification token are required' });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(tempToken, 'secret');
+    } catch (jwtErr) {
+      return res.status(401).json({ msg: 'Verification session expired. Please log in again.' });
+    }
+
+    if (decoded.step !== 'pin_pending' || !decoded.userId) {
+      return res.status(401).json({ msg: 'Invalid verification token' });
+    }
+
+    const user = await User.findById(decoded.userId).select('+securityPinHash');
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ msg: 'Super Admin access denied' });
+    }
+
+    if (user.isSuspended || user.blocked) {
+      return res.status(403).json({ msg: 'Your account has been suspended or blocked.' });
+    }
+
+    if (!user.securityPinHash) {
+      return res.status(400).json({ msg: 'No security PIN configured for this account' });
+    }
+
+    const isMatch = await bcrypt.compare(submittedPin, user.securityPinHash);
+    if (!isMatch) {
+      console.warn('[Auth] Super Admin PIN mismatch for user:', user.username || user.email);
+      return res.status(401).json({ msg: 'Invalid Security PIN' });
+    }
+
+    const token = createTokenForUser(user);
+
+    return res.json({
+      token,
+      user: {
+        id: user.id || user._id,
+        name: user.name,
+        username: user.username,
+        email: user.email || '',
+        role: user.role,
+        registrationPurpose: user.registrationPurpose || 'Owner',
+        tamilRole: user.tamilRole,
+        internalRole: user.role
+      }
+    });
+  } catch (err) {
+    console.error('Verify Super Admin PIN error:', err?.message || err);
+    return res.status(500).send('Server error');
+  }
+}
+
 module.exports = {
   register,
   verifyRegistrationOtp,
   login,
+  verifySuperAdminPin,
   forgotPassword,
   resetPasswordWithOtp,
   resendOtp,

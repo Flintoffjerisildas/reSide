@@ -24,13 +24,18 @@ if (typeof window !== 'undefined') {
         const u = JSON.parse(rawUser);
         const uid = u._id || u.id;
         if (uid) {
-          socket.emit('register_user', uid);
+          const uidStr = String(uid);
+          socket.emit('register_user', uidStr);
+          socket.emit('join', uidStr);
+          socket.emit('join', `user_${uidStr}`);
         }
       }
     } catch (e) {}
   };
 
   socket.on('connect', tryRegister);
+  socket.on('reconnect', tryRegister);
+  window.addEventListener('reside:user-logged-in', tryRegister);
   if (socket.connected) {
     tryRegister();
   }

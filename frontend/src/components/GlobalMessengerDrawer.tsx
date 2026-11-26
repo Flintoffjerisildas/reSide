@@ -199,6 +199,33 @@ export const GlobalMessengerDrawer: React.FC<GlobalMessengerDrawerProps> = ({
     }
   }, [isOpen, currentUserId, activeTab]);
 
+  // Real-time friend request updates from window event (e.g. from useMessenger socket listener)
+  useEffect(() => {
+    const handleGlobalRequestReceived = (e: any) => {
+      const data = e.detail;
+      const request: FriendRequestItem = data?.request || data;
+      if (request && request._id) {
+        setPendingRequests((prev) => {
+          if (prev.some((r) => r._id === request._id)) return prev;
+          return [request, ...prev];
+        });
+      }
+      fetchPendingRequests();
+    };
+
+    const handleGlobalRequestUpdated = () => {
+      fetchPendingRequests();
+      fetchContacts();
+    };
+
+    window.addEventListener('reside:friend-request-received', handleGlobalRequestReceived);
+    window.addEventListener('reside:friend-request-updated', handleGlobalRequestUpdated);
+    return () => {
+      window.removeEventListener('reside:friend-request-received', handleGlobalRequestReceived);
+      window.removeEventListener('reside:friend-request-updated', handleGlobalRequestUpdated);
+    };
+  }, []);
+
   // Debounced discover search
   useEffect(() => {
     if (!isOpen || !currentUserId) return;
@@ -396,17 +423,15 @@ export const GlobalMessengerDrawer: React.FC<GlobalMessengerDrawerProps> = ({
     };
 
     // 4. Friend request received live
-    const handleFriendRequestReceived = (request: FriendRequestItem) => {
-      setPendingRequests((prev) => {
-        if (prev.some((r) => r._id === request._id)) return prev;
-        return [request, ...prev];
-      });
-      toast.info(
-        t(
-          `New friend request from ${request.senderId?.name || 'a user'}!`,
-          `${request.senderId?.name || 'ஒரு பயனரிடமிருந்து'} புதிய நண்பர் கோரிக்கை வந்துள்ளது!`
-        )
-      );
+    const handleFriendRequestReceived = (data: any) => {
+      const request: FriendRequestItem = data?.request || data;
+      if (request && request._id) {
+        setPendingRequests((prev) => {
+          if (prev.some((r) => r._id === request._id)) return prev;
+          return [request, ...prev];
+        });
+      }
+      fetchPendingRequests();
       window.dispatchEvent(new Event('reside:messages-updated'));
     };
 

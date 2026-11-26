@@ -1,4 +1,4 @@
-import { Building2, Moon, Sun, LogIn, LogOut, User, Menu, LayoutDashboard, Home, Globe2, Grid2X2, Bell, ChevronDown, MessageSquare } from 'lucide-react';
+import { Building2, Moon, Sun, LogIn, LogOut, User, Menu, LayoutDashboard, Home, Globe2, Grid2X2, Bell, ChevronDown, MessageSquare, ShieldCheck } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
@@ -79,6 +79,7 @@ export default function Header({
 
   const isAuthenticated = !!user;
   const isLoggingIn = isInitializing; // Simplified
+  const isSuperAdmin = (userProfile as any)?.internalRole === 'superadmin' || user?.role === 'superadmin' || userProfile?.role === 'superadmin';
 
   const handleHomeNavigation = () => {
     onHomeClick?.();
@@ -94,6 +95,8 @@ export default function Header({
 
   const getRoleLabel = (role: string) => {
     switch (role) {
+      case 'superadmin':
+        return t('Super Admin', 'சூப்பர் நிர்வாகி');
       case 'admin':
         return t('Admin', 'நிர்வாகம்');
       case 'owners':
@@ -181,13 +184,40 @@ export default function Header({
             </Button>
           )}
 
+          {isAuthenticated && isSuperAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (window.location.pathname.startsWith('/admin')) {
+                  navigate({ to: '/superadmin' });
+                } else {
+                  navigate({ to: '/admin' });
+                }
+              }}
+              className="h-8.5 rounded-full bg-white text-slate-800 border border-slate-200 shadow-sm hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 text-xs font-bold gap-1.5 cursor-pointer"
+            >
+              {window.location.pathname.startsWith('/admin') ? (
+                <>
+                  <ShieldCheck className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                  <span>{t('Back to Super Admin Center', 'சூப்பர் அட்மின் மையத்திற்கு திரும்பவும்')}</span>
+                </>
+              ) : (
+                <>
+                  <LayoutDashboard className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                  <span>{t('Open Operations View', 'செயல்பாடுகள் காட்சி')}</span>
+                </>
+              )}
+            </Button>
+          )}
+
           {isAuthenticated && (
             <button
               type="button"
               onClick={onDashboardClick}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 text-xs font-medium shadow-2xs cursor-pointer transition-all"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white text-slate-800 border border-slate-200 shadow-sm hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 text-xs font-bold cursor-pointer transition-all"
             >
-              {isDashboardActive ? <Home className="h-3.5 w-3.5" /> : <Grid2X2 className="h-3.5 w-3.5" />}
+              {isDashboardActive ? <Home className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" /> : <Grid2X2 className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />}
               <span>{isDashboardActive ? t('Back to Home', 'முகப்புக்கு திரும்பவும்') : t('Go to Dashboard', 'டாஷ்போர்டுக்கு செல்லவும்')}</span>
             </button>
           )}
@@ -216,9 +246,15 @@ export default function Header({
                       <span className="font-semibold text-xs text-slate-900 dark:text-white">
                         {t('My Account', 'என் கணக்கு')}
                       </span>
-                      {(((userProfile as any)?.internalRole === 'admin') || userProfile?.role || user?.role) && (
+                      {(((userProfile as any)?.internalRole === 'superadmin') || ((userProfile as any)?.internalRole === 'admin') || userProfile?.role || user?.role) && (
                         <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
-                          {getRoleLabel(((userProfile as any)?.internalRole === 'admin') ? 'admin' : (userProfile?.role || user?.role || ''))}
+                          {getRoleLabel(
+                            (userProfile as any)?.internalRole === 'superadmin' || user?.role === 'superadmin'
+                              ? 'superadmin'
+                              : (userProfile as any)?.internalRole === 'admin'
+                              ? 'admin'
+                              : (userProfile?.role || user?.role || '')
+                          )}
                         </span>
                       )}
                     </div>
@@ -348,8 +384,38 @@ export default function Header({
                         <span className="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full font-bold">{unreadCount}</span>
                       </button>
                     )}
-                    <Button variant="default" onClick={onDashboardClick} className="w-full justify-start">
-                      {isDashboardActive ? <Home className="mr-2 h-4 w-4" /> : <LayoutDashboard className="mr-2 h-4 w-4" />}
+                    {isSuperAdmin && (
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          if (window.location.pathname.startsWith('/admin')) {
+                            navigate({ to: '/superadmin' });
+                          } else {
+                            navigate({ to: '/admin' });
+                          }
+                        }}
+                        className="w-full justify-start bg-white text-slate-800 border border-slate-200 shadow-sm hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 font-semibold"
+                      >
+                        {window.location.pathname.startsWith('/admin') ? (
+                          <>
+                            <ShieldCheck className="mr-2 h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            {t('Back to Super Admin Center', 'சூப்பர் அட்மின் மையத்திற்கு திரும்பவும்')}
+                          </>
+                        ) : (
+                          <>
+                            <LayoutDashboard className="mr-2 h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            {t('Open Operations View', 'செயல்பாடுகள் காட்சி')}
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      onClick={onDashboardClick}
+                      className="w-full justify-start bg-white text-slate-800 border border-slate-200 shadow-sm hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 font-semibold"
+                    >
+                      {isDashboardActive ? <Home className="mr-2 h-4 w-4 text-slate-600 dark:text-slate-300" /> : <LayoutDashboard className="mr-2 h-4 w-4 text-slate-600 dark:text-slate-300" />}
                       {isDashboardActive ? t('Back to Home', 'முகப்புக்கு திரும்பவும்') : t('Go to Dashboard', 'டாஷ்போர்டுக்கு செல்லவும்')}
                     </Button>
                     <Button variant="destructive" onClick={handleLogout} className="w-full justify-start">

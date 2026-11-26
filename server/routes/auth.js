@@ -8,6 +8,7 @@ const {
   register,
   verifyRegistrationOtp,
   login,
+  verifySuperAdminPin,
   forgotPassword,
   resetPasswordWithOtp,
   resendOtp,
@@ -24,6 +25,9 @@ router.post('/verify-otp', verifyRegistrationOtp);
 // Login with verified account
 router.post('/login', login);
 
+// Dual-auth step-up verification for Super Admin
+router.post('/verify-superadmin-pin', verifySuperAdminPin);
+
 // Get Current User
 router.get('/me', async (req, res) => {
   try {
@@ -33,6 +37,10 @@ router.get('/me', async (req, res) => {
     const decoded = jwt.verify(token, 'secret');
     const user = await User.findById(decoded.user.id).select('-password');
     if (!user) return res.status(404).json({ msg: 'User not found' });
+
+    if (user.isSuspended || user.blocked) {
+      return res.status(403).json({ msg: 'Your account has been suspended or blocked.' });
+    }
 
     if (user.role === 'user' && !user.approved) {
       user.approved = true;

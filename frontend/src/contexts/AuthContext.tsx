@@ -12,11 +12,18 @@ interface User {
   internalRole?: string; // 'admin' | 'user'
 }
 
+export interface LoginResult {
+  requiresDualAuth?: boolean;
+  tempToken?: string;
+  username?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   token: string | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<LoginResult | void>;
+  verifySuperAdminPin: (tempToken: string, pin: string) => Promise<void>;
   register: (name: string, email: string, password: string, registrationPurpose: string, tamilRole?: string) => Promise<any>;
   verifyRegisterOtp: (email: string, otp: string) => Promise<void>;
   forgotPasswordStart: (email: string) => Promise<any>;
@@ -104,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         id: u._id || u.id,
         name: u.name,
         email: u.email,
-        role: u.tamilRole,
+        role: u.role === 'superadmin' ? 'superadmin' : (u.tamilRole || u.role),
         registrationPurpose: u.registrationPurpose,
         tamilRole: u.tamilRole,
         internalRole: u.role,
@@ -131,19 +138,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<LoginResult | void> => {
     setLoading(true);
     try {
-      const res = await api.post('/auth/login', { email, password });
+      const res = await api.post('/auth/login', { username: email, email, identifier: email, password });
+      if (res.data?.requiresDualAuth) {
+        return {
+          requiresDualAuth: true,
+          tempToken: res.data.tempToken,
+          username: res.data.username,
+        };
+      }
       const apiUser = res.data.user;
       const normalizedUser: User = {
         id: apiUser._id || apiUser.id,
         name: apiUser.name,
-        email: apiUser.email,
-        role: apiUser.role || (apiUser.internalRole === 'admin' ? 'admin' : 'user'),
+        email: apiUser.email || '',
+        role: apiUser.role === 'superadmin' ? 'superadmin' : (apiUser.role || (apiUser.internalRole === 'admin' ? 'admin' : 'user')),
         registrationPurpose: apiUser.registrationPurpose || (apiUser.tamilRole === 'owners' ? 'Owner' : apiUser.tamilRole === 'brokersBuilders' ? 'Builder' : 'Customer'),
         tamilRole: apiUser.tamilRole,
         internalRole: apiUser.internalRole || apiUser.role,
+      };
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
+      setToken(res.data.token);
+      setUser(normalizedUser);
+      queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
+      queryClient.invalidateQueries({ queryKey: ['approvalStatus'] });
+      queryClient.invalidateQueries({ queryKey: ['callerAdmin'] });
+      return;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifySuperAdminPin = async (tempToken: string, pin: string): Promise<void> => {
+    setLoading(true);
+    try {
+      const res = await api.post('/auth/verify-superadmin-pin', { tempToken, pin });
+      const apiUser = res.data.user;
+      const normalizedUser: User = {
+        id: apiUser._id || apiUser.id,
+        name: apiUser.name,
+        email: apiUser.email || '',
+        role: 'superadmin',
+        registrationPurpose: apiUser.registrationPurpose || 'Owner',
+        tamilRole: apiUser.tamilRole,
+        internalRole: 'superadmin',
       };
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(normalizedUser));
@@ -250,6 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       loading, 
       login, 
+      verifySuperAdminPin,
       register, 
       verifyRegisterOtp,
       forgotPasswordStart,

@@ -12,7 +12,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { toast } from 'sonner';
-import { ArrowUpRight, Building2, CheckCircle2, KeyRound, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Building2, CheckCircle2, Eye, EyeOff, KeyRound, ShieldCheck, Sparkles } from 'lucide-react';
 
 export type LoginView = 'login' | 'register' | 'register-otp' | 'forgot-email' | 'forgot-otp';
 
@@ -30,6 +30,7 @@ export default function LoginPage({
   const { t } = useLanguage();
   const {
     login,
+    verifySuperAdminPin,
     register,
     verifyRegisterOtp,
     forgotPasswordStart,
@@ -43,6 +44,10 @@ export default function LoginPage({
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [stepUpTempToken, setStepUpTempToken] = useState<string | null>(null);
+  const [stepUpUsername, setStepUpUsername] = useState<string>('');
+  const [securityPin, setSecurityPin] = useState<string>('');
   const [otp, setOtp] = useState('');
   const [registrationPurpose, setRegistrationPurpose] = useState<string>('Customer');
   const [otpEmail, setOtpEmail] = useState('');
@@ -82,7 +87,14 @@ export default function LoginPage({
       return;
     }
     try {
-      await login(email, password);
+      const result = await login(email, password);
+      if (result && result.requiresDualAuth && result.tempToken) {
+        setStepUpTempToken(result.tempToken);
+        setStepUpUsername(result.username || email);
+        setSecurityPin('');
+        toast.info(t('Security PIN required for Super Admin', 'சூப்பர் நிர்வாகிக்கு பாதுகாப்பு பின் தேவை'));
+        return;
+      }
       toast.success(t('Logged in successfully', 'வெற்றிகரமாக உள்நுழைந்தது'));
       onSuccess?.();
     } catch (error: any) {
@@ -246,8 +258,29 @@ export default function LoginPage({
     }
   };
 
+  const handleVerifyPinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stepUpTempToken || !securityPin.trim()) {
+      toast.error(t('Please enter your Security PIN', 'உங்கள் பாதுகாப்பு பின்னை உள்ளிடவும்'));
+      return;
+    }
+    try {
+      await verifySuperAdminPin(stepUpTempToken, securityPin.trim());
+      toast.success(t('Super Admin authenticated successfully', 'சூப்பர் நிர்வாகி வெற்றிகரமாக அங்கீகரிக்கப்பட்டார்'));
+      setStepUpTempToken(null);
+      setSecurityPin('');
+      onSuccess?.();
+    } catch (error: any) {
+      const data = error?.response?.data;
+      const msg = data?.msg || error?.message || t('PIN verification failed', 'பின் சரிபார்ப்பு தோல்வியடைந்தது');
+      toast.error(String(msg));
+    }
+  };
+
   const title =
-    view === 'login'
+    stepUpTempToken
+      ? t('Security PIN Verification', 'பாதுகாப்பு பின் சரிபார்ப்பு')
+      : view === 'login'
       ? t('Login', 'உள்நுழைய')
       : view === 'register'
         ? t('Register', 'பதிவு செய்யுங்கள்')
@@ -258,7 +291,12 @@ export default function LoginPage({
             : t('Reset Password', 'கடவுச்சொல்லை மீட்டமைக்கவும்');
 
   const description =
-    view === 'login'
+    stepUpTempToken
+      ? t(
+          `Enter the 6-digit Super Admin Security PIN for ${stepUpUsername}`,
+          `${stepUpUsername}-க்கான 6 இலக்க சூப்பர் நிர்வாகி பாதுகாப்பு பின்னை உள்ளிடவும்`
+        )
+      : view === 'login'
       ? t('Enter your credentials to access your account', 'உங்கள் கணக்கை அணுக உங்கள் சான்றுகளை உள்ளிடவும்')
       : view === 'register'
         ? t('Create your account to access Reside features', 'Reside அம்சங்களை அணுக உங்கள் கணக்கை உருவாக்கவும்')
@@ -323,16 +361,68 @@ export default function LoginPage({
             <p className="mt-2 text-sm text-muted-foreground text-center">{description}</p>
           </div>
           <div className="px-8 pb-8 pt-6">
-            {view === 'login' && (
+            {stepUpTempToken ? (
+              <form onSubmit={handleVerifyPinSubmit} className="space-y-4">
+                <div className="flex flex-col items-center text-center space-y-1.5 pb-2">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 dark:bg-blue-950 text-blue-600 shadow-sm">
+                    <ShieldCheck className="h-6 w-6" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {t(
+                      'This account is protected by dual-authentication. Please enter your Security PIN to proceed.',
+                      'இந்த கணக்கு இரட்டை அங்கீகாரத்தால் பாதுகாக்கப்படுகிறது. தொடர உங்கள் பாதுகாப்பு பின்னை உள்ளிடவும்.'
+                    )}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="superadmin-pin">
+                    {t('Security PIN', 'பாதுகாப்பு பின்')} <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="superadmin-pin"
+                    type="password"
+                    maxLength={10}
+                    placeholder="••••••"
+                    value={securityPin}
+                    onChange={(e) => setSecurityPin(e.target.value)}
+                    disabled={loading}
+                    autoFocus
+                    className="text-center text-lg tracking-widest font-mono"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  className="mt-2 w-full rounded-full bg-blue-600 shadow-lg shadow-blue-600/20 hover:bg-blue-700"
+                  disabled={loading || !securityPin.trim()}
+                >
+                  {loading ? t('Verifying...', 'சரிபார்க்கிறது...') : t('Verify PIN & Proceed', 'பின் சரிபார்த்து தொடரவும்')}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setStepUpTempToken(null);
+                    setSecurityPin('');
+                  }}
+                  disabled={loading}
+                  className="w-full text-xs"
+                >
+                  {t('Back to Login', 'உள்நுழைவுக்கு திரும்பவும்')}
+                </Button>
+              </form>
+            ) : view === 'login' && (
               <form onSubmit={handleLoginSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="login-email">
-                    {t('Email', 'மின்னஞ்சல்')} <span className="text-destructive">*</span>
+                    {t('Username / Email', 'பயனர்பெயர் / மின்னஞ்சல்')} <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="login-email"
-                    type="email"
-                    placeholder="name@example.com"
+                    type="text"
+                    placeholder="Username or email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={loading}
@@ -343,14 +433,27 @@ export default function LoginPage({
                   <Label htmlFor="login-password">
                     {t('Password', 'கடவுச்சொல்')} <span className="text-destructive">*</span>
                   </Label>
-                  <Input
-                    id="login-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={loading}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="login-password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={loading}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={loading}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex justify-end">

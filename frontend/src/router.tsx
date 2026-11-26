@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   createRouter,
   createRoute,
@@ -23,6 +23,7 @@ import AuroraBackground from './components/AuroraBackground';
 import PropertyListings from './components/PropertyListings';
 import UserDashboard from './components/UserDashboard';
 import AdminDashboard from './components/AdminDashboard';
+import SuperAdminDashboardView from './components/SuperAdminDashboardView';
 import PendingApprovalScreen from './components/PendingApprovalScreen';
 import LoginPage, { LoginView } from './components/LoginPage';
 import LoadingScreen from './components/LoadingScreen';
@@ -42,7 +43,22 @@ function RootLayout() {
   const isAuthenticated = !!user;
   const roleToCheck = userProfile?.role || user?.role;
   const internalRoleToCheck = (userProfile as any)?.internalRole || (user as any)?.internalRole;
-  const isAdmin = internalRoleToCheck === 'admin' || roleToCheck === 'admin' || roleToCheck === TamilRole.admin;
+  const isSuperAdmin = internalRoleToCheck === 'superadmin' || roleToCheck === 'superadmin';
+  const isAdmin = !isSuperAdmin && (internalRoleToCheck === 'admin' || roleToCheck === 'admin' || roleToCheck === TamilRole.admin);
+
+  const [systemStatus, setSystemStatus] = useState<{
+    maintenanceMode?: boolean;
+    globalBannerMessage?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/system-status')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setSystemStatus(data);
+      })
+      .catch(() => {});
+  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -62,13 +78,18 @@ function RootLayout() {
     });
   };
 
-  const isDashboardActive = location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/admin');
+  const isDashboardActive =
+    location.pathname.startsWith('/dashboard') ||
+    location.pathname.startsWith('/admin') ||
+    location.pathname.startsWith('/superadmin');
 
   const handleDashboardClick = () => {
     if (isDashboardActive) {
       navigate({ to: '/' });
     } else {
-      if (isAdmin) {
+      if (isSuperAdmin) {
+        navigate({ to: '/superadmin' });
+      } else if (isAdmin) {
         navigate({ to: '/admin' });
       } else {
         navigate({ to: '/dashboard' });
@@ -93,7 +114,9 @@ function RootLayout() {
         onLoginClick={() => navigate({ to: '/login', search: {} })}
         onNotificationsClick={() => navigate({ to: '/dashboard/$tab', params: { tab: 'notifications' } })}
         onAccountClick={() => {
-          if (isAdmin) {
+          if (isSuperAdmin) {
+            navigate({ to: '/superadmin' });
+          } else if (isAdmin) {
             navigate({ to: '/admin' });
           } else {
             navigate({ to: '/dashboard/$tab', params: { tab: 'settings' } });
@@ -101,6 +124,19 @@ function RootLayout() {
         }}
         isDashboardActive={isDashboardActive}
       />
+      {(systemStatus?.maintenanceMode || systemStatus?.globalBannerMessage) && (
+        <div
+          className={`w-full px-4 py-2 text-center text-xs sm:text-sm font-medium ${
+            systemStatus.maintenanceMode
+              ? 'bg-amber-600 text-white'
+              : 'bg-blue-600 text-white'
+          }`}
+        >
+          {systemStatus.maintenanceMode
+            ? `Scheduled Maintenance Mode Active${systemStatus.globalBannerMessage ? ` — ${systemStatus.globalBannerMessage}` : ''}`
+            : systemStatus.globalBannerMessage}
+        </div>
+      )}
       <main className="flex-1 w-full">
         <Outlet />
         <FloatingChat />
@@ -214,7 +250,8 @@ function LoginPageWrapper({ defaultView }: { defaultView: LoginView }) {
 
   const roleToCheck = userProfile?.role || user?.role;
   const internalRoleToCheck = (userProfile as any)?.internalRole || (user as any)?.internalRole;
-  const isAdmin = internalRoleToCheck === 'admin' || roleToCheck === 'admin' || roleToCheck === TamilRole.admin;
+  const isSuperAdmin = internalRoleToCheck === 'superadmin' || roleToCheck === 'superadmin';
+  const isAdmin = !isSuperAdmin && (internalRoleToCheck === 'admin' || roleToCheck === 'admin' || roleToCheck === TamilRole.admin);
 
   const getRedirectDestination = () => {
     const rawTarget = redirectTarget || (location.state as any)?.from;
@@ -231,7 +268,7 @@ function LoginPageWrapper({ defaultView }: { defaultView: LoginView }) {
       !cleanTarget.startsWith('/') ||
       cleanTarget.startsWith('//')
     ) {
-      return isAdmin ? '/admin' : '/dashboard';
+      return isSuperAdmin ? '/superadmin' : isAdmin ? '/admin' : '/dashboard';
     }
     return cleanTarget;
   };
@@ -241,7 +278,7 @@ function LoginPageWrapper({ defaultView }: { defaultView: LoginView }) {
       const dest = getRedirectDestination();
       navigate({ to: dest as any, replace: true });
     }
-  }, [user, token, isAdmin, navigate]);
+  }, [user, token, isAdmin, isSuperAdmin, navigate]);
 
   return (
     <LoginPage
@@ -272,7 +309,8 @@ function DashboardLayoutWrapper() {
 
   const roleToCheck = userProfile?.role || user?.role;
   const internalRoleToCheck = (userProfile as any)?.internalRole || (user as any)?.internalRole;
-  const isAdmin = internalRoleToCheck === 'admin' || roleToCheck === 'admin' || roleToCheck === TamilRole.admin;
+  const isSuperAdmin = internalRoleToCheck === 'superadmin' || roleToCheck === 'superadmin';
+  const isAdmin = !isSuperAdmin && (internalRoleToCheck === 'admin' || roleToCheck === 'admin' || roleToCheck === TamilRole.admin);
 
   if (isInitializing || loading || (user && profileLoading)) {
     return <LoadingScreen />;
@@ -281,6 +319,10 @@ function DashboardLayoutWrapper() {
   if (!token && !user) {
     const returnPath = getCleanReturnPath(location);
     return <Navigate to="/login" search={{ redirect: returnPath }} replace />;
+  }
+
+  if (isSuperAdmin) {
+    return <Navigate to="/superadmin" replace />;
   }
 
   if (isAdmin && !approvalLoading && isApproved === false) {
@@ -414,7 +456,8 @@ function AdminLayoutWrapper() {
 
   const roleToCheck = userProfile?.role || user?.role;
   const internalRoleToCheck = (userProfile as any)?.internalRole || (user as any)?.internalRole;
-  const isAdmin = internalRoleToCheck === 'admin' || roleToCheck === 'admin' || roleToCheck === TamilRole.admin;
+  const isSuperAdmin = internalRoleToCheck === 'superadmin' || roleToCheck === 'superadmin';
+  const isAdmin = !isSuperAdmin && (internalRoleToCheck === 'admin' || roleToCheck === 'admin' || roleToCheck === TamilRole.admin);
 
   if (isInitializing || loading || (user && profileLoading)) {
     return <LoadingScreen />;
@@ -425,11 +468,11 @@ function AdminLayoutWrapper() {
     return <Navigate to="/login" search={{ redirect: returnPath }} replace />;
   }
 
-  if (!isAdmin) {
+  if (!isAdmin && !isSuperAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
 
-  if (!approvalLoading && isApproved === false) {
+  if (isAdmin && !approvalLoading && isApproved === false) {
     return <PendingApprovalScreen />;
   }
 
@@ -438,6 +481,37 @@ function AdminLayoutWrapper() {
 
 function AdminIndexWrapper() {
   return <AdminDashboard />;
+}
+
+// --- Protected Super Admin Guard & Layout ---
+function SuperAdminLayoutWrapper() {
+  const { user, token, loading, isInitializing } = useAuth();
+  const location = useLocation();
+  const { data: userProfile, isLoading: profileLoading } = useGetCallerUserProfile();
+
+  const roleToCheck = userProfile?.role || user?.role;
+  const internalRoleToCheck = (userProfile as any)?.internalRole || (user as any)?.internalRole;
+  const isSuperAdmin = internalRoleToCheck === 'superadmin' || roleToCheck === 'superadmin';
+  const isAdmin = !isSuperAdmin && (internalRoleToCheck === 'admin' || roleToCheck === 'admin' || roleToCheck === TamilRole.admin);
+
+  if (isInitializing || loading || (user && profileLoading)) {
+    return <LoadingScreen />;
+  }
+
+  if (!token && !user) {
+    const returnPath = getCleanReturnPath(location);
+    return <Navigate to="/login" search={{ redirect: returnPath }} replace />;
+  }
+
+  if (!isSuperAdmin) {
+    return <Navigate to={isAdmin ? '/admin' : '/dashboard'} replace />;
+  }
+
+  return <Outlet />;
+}
+
+function SuperAdminIndexWrapper() {
+  return <SuperAdminDashboardView />;
 }
 
 // --- Route Definitions ---
@@ -570,6 +644,24 @@ export const adminTabRoute = createRoute({
   component: AdminIndexWrapper,
 });
 
+export const superAdminBaseRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/superadmin',
+  component: SuperAdminLayoutWrapper,
+});
+
+export const superAdminIndexRoute = createRoute({
+  getParentRoute: () => superAdminBaseRoute,
+  path: '/',
+  component: SuperAdminIndexWrapper,
+});
+
+export const superAdminTabRoute = createRoute({
+  getParentRoute: () => superAdminBaseRoute,
+  path: '$section',
+  component: SuperAdminIndexWrapper,
+});
+
 export const fallbackRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '*',
@@ -594,6 +686,7 @@ const routeTree = rootRoute.addChildren([
     dashboardTabRoute,
   ]),
   adminBaseRoute.addChildren([adminIndexRoute, adminTabRoute]),
+  superAdminBaseRoute.addChildren([superAdminIndexRoute, superAdminTabRoute]),
   fallbackRoute,
 ]);
 

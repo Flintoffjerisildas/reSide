@@ -25,6 +25,7 @@ const notificationSchema = new mongoose.Schema({
       'AGREEMENT_UPLOADED',
       'AGREEMENT_VERIFIED',
       'AGREEMENT_SYNCED',
+      'friend_request',
       'friend_request_received',
       'friend_request_accepted'
     ],
@@ -39,6 +40,7 @@ const notificationSchema = new mongoose.Schema({
   transactionType: { type: String, enum: ['rent', 'buy'], default: 'rent' },
   actionUrl: { type: String },
   read: { type: Boolean, default: false },
+  isRead: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now }
 });
 
