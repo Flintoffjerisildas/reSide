@@ -1,12 +1,12 @@
 # reSide Local Development Guide
 
-This guide explains how to configure, run, and test reSide locally with its strict dependency on `auth_serv`.
+This guide explains how to configure, run, and test reSide locally.
 
 ---
 
 ## 1. Architecture Overview & Required Services
 
-reSide is strictly dependent on the external authentication microservice `auth_serv`. If `auth_serv` is offline, unreachable, or fails availability verification, reSide blocks all application functionality and displays a dedicated full-screen error screen (`ServerOfflineScreen`).
+The frontend login, registration, OTP, and application API are served by the reSide Express backend on port 5000. `auth_serv` on port 3004 is a separate authentication microservice used by the application's availability gate; it is not the reSide API server, and `VITE_AUTH_SERVICE_URL` must continue to point to it when that microservice is part of the deployment.
 
 The local development ecosystem consists of three services:
 
@@ -32,10 +32,16 @@ VITE_AUTH_SERVICE_URL=http://localhost:3004
 # Periodic polling interval (in ms) to monitor auth_serv connectivity while reSide is open
 # Default: 15000 (15 seconds)
 VITE_AUTH_SERVICE_POLL_INTERVAL=15000
+
+# Optional backend URL override. Leave unset for local development and VS Code
+# port forwarding so the same-origin Vite proxy handles backend API requests.
+# VITE_API_URL=
+# Optional Socket.IO override; defaults to VITE_API_URL or the current origin.
+# VITE_SOCKET_URL=
 ```
 
 > **Important Note Regarding `localhost`:**
-> `localhost` refers to the machine running the browser. For local development, this connects to the auth service running on your local machine. For deployed staging or production environments, set `VITE_AUTH_SERVICE_URL` to the publicly reachable service URL or ingress route (e.g., `https://auth.yourdomain.com`).
+> `localhost` in the Vite proxy target refers to the machine running the development server. Browser API and Socket.IO requests use the frontend's origin, so they also work when the frontend is opened through a VS Code forwarded URL. The auth-service proxy target must be reachable from the Vite server. For deployed environments, use publicly reachable service URLs or a same-origin reverse proxy.
 
 ---
 
@@ -45,8 +51,8 @@ VITE_AUTH_SERVICE_POLL_INTERVAL=15000
 
 To adhere to the requirement of **never modifying `auth_serv` source code or configuration**, reSide resolves browser CORS restrictions as follows:
 
-1. **Local Development Proxy**:
-   The Vite dev server (`vite.config.js`) proxies `/auth-service-proxy` directly to `http://localhost:3004` with `changeOrigin: true`. This allows browser health checks to run seamlessly without CORS rejections.
+1. **Local Development Proxies**:
+   The Vite dev server (`vite.config.js`) proxies `/api` and `/socket.io` to the reSide backend on port 5000, and `/auth-service-proxy` to the separate auth service configured by `VITE_AUTH_SERVICE_URL`. Browser API and Socket.IO requests therefore stay on the frontend's origin, including when accessed through VS Code port forwarding.
 
 2. **Availability Check Fallback**:
    The availability module (`frontend/src/services/authServiceAvailability.ts`) tests direct connection first, and if direct browser fetch encounters CORS blocking, automatically verifies connectivity through the local dev proxy.
@@ -95,22 +101,25 @@ npm run start
 ### Step 2: Start reSide Backend Server
 ```bash
 cd reSideAI/server
-npm start
+npm run start
 # Server will listen on http://localhost:5000
 ```
 
 ### Step 3: Start reSide Frontend
 ```bash
 cd reSideAI/frontend
-npm start
+npm run start
 # Frontend will listen on http://localhost:3000
 ```
+
+When using VS Code port forwarding, forward port 3000 and open the forwarded frontend URL. Keep `VITE_API_URL` unset so the Vite proxy sends `/api` and `/socket.io` requests to port 5000. The backend binds to `0.0.0.0`; browser-side requests do not need a `localhost:5000` URL.
 
 ---
 
 ## 6. Verification and Testing
 
-1. **Test Online State**: Ensure `auth_serv` is running on port 3004. Open `http://localhost:3000`. The initial check succeeds and the application loads normally.
-2. **Test Offline State**: Stop `auth_serv`. Open or refresh `http://localhost:3000`. `ServerOfflineScreen` blocks all content.
-3. **Test Retry Flow**: With `auth_serv` stopped, click **Retry Connection**; observe the concise error notice. Start `auth_serv`, click **Retry Connection**; observe instant recovery into reSide.
-4. **Test Mid-Session Disconnect**: With reSide running and logged in, stop `auth_serv`. Within the configured polling interval, reSide transitions automatically to the offline screen.
+1. **Test Backend API**: With the reSide backend running, open `http://localhost:3000/api/system-status`. It should return system-status JSON; use the same path on the forwarded frontend URL in VS Code.
+2. **Test Online State**: Ensure `auth_serv` is running on port 3004. Open the frontend. The initial auth service availability check succeeds and the application loads normally.
+3. **Test Offline State**: Stop `auth_serv`. Open or refresh the frontend. `ServerOfflineScreen` blocks all content.
+4. **Test Retry Flow**: With `auth_serv` stopped, click **Retry Connection**; observe the concise error notice. Start `auth_serv`, click **Retry Connection**; observe instant recovery into reSide.
+5. **Test Mid-Session Disconnect**: With reSide running and logged in, stop `auth_serv`. Within the configured polling interval, reSide transitions automatically to the offline screen.

@@ -3,10 +3,29 @@ const router = express.Router();
 const Notification = require('../models/Notification');
 const auth = require('../middleware/auth');
 
-// Get all notifications for authenticated user
+// Helper to build notification query based on user role
+function buildNotificationQuery(user) {
+  const isSuperAdmin = user?.role === 'superadmin';
+  if (isSuperAdmin) {
+    return {
+      $or: [
+        { recipient: user.id },
+        { recipientRole: { $in: ['superadmin', 'admin'] } },
+        { forRole: { $in: ['superadmin', 'admin'] } },
+        { isGlobal: true },
+        { isSystem: true },
+        { recipient: null }
+      ]
+    };
+  }
+  return { recipient: user.id };
+}
+
+// Get all notifications for authenticated user (supports user, admin, and superadmin)
 router.get('/', auth, async (req, res) => {
   try {
-    const notifications = await Notification.find({ recipient: req.user.id })
+    const query = buildNotificationQuery(req.user);
+    const notifications = await Notification.find(query)
       .populate('sender', 'name email phone')
       .populate('property', 'title location price images transactionType')
       .populate('request')
@@ -27,14 +46,32 @@ router.get('/', auth, async (req, res) => {
 
     const unreadCount = validNotifications.filter(n => !n.read && !n.isRead).length;
 
-    res.json({ notifications: validNotifications, unreadCount });
+    res.json({ notifications: validNotifications, unreadCount, success: true });
   } catch (err) {
-    console.error('Error fetching notifications:', err.message);
-    res.status(500).send('Server Error');
+    console.error('Error fetching notifications:', err.message || err);
+    res.status(200).json({ notifications: [], unreadCount: 0, error: err.message });
   }
 });
 
-// Mark single notification as read
+// Get unread notification count
+router.get('/unread-count', auth, async (req, res) => {
+  try {
+    const baseQuery = buildNotificationQuery(req.user);
+    const query = {
+      ...baseQuery,
+      read: { $ne: true },
+      isRead: { $ne: true }
+    };
+
+    const count = await Notification.countDocuments(query);
+    res.json({ unreadCount: count, count, success: true });
+  } catch (err) {
+    console.error('Error getting unread count:', err.message || err);
+    res.status(200).json({ unreadCount: 0, count: 0, error: err.message });
+  }
+});
+
+// Mark single notification as read (supports superadmin authorization)
 router.put('/:id/read', auth, async (req, res) => {
   try {
     const notification = await Notification.findById(req.params.id);
@@ -42,32 +79,35 @@ router.put('/:id/read', auth, async (req, res) => {
       return res.status(404).json({ msg: 'Notification not found' });
     }
 
-    if (notification.recipient.toString() !== req.user.id) {
+    const isSuperAdmin = req.user?.role === 'superadmin';
+    if (!isSuperAdmin && notification.recipient && notification.recipient.toString() !== req.user.id) {
       return res.status(401).json({ msg: 'Not authorized' });
     }
 
     notification.read = true;
+    notification.isRead = true;
     await notification.save();
 
-    res.json(notification);
+    res.json({ notification, success: true });
   } catch (err) {
-    console.error('Error marking notification as read:', err.message);
-    res.status(500).send('Server Error');
+    console.error('Error marking notification as read:', err.message || err);
+    res.status(500).json({ msg: 'Server Error' });
   }
 });
 
-// Mark all notifications for user as read
+// Mark all notifications for user as read (supports superadmin)
 router.put('/read-all', auth, async (req, res) => {
   try {
+    const query = buildNotificationQuery(req.user);
     await Notification.updateMany(
-      { recipient: req.user.id, read: false },
-      { $set: { read: true } }
+      query,
+      { $set: { read: true, isRead: true } }
     );
 
-    res.json({ msg: 'All notifications marked as read' });
+    res.json({ msg: 'All notifications marked as read', success: true });
   } catch (err) {
-    console.error('Error marking all notifications as read:', err.message);
-    res.status(500).send('Server Error');
+    console.error('Error marking all notifications as read:', err.message || err);
+    res.status(500).json({ msg: 'Server Error' });
   }
 });
 

@@ -2067,7 +2067,7 @@ export default function OwnerDashboard({
             </TabsContent>
 
             {/* Reports Tab */}
-            <TabsContent value="reports" className="mt-2 pb-2">
+            <TabsContent value="reports" className="mt-2 pb-24">
               {/* MAIN CONTENT — 2-COLUMN FIT-TO-PAGE GRID */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                 {/* LEFT COLUMN (lg:col-span-3): FULL-HEIGHT FROSTED SIDEBAR */}
@@ -2253,18 +2253,18 @@ export default function OwnerDashboard({
                 {/* RIGHT COLUMN (lg:col-span-9): ACTIVE GENERATED REPORT VIEW */}
                 <div className="lg:col-span-9 h-full">
                   {activeReport ? (
-                    <Card className="h-full flex flex-col justify-between rounded-2xl border border-slate-200/80 dark:border-slate-600/75 bg-white/85 dark:bg-slate-900/75 backdrop-blur-md shadow-sm px-4 py-2.5">
-                      <div className="flex items-center justify-between gap-2 pb-1 m-0">
-                        <div className="space-y-0 min-w-0">
-                          <CardTitle className="text-base sm:text-lg">{buildReportTitle()}</CardTitle>
-                          <CardDescription className="text-xs">
+                    <Card className="h-full flex flex-col justify-between rounded-2xl border border-slate-200/90 dark:border-slate-700/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm shadow-sm p-4 sm:p-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2 m-0">
+                        <div className="w-full min-w-0 space-y-0.5">
+                          <CardTitle className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-tight">{buildReportTitle()}</CardTitle>
+                          <CardDescription className="text-xs text-slate-500 dark:text-slate-400">
                             {t('Summary on top, detailed table below.', 'மேல் பகுதியில் சுருக்கம், கீழே விரிவான அட்டவணை.')}
                           </CardDescription>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
                           <Button
-                            className="h-8 px-3 py-1.5 text-xs whitespace-nowrap rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm"
+                            className="h-8.5 px-3 py-1.5 text-xs whitespace-nowrap rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm w-full sm:w-auto justify-center"
                             onClick={() => {
                               if (!activeReport) return;
                               if (activeReport === 'rent') rentReportQuery.refetch();
@@ -2276,17 +2276,17 @@ export default function OwnerDashboard({
                             {isGeneratingReport ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
                             {t('Generate Report', 'அறிக்கை உருவாக்கு')}
                           </Button>
-                          <Button variant="outline" className="h-8 px-3 py-1.5 text-xs whitespace-nowrap rounded-xl" onClick={handleDownloadPdf} disabled={!currentReport || isGeneratingReport}>
+                          <Button variant="outline" className="h-8.5 px-3 py-1.5 text-xs whitespace-nowrap rounded-xl w-full sm:w-auto justify-center" onClick={handleDownloadPdf} disabled={!currentReport || isGeneratingReport}>
                             {isGeneratingReport ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1.5 h-3.5 w-3.5" />}
                             {t('Download as PDF', 'PDF ஆக பதிவிறக்கவும்')}
                           </Button>
-                          <Button variant="outline" className="h-8 px-3 py-1.5 text-xs whitespace-nowrap rounded-xl" onClick={handlePrint} disabled={!currentReport || isGeneratingReport}>
+                          <Button variant="outline" className="h-8.5 px-3 py-1.5 text-xs whitespace-nowrap rounded-xl w-full sm:w-auto justify-center" onClick={handlePrint} disabled={!currentReport || isGeneratingReport}>
                             <Printer className="mr-1.5 h-3.5 w-3.5" />
                             {t('Print Report', 'அறிக்கையை அச்சிடு')}
                           </Button>
                           <Button
                             variant="outline"
-                            className="h-8 px-3 py-1.5 text-xs whitespace-nowrap rounded-xl"
+                            className="h-8.5 px-3 py-1.5 text-xs whitespace-nowrap rounded-xl w-full sm:w-auto justify-center"
                             onClick={() => {
                               if (!activeReport || !currentReport) return;
                               const nowStamp = new Date().toISOString().slice(0, 10);
@@ -2352,20 +2352,20 @@ export default function OwnerDashboard({
                       </div>
 
                       {activeReport ? (
-                        <div className="py-1 my-1 border-y border-slate-200/80 dark:border-slate-600/60 flex flex-wrap items-center justify-between gap-x-4 text-[11px] leading-tight text-slate-600 dark:text-slate-300">
-                          <div className="flex flex-wrap items-center gap-x-4">
+                        <div className="py-2 my-1 border-y border-slate-200/80 dark:border-slate-700/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                             <div>
-                              <span className="font-medium text-slate-700 dark:text-slate-200">{t('Owner Name', 'உரிமையாளர் பெயர்')}:</span>{' '}
+                              <span className="font-semibold text-slate-700 dark:text-slate-200">{t('Owner Name', 'உரிமையாளர் பெயர்')}:</span>{' '}
                               <span>{String(userProfile?.name || 'Owner')}</span>
                             </div>
-                            <span>•</span>
+                            <span className="hidden sm:inline text-slate-300 dark:text-slate-600">•</span>
                             <div>
-                              <span className="font-medium text-slate-700 dark:text-slate-200">{t('Report Period', 'அறிக்கை காலம்')}:</span>{' '}
+                              <span className="font-semibold text-slate-700 dark:text-slate-200">{t('Report Period', 'அறிக்கை காலம்')}:</span>{' '}
                               <span>{reportFrom} → {reportTo}</span>
                             </div>
-                            <span>•</span>
+                            <span className="hidden sm:inline text-slate-300 dark:text-slate-600">•</span>
                             <div>
-                              <span className="font-medium text-slate-700 dark:text-slate-200">{t('Generated On', 'உருவாக்கப்பட்ட தேதி')}:</span>{' '}
+                              <span className="font-semibold text-slate-700 dark:text-slate-200">{t('Generated On', 'உருவாக்கப்பட்ட தேதி')}:</span>{' '}
                               <span>{formatShortDate(currentReport?.generatedAt || new Date().toISOString())}</span>
                             </div>
                           </div>
@@ -2660,8 +2660,8 @@ export default function OwnerDashboard({
                               </div>
                             ) : null}
 
-                            <div className="overflow-auto rounded-xl border border-slate-200/80 dark:border-slate-600/75 bg-white/40 dark:bg-slate-800/40">
-                              <Table>
+                            <div className="overflow-x-auto rounded-xl border border-slate-200/90 dark:border-slate-700/80 bg-white/60 dark:bg-slate-800/60 shadow-2xs">
+                              <Table className="w-full min-w-[540px]">
                                 <TableHeader>
                                   <TableRow className="h-8">
                                     {activeReport === 'rent' ? (

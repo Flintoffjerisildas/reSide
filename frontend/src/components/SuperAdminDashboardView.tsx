@@ -14,7 +14,6 @@ import {
   Download,
   FileText,
   KeyRound,
-  LayoutDashboard,
   MailCheck,
   Megaphone,
   Phone,
@@ -525,8 +524,8 @@ export default function SuperAdminDashboardView() {
   ];
 
   return (
-    <div className="relative z-10 w-full max-w-none min-h-[calc(100vh-60px)] bg-slate-50/70 dark:bg-slate-950/60">
-      <div className="w-full max-w-none px-3 sm:px-4 pt-2 pb-4 space-y-3">
+    <div className="relative z-10 w-full max-w-none min-h-[calc(100vh-60px)] bg-slate-50/70 dark:bg-slate-950/60 pb-24">
+      <div className="w-full max-w-none px-3 sm:px-4 pt-2 pb-24 space-y-3">
         {/* Compact Executive Header Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 px-3.5 py-2.5 shadow-sm backdrop-blur-xs">
           <div className="flex items-center gap-2.5">
@@ -552,15 +551,6 @@ export default function SuperAdminDashboardView() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate({ to: '/admin' })}
-              className="h-8.5 rounded-lg bg-white text-slate-800 border border-slate-200 shadow-sm hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 text-xs font-semibold cursor-pointer"
-            >
-              <LayoutDashboard className="mr-1.5 h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-              Admin Operations
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
               onClick={() => loadAll(true)}
               disabled={refreshing}
               className="h-8.5 rounded-lg bg-white text-slate-800 border border-slate-200 shadow-sm hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 text-xs font-semibold cursor-pointer"
@@ -571,16 +561,16 @@ export default function SuperAdminDashboardView() {
             <Button
               size="sm"
               onClick={() => setCreateAdminOpen(true)}
-              className="h-8.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm gap-1 cursor-pointer"
+              className="h-8.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm gap-1 cursor-pointer shrink-0"
             >
               <Plus className="h-3.5 w-3.5" />
-              + Create Admin
+              Create Admin
             </Button>
           </div>
         </div>
 
         {/* Sleek Sub-Navigation Tab Bar */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pb-0.5">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -589,7 +579,7 @@ export default function SuperAdminDashboardView() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer border ${active
+                className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer border shrink-0 ${active
                   ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                   : 'bg-white text-slate-800 border border-slate-200 shadow-sm hover:bg-slate-50 hover:text-blue-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700'
                   }`}
@@ -621,7 +611,7 @@ export default function SuperAdminDashboardView() {
               className="h-8.5 rounded-lg bg-white text-slate-800 border border-slate-200 shadow-sm hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 text-xs font-semibold gap-1.5 cursor-pointer"
             >
               <ArrowLeft className="h-4 w-4 text-slate-600 dark:text-slate-300" />
-              <span>← Back to Overview</span>
+              <span>Back to Overview</span>
             </Button>
           </div>
         )}
@@ -630,7 +620,7 @@ export default function SuperAdminDashboardView() {
         {activeTab === 'overview' && (
           <div className="space-y-3">
             {/* 6 Top KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
               <Card className="border border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shadow-sm">
                 <CardContent className="p-3.5">
                   <div className="flex items-center justify-between">
@@ -821,7 +811,7 @@ export default function SuperAdminDashboardView() {
                   <CardContent className="p-3.5 space-y-2">
                     {admins.length === 0 ? (
                       <div className="text-center py-5 text-xs text-slate-500">
-                        No delegated admin accounts yet. Click "+ Create Admin" to add one.
+                        No delegated admin accounts yet. Click "Create Admin" to add one.
                       </div>
                     ) : (
                       admins.slice(0, 4).map((adm) => {
@@ -871,7 +861,7 @@ export default function SuperAdminDashboardView() {
                     className="h-8 text-xs rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm cursor-pointer"
                   >
                     <Plus className="mr-1 h-3.5 w-3.5" />
-                    + Create Admin
+                    Create Admin
                   </Button>
                 </div>
               </Card>
@@ -941,35 +931,26 @@ export default function SuperAdminDashboardView() {
         {/* TAB 2: ADMIN GOVERNANCE */}
         {activeTab === 'admins' && (
           <Card className="border border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 p-3.5">
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setActiveTab('overview')}
-                  className="h-8.5 rounded-lg bg-white text-slate-800 border border-slate-200 shadow-sm hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 text-xs font-semibold gap-1.5 cursor-pointer shrink-0"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Overview
-                </Button>
-                <div>
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800 p-3.5 sm:p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="w-full min-w-0">
                   <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-                    <ShieldCheck className="h-5 w-5 text-blue-600" />
-                    Admin Governance Roster
+                    <ShieldCheck className="h-5 w-5 text-blue-600 shrink-0" />
+                    <span>Admin Governance Roster</span>
                   </CardTitle>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-xs text-slate-500 mt-1">
                     Exclusive Super Admin controls: create admins, demote to user, force-reset passwords, suspend, or delete.
                   </p>
                 </div>
+                <Button
+                  size="sm"
+                  onClick={() => setCreateAdminOpen(true)}
+                  className="h-8.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm cursor-pointer shrink-0 self-start sm:self-center"
+                >
+                  <Plus className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+                  Create Admin
+                </Button>
               </div>
-              <Button
-                size="sm"
-                onClick={() => setCreateAdminOpen(true)}
-                className="h-8.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm cursor-pointer"
-              >
-                <UserPlus className="mr-1.5 h-4 w-4" />
-                + Create Admin
-              </Button>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -987,7 +968,7 @@ export default function SuperAdminDashboardView() {
                     {admins.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center py-8 text-slate-500 font-medium">
-                          No delegated admin accounts yet. Click "+ Create Admin" or promote a user from Global Users Directory.
+                          No delegated admin accounts yet. Click "Create Admin" or promote a user from Global Users Directory.
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -1078,36 +1059,25 @@ export default function SuperAdminDashboardView() {
         {/* TAB 3: GLOBAL USERS DIRECTORY */}
         {activeTab === 'users' && (
           <Card className="border border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shadow-sm">
-            <CardHeader className="border-b border-slate-100 dark:border-slate-800 p-3.5">
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800 p-3.5 sm:p-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setActiveTab('overview')}
-                    className="h-8.5 rounded-lg bg-white text-slate-800 border border-slate-200 shadow-sm hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 text-xs font-semibold gap-1.5 cursor-pointer shrink-0"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to Overview
-                  </Button>
-                  <div>
-                    <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-                      <Users className="h-5 w-5 text-blue-600" />
-                      Global Users Directory
-                    </CardTitle>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Inspect verification status (Email, Phone, KYC), promote to Admin, force-reset passwords, or suspend.
-                    </p>
-                  </div>
+                <div className="w-full min-w-0">
+                  <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+                    <Users className="h-5 w-5 text-blue-600 shrink-0" />
+                    <span>Global Users Directory</span>
+                  </CardTitle>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Inspect verification status (Email, Phone, KYC), promote to Admin, force-reset passwords, or suspend.
+                  </p>
                 </div>
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <div className="relative w-64">
+                <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0">
+                  <div className="relative w-full sm:w-64">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
                     <Input
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       placeholder="Search name, username, email..."
-                      className="pl-8 h-9 rounded-lg text-xs bg-white/95 border-slate-200/90 shadow-2xs"
+                      className="pl-8 h-9 rounded-lg text-xs bg-white/95 border-slate-200/90 shadow-2xs w-full"
                     />
                   </div>
                 </div>
@@ -1339,29 +1309,18 @@ export default function SuperAdminDashboardView() {
             </div>
 
             <Card className="border border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shadow-sm">
-              <CardHeader className="border-b border-slate-100 dark:border-slate-800 p-3.5">
+              <CardHeader className="border-b border-slate-100 dark:border-slate-800 p-3.5 sm:p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setActiveTab('overview')}
-                      className="h-8.5 rounded-lg bg-white text-slate-800 border border-slate-200 shadow-sm hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 text-xs font-semibold gap-1.5 cursor-pointer shrink-0"
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                      Back to Overview
-                    </Button>
-                    <div>
-                      <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-                        <Building2 className="h-5 w-5 text-blue-600" />
-                        Global Properties, Agreements &amp; Maintenance
-                      </CardTitle>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Platform-wide management: force verify, force delete listings, inspect active agreements.
-                      </p>
-                    </div>
+                  <div className="w-full min-w-0">
+                    <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+                      <Building2 className="h-5 w-5 text-blue-600 shrink-0" />
+                      <span>Global Properties, Agreements &amp; Maintenance</span>
+                    </CardTitle>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Platform-wide management: force verify, force delete listings, inspect active agreements.
+                    </p>
                   </div>
-                  <div className="flex items-center gap-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800 border border-slate-200/80 p-1">
+                  <div className="flex items-center gap-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800 border border-slate-200/80 p-1 overflow-x-auto no-scrollbar scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden shrink-0">
                     <button
                       type="button"
                       onClick={() => setOversightSubTab('properties')}
@@ -1584,25 +1543,14 @@ export default function SuperAdminDashboardView() {
             <Card className="border border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shadow-sm">
               <CardHeader className="border-b border-slate-100 dark:border-slate-800 p-3.5 pb-2.5">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setActiveTab('overview')}
-                      className="h-8.5 rounded-lg bg-white text-slate-800 border border-slate-200 shadow-sm hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 text-xs font-semibold gap-1.5 cursor-pointer shrink-0"
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                      Back to Overview
-                    </Button>
-                    <div>
-                      <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-                        <Settings2 className="h-5 w-5 text-blue-600" />
-                        Global Platform System Controls
-                      </CardTitle>
-                      <CardDescription className="text-xs text-slate-500 mt-0.5">
-                        Configure core platform access, maintenance states, and announcements in real-time.
-                      </CardDescription>
-                    </div>
+                  <div className="w-full min-w-0">
+                    <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+                      <Settings2 className="h-5 w-5 text-blue-600 shrink-0" />
+                      <span>Global Platform System Controls</span>
+                    </CardTitle>
+                    <CardDescription className="text-xs text-slate-500 mt-1">
+                      Configure core platform access, maintenance states, and announcements in real-time.
+                    </CardDescription>
                   </div>
                 </div>
               </CardHeader>

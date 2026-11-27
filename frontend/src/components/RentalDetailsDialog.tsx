@@ -18,7 +18,7 @@ import { CheckCircle, AlertCircle, Clock, FileText, Wrench, CreditCard, Mic, Squ
 import { useLanguage } from '../contexts/LanguageContext';
 import { generateReceipt } from '../utils/receiptGenerator';
 import { toast } from 'sonner';
-import { translateText } from '../lib/api';
+import { apiUrl, translateText } from '../lib/api';
 import {
   useCreateVacateRequest,
   useGetMyVacateRequests,
@@ -90,7 +90,7 @@ export default function RentalDetailsDialog({
       
       try {
         const res = await axios.get(
-          `http://localhost:5000/api/requests/property/${propertyId}/maintenance`,
+          apiUrl(`/requests/property/${propertyId}/maintenance`),
           { headers: { 'x-auth-token': token } }
         );
         setMaintenanceRequests(res.data);
@@ -218,7 +218,7 @@ export default function RentalDetailsDialog({
     setIsTranscribing(true);
     try {
       try {
-        await axios.get('http://localhost:5000/', { timeout: 3000 });
+        await axios.get(apiUrl('/system-status'), { timeout: 3000 });
       } catch {
         toast.error(t('Cannot reach server. Please start the backend.', 'சர்வரை அணுக முடியவில்லை. தயவுசெய்து backend ஐ தொடங்கவும்.'));
         throw new Error('SERVER_UNREACHABLE');
@@ -234,7 +234,7 @@ export default function RentalDetailsDialog({
           : 'voice.webm';
       form.append('audio', audioBlob, filename);
 
-      const res = await axios.post('http://localhost:5000/api/voice-to-text', form, {
+      const res = await axios.post(apiUrl('/voice-to-text'), form, {
         headers: token ? { 'x-auth-token': token } : undefined,
         timeout: 60000,
       });
@@ -518,7 +518,7 @@ export default function RentalDetailsDialog({
       });
 
       const res = await axios.put(
-        `http://localhost:5000/api/agreements/${agreementId}/documents`,
+        apiUrl(`/agreements/${agreementId}/documents`),
         {
           name: selectedFile.name,
           data: dataUrl
@@ -585,7 +585,7 @@ export default function RentalDetailsDialog({
       }
 
       const res = await axios.post(
-        'http://localhost:5000/api/requests/maintenance',
+        apiUrl('/requests/maintenance'),
         {
           propertyId,
           issue: newIssue,

@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
 
 const notificationSchema = new mongoose.Schema({
-  recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
+  sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   type: {
     type: String,
     enum: [
@@ -27,7 +27,11 @@ const notificationSchema = new mongoose.Schema({
       'AGREEMENT_SYNCED',
       'friend_request',
       'friend_request_received',
-      'friend_request_accepted'
+      'friend_request_accepted',
+      'system',
+      'admin_governance',
+      'platform_alert',
+      'security_alert'
     ],
     required: true
   },
@@ -39,6 +43,10 @@ const notificationSchema = new mongoose.Schema({
   request: { type: mongoose.Schema.Types.ObjectId, ref: 'Request' },
   transactionType: { type: String, enum: ['rent', 'buy'], default: 'rent' },
   actionUrl: { type: String },
+  recipientRole: { type: String, index: true },
+  forRole: { type: String, index: true },
+  isGlobal: { type: Boolean, default: false },
+  isSystem: { type: Boolean, default: false },
   read: { type: Boolean, default: false },
   isRead: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now }

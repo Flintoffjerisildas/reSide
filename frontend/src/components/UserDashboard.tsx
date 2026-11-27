@@ -1312,45 +1312,49 @@ export default function UserDashboard({
   };
 
   return (
-    <div className="relative z-10 w-full min-h-[calc(100vh-58px)] py-3 sm:py-4 px-3 sm:px-5 lg:px-6 space-y-0">
+    <div className="relative z-10 w-full min-h-[calc(100vh-58px)] py-3 sm:py-4 px-3 sm:px-5 lg:px-6 space-y-0 pb-20">
       {/* Main Unified Navigation Tabs */}
       <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as any)} className="w-full space-y-0">
         {/* Compact Container Architecture: Container 1 (Banner) + Container 2 (Primary Tabs) */}
 
         {/* Container 1: Welcome Banner (Desktop height approx 140-160px, rounded 16px, soft blue gradient, building image on right) */}
-        <div className="relative overflow-hidden rounded-2xl border border-blue-200/70 dark:border-blue-900/40 bg-gradient-to-r from-[#d9ebff]/90 via-[#e4f0ff]/80 to-[#eff6ff]/50 dark:from-slate-900 dark:via-blue-950/40 dark:to-slate-900 p-5 sm:p-6 shadow-xs min-h-[145px] flex flex-col md:flex-row md:items-center justify-between gap-4">
-          {/* Residential Building Background restricted to right portion */}
+        <div className="relative overflow-hidden rounded-2xl border border-blue-200/70 dark:border-blue-900/40 bg-gradient-to-r from-[#d9ebff]/90 via-[#e4f0ff]/80 to-[#eff6ff]/50 dark:from-slate-900 dark:via-blue-950/40 dark:to-slate-900 p-4 sm:p-5 md:p-6 shadow-xs min-h-[145px] flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Residential Building Background visible on all screens with soft light wash/overlay on mobile */}
           <div className="absolute right-0 top-0 bottom-0 w-full md:w-[46%] pointer-events-none overflow-hidden select-none">
             <img
               src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1000&q=80"
               alt="Modern residential building"
-              className="w-full h-full object-cover object-center opacity-85 [mask-image:linear-gradient(to_left,black_60%,transparent_100%)]"
+              className="w-full h-full object-cover object-center opacity-50 sm:opacity-50 md:opacity-50 brightness-110 contrast-75 md:contrast-100 md:brightness-100 [mask-image:linear-gradient(to_left,black_50%,transparent_100%)] md:[mask-image:linear-gradient(to_left,black_60%,transparent_100%)]"
             />
+            {/* Soft light gradient/frosted overlay over the image on mobile and desktop */}
+            <div className="absolute inset-0 bg-gradient-to-r from-white/90 via-white/80 to-white/65 md:from-white/95 md:via-white/75 md:to-transparent dark:from-slate-900/90 dark:via-slate-900/70 dark:to-transparent" />
             <div className="absolute inset-0 bg-blue-500/10 mix-blend-multiply" />
           </div>
 
-          {/* Left section: Welcome Back, Customer, Badges, Description */}
-          <div className="relative z-10 space-y-1.5 max-w-xl">
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          {/* Left section: Welcome Back, Customer, Badges, Description with crisp high-contrast text and clean wrapping */}
+          <div className="relative z-10 space-y-2 max-w-xl">
+            <div className="flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
               <span>{t('WELCOME BACK', 'மீண்டும் வருக')}</span>
-              <span className="w-6 h-0.5 bg-slate-400/60 inline-block rounded-full" />
+              <span className="w-6 h-0.5 bg-slate-400/80 inline-block rounded-full" />
             </div>
 
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#0B1736] dark:text-white tracking-tight leading-none">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-2.5 flex-wrap">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
                 {userProfile?.name || 'Customer'}
               </h1>
-              <Badge className="bg-blue-500/15 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-full px-2.5 py-0.5 text-xs font-semibold flex items-center gap-1.5 shadow-2xs">
-                <User className="w-3.5 h-3.5 text-blue-600" />
-                {getPurposeLabel(registrationPurpose)}
-              </Badge>
-              <Badge className="bg-emerald-500/15 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-full px-2.5 py-0.5 text-xs font-semibold flex items-center gap-1.5 shadow-2xs">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                {t('Unified Account', 'ஒருங்கிணைந்த கணக்கு')}
-              </Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="bg-blue-50/95 hover:bg-blue-100/90 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800 rounded-full px-2.5 py-0.5 text-xs font-semibold flex items-center gap-1.5 shadow-2xs shrink-0">
+                  <User className="w-3.5 h-3.5 text-blue-600" />
+                  {getPurposeLabel(registrationPurpose)}
+                </Badge>
+                <Badge className="bg-emerald-50/95 hover:bg-emerald-100/90 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800 rounded-full px-2.5 py-0.5 text-xs font-semibold flex items-center gap-1.5 shadow-2xs shrink-0">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  {t('Unified Account', 'ஒருங்கிணைந்த கணக்கு')}
+                </Badge>
+              </div>
             </div>
 
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-normal leading-relaxed pt-0.5">
+            <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-normal leading-relaxed pt-0.5">
               {t(
                 'Buy, rent, sell, or lease from one unified hub with complete transaction security and verified payment workflow.',
                 'ஒரே மையத்திலிருந்து வாங்கலாம், வாடகைக்கு எடுக்கலாம், விற்கலாம் மற்றும் கட்டணங்களை சரிபார்க்கலாம்.'
@@ -1359,7 +1363,7 @@ export default function UserDashboard({
           </div>
 
           {/* Right section: 3 action buttons */}
-          <div className="relative z-10 flex items-center gap-2.5 flex-wrap shrink-0">
+          <div className="relative z-10 flex items-center gap-2 sm:gap-2.5 flex-wrap shrink-0 w-full sm:w-auto">
             <button
               type="button"
               onClick={() => onBrowseProperties?.('rent')}
@@ -1405,10 +1409,10 @@ export default function UserDashboard({
         </div>
 
         {/* Container 2: Primary Navigation Tabs (Unified white container, equal-width tabs, blue pill active highlight) */}
-        <TabsList className="w-full bg-white/95 dark:bg-[#07111e] border border-blue-100/80 dark:border-slate-600/75 rounded-2xl shadow-xs p-1.5 flex items-center justify-between gap-1 overflow-x-auto h-auto mt-4">
+        <TabsList className="w-full bg-white/95 dark:bg-[#07111e] border border-blue-100/80 dark:border-slate-600/75 rounded-2xl shadow-xs p-1.5 flex items-center justify-start sm:justify-between gap-1 overflow-x-auto scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden h-auto mt-4">
           <TabsTrigger
             value="overview"
-            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-200 hover:dark:text-white cursor-pointer"
+            className="shrink-0 sm:flex-1 min-h-[40px] sm:h-9 px-4 sm:px-2 whitespace-nowrap rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-200 hover:dark:text-white cursor-pointer"
           >
             <LayoutGrid className="h-4 w-4" />
             <span>{t('Overview', 'கண்ணோட்டம்')}</span>
@@ -1416,7 +1420,7 @@ export default function UserDashboard({
 
           <TabsTrigger
             value="properties"
-            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-200 hover:dark:text-white cursor-pointer"
+            className="shrink-0 sm:flex-1 min-h-[40px] sm:h-9 px-4 sm:px-2 whitespace-nowrap rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-200 hover:dark:text-white cursor-pointer"
           >
             <Building className="h-4 w-4" />
             <span>{t('My Properties', 'என் சொத்துக்கள்')}</span>
@@ -1432,7 +1436,7 @@ export default function UserDashboard({
 
           <TabsTrigger
             value="notifications"
-            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-200 hover:dark:text-white cursor-pointer"
+            className="shrink-0 sm:flex-1 min-h-[40px] sm:h-9 px-4 sm:px-2 whitespace-nowrap rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-200 hover:dark:text-white cursor-pointer"
           >
             <Bell className="h-4 w-4" />
             <span>{t('Notifications', 'அறிவிப்புகள்')}</span>
@@ -1445,7 +1449,7 @@ export default function UserDashboard({
 
           <TabsTrigger
             value="reports"
-            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-200 hover:dark:text-white cursor-pointer"
+            className="shrink-0 sm:flex-1 min-h-[40px] sm:h-9 px-4 sm:px-2 whitespace-nowrap rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-200 hover:dark:text-white cursor-pointer"
           >
             <FileText className="h-4 w-4" />
             <span>{t('Reports', 'அறிக்கைகள்')}</span>
@@ -1453,7 +1457,7 @@ export default function UserDashboard({
 
           <TabsTrigger
             value="settings"
-            className="flex-1 h-9 rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-200 hover:dark:text-white cursor-pointer"
+            className="shrink-0 sm:flex-1 min-h-[40px] sm:h-9 px-4 sm:px-2 whitespace-nowrap rounded-full text-xs font-medium flex items-center justify-center gap-2 transition-all data-[state=active]:border-2 data-[state=active]:border-blue-500 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:font-bold data-[state=active]:shadow-2xs text-slate-600 hover:text-slate-900 dark:text-slate-200 hover:dark:text-white cursor-pointer"
           >
             <User className="h-4 w-4" />
             <span>{t('My Profile', 'என் சுயவிவரம்')}</span>
@@ -1461,24 +1465,24 @@ export default function UserDashboard({
         </TabsList>
 
         {/* Tab 1: Unified Overview */}
-        <TabsContent value="overview" className="space-y-6 mt-0">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <TabsContent value="overview" className="space-y-6 mt-0 pb-20">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <Card
-              className="cursor-pointer hover:border-primary/50 transition-all shadow-sm"
+              className="cursor-pointer hover:border-primary/50 transition-all shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border border-slate-200/80 dark:border-slate-800"
               onClick={() => {
                 setMainTab('properties');
                 setPropertySection('rents');
               }}
             >
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
+                <CardTitle className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 truncate">
                   {t('My Sent Requests', 'அனுப்பிய கோரிக்கைகள்')}
                 </CardTitle>
-                <Send className="h-4 w-4 text-blue-500" />
+                <Send className="h-4 w-4 text-blue-500 shrink-0" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{tenantRequests.length}</div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <div className="text-2xl font-bold text-slate-900 dark:text-white">{tenantRequests.length}</div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
                   {pendingTenantRequests > 0
                     ? `${pendingTenantRequests} ${t('awaiting action / response', 'பதிலுக்காக காத்திருக்கிறது')}`
                     : t('Track purchase offers & rentals', 'கொள்முதல் & வாடகை கண்காணிப்பு')}
@@ -1487,21 +1491,21 @@ export default function UserDashboard({
             </Card>
 
             <Card
-              className="cursor-pointer hover:border-primary/50 transition-all shadow-sm"
+              className="cursor-pointer hover:border-primary/50 transition-all shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border border-slate-200/80 dark:border-slate-800"
               onClick={() => {
                 setMainTab('properties');
                 setPropertySection('owned');
               }}
             >
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
+                <CardTitle className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 truncate">
                   {t('Incoming Inquiries', 'பெறப்பட்ட கோரிக்கைகள்')}
                 </CardTitle>
-                <Inbox className="h-4 w-4 text-amber-500" />
+                <Inbox className="h-4 w-4 text-amber-500 shrink-0" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{ownerRequests.length}</div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <div className="text-2xl font-bold text-slate-900 dark:text-white">{ownerRequests.length}</div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
                   {pendingOwnerRequests > 0
                     ? `${pendingOwnerRequests} ${t('pending your review', 'உங்கள் ஆய்வுக்கு நிலுவையில்')}`
                     : t('Inquiries on your properties', 'உங்கள் சொத்துக்கான கோரிக்கைகள்')}
@@ -1510,7 +1514,7 @@ export default function UserDashboard({
             </Card>
 
             <Card
-              className="cursor-pointer hover:border-primary/50 transition-all shadow-sm"
+              className="cursor-pointer hover:border-primary/50 transition-all shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border border-slate-200/80 dark:border-slate-800"
               onClick={() => {
                 setMainTab('properties');
                 const hasTenantTx = tenantProperties.some(p => p._request);
@@ -1519,32 +1523,32 @@ export default function UserDashboard({
               }}
             >
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
+                <CardTitle className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 truncate">
                   {t('Active Transactions', 'செயலில் உள்ள ஒப்பந்தங்கள்')}
                 </CardTitle>
-                <CreditCard className="h-4 w-4 text-emerald-600" />
+                <CreditCard className="h-4 w-4 text-emerald-600 shrink-0" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{activeTransactions.length}</div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <div className="text-2xl font-bold text-slate-900 dark:text-white">{activeTransactions.length}</div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
                   {t('Accepted offers, terms, and payments', 'ஏற்கப்பட்ட சலுகைகள் மற்றும் கட்டணங்கள்')}
                 </p>
               </CardContent>
             </Card>
 
             <Card
-              className="cursor-pointer hover:border-primary/50 transition-all shadow-sm"
+              className="cursor-pointer hover:border-primary/50 transition-all shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border border-slate-200/80 dark:border-slate-800"
               onClick={() => setMainTab('notifications')}
             >
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
+                <CardTitle className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 truncate">
                   {t('Notifications', 'அறிவிப்புகள்')}
                 </CardTitle>
-                <Bell className="h-4 w-4 text-indigo-500" />
+                <Bell className="h-4 w-4 text-indigo-500 shrink-0" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{unreadCount}</div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <div className="text-2xl font-bold text-slate-900 dark:text-white">{unreadCount}</div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
                   {unreadCount > 0 ? t('Unread action alerts', 'படிக்காத அறிவிப்புகள்') : t('All alerts caught up', 'அனைத்தும் படிக்கப்பட்டது')}
                 </p>
               </CardContent>
@@ -1684,7 +1688,7 @@ export default function UserDashboard({
           {/* Sub-Header / Filter Command Bar */}
           <div className="w-full bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md border border-blue-100/80 dark:border-slate-600/75 rounded-2xl px-4 py-2 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shadow-xs transition-colors mt-3">
             {/* Left side pills */}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none whitespace-nowrap py-0.5 max-w-full">
               {/* 1. Property Owned */}
               <button
                 type="button"
@@ -1693,7 +1697,7 @@ export default function UserDashboard({
                   handleSwitchSection('owned');
                   setDetailedViewProperty(null);
                 }}
-                className={`rounded-full px-4 py-1.5 font-semibold text-xs inline-flex items-center gap-2 cursor-pointer transition-all ${propertySection === 'owned'
+                className={`rounded-full px-4 py-1.5 font-semibold text-xs inline-flex items-center gap-2 cursor-pointer transition-all shrink-0 ${propertySection === 'owned'
                   ? 'border border-blue-500 text-blue-600 bg-white dark:bg-[#0d162a] shadow-xs font-bold'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:dark:text-white font-medium'
                   }`}
@@ -1716,7 +1720,7 @@ export default function UserDashboard({
                   setRentsActiveSection('overview');
                   setDetailedViewProperty(null);
                 }}
-                className={`rounded-full px-4 py-1.5 font-semibold text-xs inline-flex items-center gap-2 cursor-pointer transition-all ${propertySection === 'rents' && rentSubView === 'dashboard'
+                className={`rounded-full px-4 py-1.5 font-semibold text-xs inline-flex items-center gap-2 cursor-pointer transition-all shrink-0 ${propertySection === 'rents' && rentSubView === 'dashboard'
                   ? 'border border-blue-500 text-blue-600 bg-white dark:bg-[#0d162a] shadow-xs font-bold'
                   : propertySection === 'rents'
                     ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:dark:text-white font-semibold'
@@ -1736,7 +1740,7 @@ export default function UserDashboard({
               {/* Conditionally reveal Divider, Rent In, and Rent Out ONLY when inside My Rents */}
               {propertySection === 'rents' && (
                 <>
-                  <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block" />
+                  <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block shrink-0" />
 
                   {/* 3. Rent In */}
                   <button
@@ -1756,7 +1760,7 @@ export default function UserDashboard({
                         } catch { }
                       }
                     }}
-                    className={`rounded-full px-4 py-1.5 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer transition-all ${rentSubView === 'rentIn'
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer transition-all shrink-0 ${rentSubView === 'rentIn'
                       ? 'bg-blue-600 text-white shadow-xs font-bold'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:dark:text-white font-medium'
                       }`}
@@ -1786,7 +1790,7 @@ export default function UserDashboard({
                         } catch { }
                       }
                     }}
-                    className={`rounded-full px-4 py-1.5 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer transition-all ${rentSubView === 'rentOut'
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer transition-all shrink-0 ${rentSubView === 'rentOut'
                       ? 'bg-blue-600 text-white shadow-xs font-bold'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:dark:text-white font-medium'
                       }`}
@@ -1802,16 +1806,16 @@ export default function UserDashboard({
             </div>
 
             {/* Right side controls */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full lg:w-auto">
               {/* Search input */}
-              <div className="relative flex items-center">
+              <div className="relative flex items-center w-full lg:w-auto">
                 <Search className="absolute left-3.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
                 <input
                   type="text"
                   value={propertySearchText}
                   onChange={(e) => setPropertySearchText(e.target.value)}
                   placeholder={t('Search property...', 'சொத்து தேடுக...')}
-                  className="w-72 md:w-96 pl-9 pr-4 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 shadow-2xs h-9 transition-colors"
+                  className="w-full sm:w-72 md:w-96 pl-9 pr-4 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 shadow-2xs h-9 transition-colors"
                 />
               </div>
 
@@ -3581,14 +3585,14 @@ export default function UserDashboard({
         </TabsContent>
 
         {/* Tab 7: Reports */}
-        <TabsContent value="reports" className="space-y-4 mt-0">
-          <div className="flex items-center justify-between border-b pb-3">
-            <div className="flex items-center gap-2">
+        <TabsContent value="reports" className="space-y-4 mt-0 pb-24">
+          <div className="flex items-center justify-between border-b pb-3 overflow-x-auto no-scrollbar scrollbar-none">
+            <div className="flex items-center gap-2 shrink-0">
               <Button
                 variant={reportsSubTab === 'owner' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setReportsSubTab('owner')}
-                className="gap-1.5"
+                className="gap-1.5 whitespace-nowrap shrink-0"
               >
                 <Building className="h-4 w-4" />
                 {t('Landlord Reports (Rent & Occupancy)', 'உரிமையாளர் அறிக்கைகள்')}
@@ -3597,7 +3601,7 @@ export default function UserDashboard({
                 variant={reportsSubTab === 'tenant' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setReportsSubTab('tenant')}
-                className="gap-1.5"
+                className="gap-1.5 whitespace-nowrap shrink-0"
               >
                 <KeyRound className="h-4 w-4" />
                 {t('Tenant Reports (Payments & Expenses)', 'வாடகைதாரர் அறிக்கைகள்')}

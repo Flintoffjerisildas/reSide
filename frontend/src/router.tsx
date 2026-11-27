@@ -102,7 +102,7 @@ function RootLayout() {
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col">
+    <div className="relative flex min-h-screen flex-col overflow-x-hidden">
       <AuroraBackground />
       <Header
         onLogout={handleLogout}
@@ -112,7 +112,10 @@ function RootLayout() {
         onRentClick={() => handleBrowseProperties('rent')}
         onBuyClick={() => handleBrowseProperties('buy')}
         onLoginClick={() => navigate({ to: '/login', search: {} })}
-        onNotificationsClick={() => navigate({ to: '/dashboard/$tab', params: { tab: 'notifications' } })}
+        onNotificationsClick={() => {
+          if (isSuperAdmin) return;
+          navigate({ to: '/dashboard/$tab', params: { tab: 'notifications' } });
+        }}
         onAccountClick={() => {
           if (isSuperAdmin) {
             navigate({ to: '/superadmin' });
@@ -137,7 +140,7 @@ function RootLayout() {
             : systemStatus.globalBannerMessage}
         </div>
       )}
-      <main className="flex-1 w-full">
+      <main className="flex-1 w-full overflow-x-hidden">
         <Outlet />
         <FloatingChat />
       </main>

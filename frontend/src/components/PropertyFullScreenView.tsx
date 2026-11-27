@@ -85,7 +85,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import socket from '../lib/socket';
-import api, { translateText } from '../lib/api';
+import api, { apiUrl, translateText } from '../lib/api';
 import {
   useGetOwnerRequests,
   useGetTenantRequests,
@@ -1384,7 +1384,7 @@ export default function PropertyFullScreenView({
       const token = localStorage.getItem('token');
       if (!property) return;
 
-      const res = await axios.get('http://localhost:5000/api/payments/owner/summary', {
+      const res = await axios.get(apiUrl('/payments/owner/summary'), {
         headers: { 'x-auth-token': token }
       });
 
@@ -1423,7 +1423,7 @@ export default function PropertyFullScreenView({
 
       setPaymentDetails(summaries);
 
-      const requestsRes = await axios.get('http://localhost:5000/api/payments/owner/requests', {
+      const requestsRes = await axios.get(apiUrl('/payments/owner/requests'), {
         headers: { 'x-auth-token': token }
       });
 
@@ -1452,7 +1452,7 @@ export default function PropertyFullScreenView({
       if (!propertyId) return;
 
       const res = await axios.get(
-        `http://localhost:5000/api/requests/property/${propertyId}/maintenance`,
+        apiUrl(`/requests/property/${propertyId}/maintenance`),
         { headers: { 'x-auth-token': token } }
       );
       setMaintenanceRequests(res.data);
@@ -1576,7 +1576,7 @@ export default function PropertyFullScreenView({
       setApprovingPaymentId(requestId);
       const token = localStorage.getItem('token');
       await axios.put(
-        `http://localhost:5000/api/payments/owner/requests/${requestId}/approve`,
+        apiUrl(`/payments/owner/requests/${requestId}/approve`),
         {},
         { headers: { 'x-auth-token': token } }
       );
@@ -1600,7 +1600,7 @@ export default function PropertyFullScreenView({
       setRejectingPaymentId(requestId);
       const token = localStorage.getItem('token');
       await axios.put(
-        `http://localhost:5000/api/payments/owner/requests/${requestId}/reject`,
+        apiUrl(`/payments/owner/requests/${requestId}/reject`),
         {},
         { headers: { 'x-auth-token': token } }
       );
@@ -1706,7 +1706,7 @@ export default function PropertyFullScreenView({
     try {
       const token = localStorage.getItem('token');
       await axios.put(
-        `http://localhost:5000/api/requests/${requestId}`,
+        apiUrl(`/requests/${requestId}`),
         { status: newStatus },
         { headers: { 'x-auth-token': token } }
       );
@@ -2327,55 +2327,11 @@ export default function PropertyFullScreenView({
 
   return (
     <>
-      <div className="w-full space-y-3.5">
-        {/* Mobile Navigation Bar (Adaptive compact horizontal scrollable strip with badges) */}
-        <div className="lg:hidden w-full overflow-x-auto no-scrollbar p-1.5 rounded-2xl glass-panel bg-white/80 dark:bg-[#0a1628]/85 dark:backdrop-blur-xl border border-slate-200/80 dark:border-sky-500/20 shadow-xs dark:shadow-xl dark:shadow-black/40 sticky top-[60px] z-30">
-          <div className="flex items-center gap-1.5 min-w-max">
-            {navItems.map((item) => {
-              const isActive = activeSection === item.key;
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => setActiveSection(item.key)}
-                  className={`px-3 py-1.5 rounded-xl flex items-center gap-2 text-xs font-medium transition-all shrink-0 cursor-pointer ${isActive
-                    ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 dark:text-slate-300 dark:hover:text-white'
-                    }`}
-                >
-                  <Icon className="h-3.5 w-3.5 shrink-0" />
-                  <span>{item.label}</span>
-                  {item.badge != null && item.badge > 0 && (
-                    <span className={`h-4 min-w-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${isActive ? 'bg-white text-blue-600' : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
-                      }`}>
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-
-            {((!isTenantView && !isBuyerView) || isSelfManaged) && (
-              <>
-                <div className="h-5 w-px bg-slate-200 dark:bg-border/60 mx-1 shrink-0" />
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-medium transition-all shrink-0 cursor-pointer text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
-                >
-                  <Trash2 className="h-3.5 w-3.5 shrink-0 text-rose-600 dark:text-rose-400" />
-                  <span>{isSelfManaged ? t('Delete Rental', 'வாடகையை நீக்கு') : t('Delete', 'நீக்கு')}</span>
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
+      <div className="w-full space-y-3">
         {/* 6. Main Workspace Responsive Layout with Synchronized Heights */}
-        <div className="w-full pt-3 grid grid-cols-1 lg:grid-cols-[240px_210px_1fr] gap-5 lg:h-[465px] lg:max-h-[465px] items-stretch">
-          {/* A. LEFT COLUMN: "Your Properties" (240px Sidebar) */}
-          <div className="w-full h-full flex flex-col justify-between relative bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-600/75 p-3 shadow-xs">
+        <div className="w-full pt-1 grid grid-cols-1 lg:grid-cols-[240px_210px_1fr] gap-3 lg:gap-5 lg:h-[465px] lg:max-h-[465px] items-stretch">
+          {/* A. LEFT COLUMN: "Your Properties" (Order 1 on mobile, left 240px sidebar on desktop) */}
+          <div className="order-1 lg:order-none w-full h-auto lg:h-full flex flex-col justify-between relative bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-600/75 p-3 shadow-xs">
             {/* Floating Filter & Sort Popover */}
             {isFilterOpen && (
               <div
@@ -2495,10 +2451,10 @@ export default function PropertyFullScreenView({
                 </button>
               </div>
 
-              {/* Vertical list of selectable property cards with internal scroll (Fixed 4 cards) */}
-              <div className="max-h-[370px] overflow-y-auto pr-1 space-y-2.5 pt-2.5 min-h-0 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+              {/* Selectable property cards (horizontal swipe on mobile, vertical list on desktop) */}
+              <div className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-y-auto no-scrollbar scrollbar-none lg:scrollbar-thin max-h-none lg:max-h-[370px] space-y-0 lg:space-y-2.5 gap-2.5 pt-2.5 min-h-0">
                 {filteredProperties.length === 0 ? (
-                  <div className="py-8 text-center space-y-2">
+                  <div className="py-8 text-center space-y-2 w-full">
                     <p className="text-xs text-slate-400">
                       {t('No properties match the selected filters', 'தேர்ந்தெடுத்த வடிப்பான்களுக்கு பொருந்தும் சொத்துக்கள் இல்லை')}
                     </p>
@@ -2544,7 +2500,7 @@ export default function PropertyFullScreenView({
                             onSelectProperty(item.raw);
                           }
                         }}
-                        className={`w-full text-left transition-all cursor-pointer ${isSelected
+                        className={`w-[260px] sm:w-[280px] lg:w-full shrink-0 text-left transition-all cursor-pointer ${isSelected
                           ? 'border-2 border-blue-500 bg-[#f0f7ff] dark:bg-blue-950/20 dark:border-cyan-400/25 rounded-2xl p-2.5 flex items-center gap-2.5 shadow-2xs'
                           : 'border border-slate-200/80 hover:border-blue-200 bg-white dark:bg-slate-900/75 dark:backdrop-blur-md dark:border-slate-600/75 rounded-2xl p-2.5 flex items-center gap-2.5'
                           }`}
@@ -2589,81 +2545,127 @@ export default function PropertyFullScreenView({
             </div>
           </div>
 
-          {/* B. MIDDLE COLUMN: "MANAGEMENT SECTIONS" (210px Sidebar) */}
-          <div className="w-full h-full flex flex-col justify-between overflow-hidden bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-600/75 p-3 shadow-xs">
-            {/* Top sections */}
-            <div className="space-y-1 overflow-y-auto pr-0.5">
-              <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">
-                {t('MANAGEMENT SECTIONS', 'நிர்வாகப் பிரிவுகள்')}
-              </div>
+          {/* B. MIDDLE COLUMN: "MANAGEMENT SECTIONS" (Order 2 on mobile, middle 210px sidebar on desktop) */}
+          <div className="order-2 lg:order-none w-full h-auto lg:h-full flex flex-col justify-between overflow-hidden bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-600/75 p-2 sm:p-2.5 lg:p-3 shadow-xs">
+            {/* Mobile View: Single Compact Horizontal Scrolling Bar */}
+            <div className="lg:hidden w-full overflow-x-auto no-scrollbar scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-0.5">
+              <div className="flex items-center gap-1.5 min-w-max">
+                {navItems.map((item) => {
+                  const isActive = activeSection === item.key;
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setActiveSection(item.key)}
+                      className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-medium whitespace-nowrap transition-all shrink-0 cursor-pointer ${isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 dark:text-slate-300 dark:hover:text-white'
+                        }`}
+                    >
+                      <Icon className="h-3.5 w-3.5 shrink-0" />
+                      <span>{item.label}</span>
+                      {item.badge != null && item.badge > 0 && (
+                        <span className={`h-4 min-w-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${isActive ? 'bg-white text-blue-600' : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'}`}>
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
 
-              {navItems.filter((item) => item.key !== 'vacate').map((item) => {
-                const isActive = activeSection === item.key;
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setActiveSection(item.key)}
-                    title={item.label}
-                    className={`w-full text-left px-2.5 py-2.5 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${isActive
-                      ? 'bg-blue-600 text-white font-semibold shadow-xs'
-                      : 'text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:dark:text-white font-medium'
-                      }`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
-                      <span className="truncate">{item.label}</span>
-                    </div>
-                    {item.badge != null && item.badge > 0 && (
-                      <span
-                        className={`h-4 min-w-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ml-1 ${isActive ? 'bg-white text-blue-600' : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
-                          }`}
-                      >
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+                {((!isTenantView && !isBuyerView) || isSelfManaged) && (
+                  <>
+                    <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-1 shrink-0" />
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap transition-all shrink-0 cursor-pointer text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200/60 dark:border-rose-900/40"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 shrink-0 text-rose-600 dark:text-rose-400" />
+                      <span>{isSelfManaged ? t('Delete Rental', 'வாடகையை நீக்கு') : t('Delete Property', 'சொத்தை நீக்கு')}</span>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
-            {/* Bottom sections: Vacate + Delete Property */}
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1 shrink-0">
-              {navItems.filter((item) => item.key === 'vacate').map((item) => {
-                const isActive = activeSection === item.key;
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setActiveSection(item.key)}
-                    className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-2.5 transition-colors cursor-pointer ${isActive
-                      ? 'bg-blue-600 text-white font-semibold shadow-xs'
-                      : 'text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:dark:text-white font-medium'
-                      }`}
-                  >
-                    <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
+            {/* Desktop View: 210px Vertical Sidebar */}
+            <div className="hidden lg:flex flex-col justify-between h-full">
+              {/* Top sections */}
+              <div className="space-y-1 overflow-y-auto pr-0.5">
+                <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">
+                  {t('MANAGEMENT SECTIONS', 'நிர்வாகப் பிரிவுகள்')}
+                </div>
 
-              {((!isTenantView && !isBuyerView) || isSelfManaged) && (
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="w-full text-left px-3.5 py-2.5 bg-[#fef2f2] hover:bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400 rounded-xl text-xs font-semibold flex items-center gap-2.5 cursor-pointer transition-colors"
-                >
-                  <Trash2 className="h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-400" />
-                  <span className="truncate">{isSelfManaged ? t('Delete Rental', 'வாடகையை நீக்கு') : t('Delete Property', 'சொத்தை நீக்கு')}</span>
-                </button>
-              )}
+                {navItems.filter((item) => item.key !== 'vacate').map((item) => {
+                  const isActive = activeSection === item.key;
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setActiveSection(item.key)}
+                      title={item.label}
+                      className={`w-full text-left px-2.5 py-2.5 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${isActive
+                        ? 'bg-blue-600 text-white font-semibold shadow-xs'
+                        : 'text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:dark:text-white font-medium'
+                        }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
+                        <span className="truncate">{item.label}</span>
+                      </div>
+                      {item.badge != null && item.badge > 0 && (
+                        <span
+                          className={`h-4 min-w-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ml-1 ${isActive ? 'bg-white text-blue-600' : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
+                            }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Bottom sections: Vacate + Delete Property */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1 shrink-0">
+                {navItems.filter((item) => item.key === 'vacate').map((item) => {
+                  const isActive = activeSection === item.key;
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setActiveSection(item.key)}
+                      className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-2.5 transition-colors cursor-pointer ${isActive
+                        ? 'bg-blue-600 text-white font-semibold shadow-xs'
+                        : 'text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:dark:text-white font-medium'
+                        }`}
+                    >
+                      <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+
+                {((!isTenantView && !isBuyerView) || isSelfManaged) && (
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="w-full text-left px-3.5 py-2.5 bg-[#fef2f2] hover:bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400 rounded-xl text-xs font-semibold flex items-center gap-2.5 cursor-pointer transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-400" />
+                    <span className="truncate">{isSelfManaged ? t('Delete Rental', 'வாடகையை நீக்கு') : t('Delete Property', 'சொத்தை நீக்கு')}</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
           {/* C. RIGHT COLUMN: PROPERTY MEDIA & SPECIFICATIONS (1fr Workspace) */}
-          <div className="w-full min-w-0 h-full max-h-full flex flex-col overflow-hidden">
+          <div className="order-3 lg:order-none w-full min-w-0 h-auto lg:h-full lg:max-h-full flex flex-col overflow-hidden">
             {activeSection === 'overview' ? (
               <>
                 {/* Top Detail Header Strip */}
@@ -2766,7 +2768,7 @@ export default function PropertyFullScreenView({
                 {/* Nested Grid (Image & Specifications & Details): grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch */}
                 <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
                   {/* Left Image Container (md:col-span-7) */}
-                  <div className="md:col-span-7 h-full w-full relative rounded-2xl overflow-hidden group bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-600/75 shadow-xs min-h-[360px]">
+                  <div className="md:col-span-7 h-auto min-h-[260px] sm:min-h-[320px] md:min-h-[360px] w-full relative rounded-2xl overflow-hidden group bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-600/75 shadow-xs">
                     {carouselImages.length > 0 ? (
                       <>
                         <img
@@ -2817,7 +2819,7 @@ export default function PropertyFullScreenView({
                   </div>
 
                   {/* Right "Specifications & Details" Card (md:col-span-5): h-full flex flex-col justify-between */}
-                  <div className="md:col-span-5 h-full flex flex-col justify-between bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-600/75 p-4 shadow-xs">
+                  <div className="md:col-span-5 h-auto md:h-full flex flex-col justify-between bg-white/95 dark:bg-[#070e1b]/70 dark:backdrop-blur-md rounded-2xl border border-blue-100/80 dark:border-slate-600/75 p-4 shadow-xs">
                     {/* Top Group: Title + 2-Column Grid Specs */}
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
